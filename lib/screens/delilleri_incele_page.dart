@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import '../widgets/profile_icons_row.dart';
-import 'category_page.dart';
-import 'gelen_davalar_kactane.dart';
-import '../widgets/my_checkbox_widget_yargila.dart';
-import 'masraflar_page.dart';
-import 'cezalar_page.dart';
+import '../widgets/common_header_widgets.dart';
+import '../widgets/evidence_viewer_widget.dart';
+import '../services/hive_database_service.dart';
 
 // Model class for Dava (delil için de kullanılabilir)
 class Dava {
@@ -24,22 +21,99 @@ class Dava {
   });
 }
 
-// Delilleri İncele Sayfası (Yargıla sayfasının kopyası)
-class DelilleriIncelePage extends StatelessWidget {
-  const DelilleriIncelePage({super.key});
+/// Delilleri İncele Sayfası
+/// Yargıla sayfasından erişilen, dava delillerini görüntüleme sayfası
+/// Modern EvidenceViewerWidget kullanır
+class DelilleriIncelePage extends StatefulWidget {
+  final String? userEmail;
+  final String? davaId; // Opsiyonel dava ID - null ise kabul edilen davalar gösterilir
+
+  const DelilleriIncelePage({
+    super.key,
+    this.userEmail,
+    this.davaId,
+  });
+
+  @override
+  State<DelilleriIncelePage> createState() => _DelilleriIncelePageState();
+}
+
+class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
+  List<Map<String, dynamic>> _acceptedDavalar = [];
+  bool _isLoading = true;
+  String? _selectedDavaId; // Deliller için kullanılan gerçek davaId
+  String? _selectedDropdownValue; // Dropdown için benzersiz değer
+
+  @override
+  void initState() {
+    super.initState();
+    // Eğer widget'tan davaId gelmişse onu kullan
+    // Ama önce accepted davaları yükleyip davaId alanını kontrol etmeliyiz
+    _selectedDavaId = widget.davaId;
+    _loadAcceptedDavalar();
+  }
+
+  /// Kabul edilen davaları yükle
+  Future<void> _loadAcceptedDavalar() async {
+    try {
+      final acceptedDavalar = await HiveDatabaseService.getAcceptedDavalar(
+        widget.userEmail ?? '',
+      );
+      
+      setState(() {
+        _acceptedDavalar = acceptedDavalar;
+        _isLoading = false;
+        
+        // Eğer widget'tan davaId gelmişse, accepted davalar içinde eşleşeni bul
+        if (widget.davaId != null && _acceptedDavalar.isNotEmpty) {
+          // Önce davaId ile eşleşen dava ara
+          final matchingIndex = _acceptedDavalar.indexWhere(
+            (dava) {
+              final davaId = (dava['davaId'] as String?) ?? (dava['id'] as String?);
+              return davaId?.trim().toLowerCase() == widget.davaId!.trim().toLowerCase() ||
+                     (dava['id'] as String?)?.trim().toLowerCase() == widget.davaId!.trim().toLowerCase();
+            },
+          );
+          
+          if (matchingIndex != -1) {
+            final matchingDava = _acceptedDavalar[matchingIndex];
+            _selectedDavaId = (matchingDava['davaId'] as String?) ?? 
+                             (matchingDava['id'] as String?);
+            // Dropdown için benzersiz değer oluştur
+            _selectedDropdownValue = (matchingDava['id'] as String?) ?? 
+                                    '${matchingDava['davaId'] as String? ?? 'dava'}_$matchingIndex';
+            print('🔍 Widget davaId ile eşleşen dava bulundu: $_selectedDavaId');
+          }
+        }
+        
+        // Eğer dava ID belirtilmemişse ve listede dava varsa ilkini seç
+        // Önce davaId alanını dene, yoksa id kullan
+        if (_selectedDavaId == null && _acceptedDavalar.isNotEmpty) {
+          final firstDava = _acceptedDavalar.first;
+          const firstIndex = 0;
+          _selectedDavaId = (firstDava['davaId'] as String?) ?? 
+                           (firstDava['id'] as String?);
+          // Dropdown için benzersiz değer oluştur
+          _selectedDropdownValue = (firstDava['id'] as String?) ?? 
+                                  '${firstDava['davaId'] as String? ?? 'dava'}_$firstIndex';
+          print('🔍 İlk dava seçildi: $_selectedDavaId');
+        }
+      });
+      
+      print('✅ ${_acceptedDavalar.length} kabul edilmiş dava yüklendi');
+      if (_selectedDavaId != null) {
+        print('🔍 Seçili dava ID: $_selectedDavaId');
+      }
+    } catch (e) {
+      print('❌ Davalar yüklenirken hata: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Örnek veri
-    final List<Dava> davaList = [
-      Dava(
-        adi: "Şeytanın Hileleri",
-        davali: "Edip Yüksel",
-        mevkii: "Davalı Avukatı",
-        kalanSure: "72 saat (3 gün)",
-        profilResmi: "lib/icons/03_davala_ana_icon.png",
-      ),
-    ];
 
     return Scaffold(
       body: SafeArea(
@@ -47,157 +121,190 @@ class DelilleriIncelePage extends StatelessWidget {
           child: Column(
             children: [
               // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
-              ZeroWhoboomSearchMessage(),
+              ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
               // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: OneFriendPhoneBellMenu(),
+                child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
               ),
               // ROW 3: Profil Bölümü
               Padding(
                 padding: const EdgeInsets.all(4.0),
-                child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(),
+                child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
+                  userEmail: widget.userEmail,
+                  onShowSavedDavalar: () {
+                    // Delilleri incele sayfasında kaydedilen davalar dialog'u açılamaz
+                    // Bu sayfa sadece delil inceleme işlemleri için
+                  },
+                ),
               ),
-              // ROW 4: Hamburger Iconu, Checkbox ve bilgi satırı
+              // ROW 4: Başlık satırı
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Image.asset(
-                        'lib/icons/menu_red.png',
-                        width: 24,
-                        height: 24,
+                      icon: Icon(
+                        MdiIcons.menuOpen,
+                        size: 34,
+                        color: Colors.red,
                       ),
                       onPressed: () {},
                     ),
-                    const SizedBox(width: 68),
-                    Center(child: Text("DELİLLERİ İNCELE ",style: TextStyle(fontSize: 19),),)
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.content_paste_search,
+                              color: Colors.blue[700],
+                              size: 24,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              "DELİLLERİ İNCELE",
+                              style: TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              // ROW 5: 6 Icon Solda, Sağda Card ile Dava Bilgileri
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 50,
+              // ROW 5: Dava seçici ve Delil görüntüleyici
+              if (_isLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_acceptedDavalar.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
-                            child: Icon(Icons.save_outlined, size: 24,  color: Colors.black54),
+                        Icon(
+                          MdiIcons.gavel,
+                          size: 80,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Henüz kabul edilmiş dava yok',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
                           ),
-
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Dava kabul ettiğinizde delillerini buradan inceleyebilirsiniz',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                         ],
                       ),
                     ),
-                    Expanded(
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
                       child: Column(
                         children: [
-                          SizedBox(
-                            height: 200,
-                            child: ListView.builder(
-                              itemCount: davaList.length,
-                              itemBuilder: (context, index) {
-                                return ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  title: FiveCardCaseInformation(
-                                    dava: davaList[index],
-                                    onTap: () {},
+                      // Dava seçici dropdown (birden fazla dava varsa)
+                      if (_acceptedDavalar.length > 1)
+                        Container(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.blue[200]!,
+                            ),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedDropdownValue,
+                              isExpanded: true,
+                              icon: Icon(
+                                Icons.arrow_drop_down,
+                                color: Colors.blue[700],
+                              ),
+                              items: _acceptedDavalar.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final dava = entry.value;
+                                // Her item için benzersiz bir value oluştur
+                                // Önce id alanını kullan (her zaman benzersizdir)
+                                // Eğer id yoksa davaId + index kombinasyonu kullan
+                                final uniqueValue = (dava['id'] as String?) ?? 
+                                                   '${dava['davaId'] as String? ?? 'dava'}_$index';
+                                return DropdownMenuItem<String>(
+                                  value: uniqueValue,
+                                  child: Text(
+                                    dava['adi'] as String? ?? 'İsimsiz Dava',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 );
+                              }).toList(),
+                              onChanged: (String? newValue) {
+                                setState(() {
+                                  _selectedDropdownValue = newValue;
+                                  // Seçilen dava için gerçek davaId'yi bul
+                                  if (newValue != null) {
+                                    final selectedIndex = _acceptedDavalar.asMap().entries.firstWhere(
+                                      (entry) {
+                                        final index = entry.key;
+                                        final dava = entry.value;
+                                        final uniqueValue = (dava['id'] as String?) ?? 
+                                                           '${dava['davaId'] as String? ?? 'dava'}_$index';
+                                        return uniqueValue == newValue;
+                                      },
+                                      orElse: () => _acceptedDavalar.asMap().entries.first,
+                                    );
+                                    
+                                    final selectedDava = selectedIndex.value;
+                                    // Deliller için gerçek davaId'yi kullan
+                                    _selectedDavaId = (selectedDava['davaId'] as String?) ?? 
+                                                     (selectedDava['id'] as String?);
+                                    print('🔍 Dava seçildi - Dropdown: $newValue, DavaId: $_selectedDavaId');
+                                  }
+                                });
                               },
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              for (var icon in [
-                                'foto_icon',
-                                'camera_icon',
-                                'text_icon',
-                                'link_icon',
-                              ])
-                                Expanded(
-                                  child: IconButton(
-                                    icon: Image.asset('lib/icons/13_delilleri_incele_$icon.png', width: 24, height: 24),
-                                    onPressed: () {},
-                                  ),
-                                ),
-                            ],
-                          ),
-
-                          /// Stack örneği
-                          Row(
-                            children: [Expanded(
-                              child: Icon(
-                                MdiIcons.checkCircleOutline,
-                                size: 19,
-                                color: Colors.green,
-                              ),
-                            ),
-                              Expanded(
-                                child: Icon(
-                                  MdiIcons.closeCircleOutline,
-                                  size: 19,
-                                  color: Colors.red,
-                                ),
-                              ),
-                              Expanded(
-                                child: Icon(
-                                  MdiIcons.checkCircleOutline,
-                                  size: 19,
-                                  color: Colors.green,
-                                ),
-                              ),
-                              Expanded(
-                                child: Icon(
-                                  MdiIcons.closeCircleOutline,
-                                  size: 19,
-                                  color: Colors.red,
-                                ),
-                              ),
-
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                                  child: Text(
-                                    "'İts 19 Sakinleri adına whoBOOM'larım şu şekildedir;\n\nGereği Düşünüldü :\n\n"
-                                    "Gelen bir dava kabul edilirse onun içerğinden bir kopya  oluşturulur\n ve burada gösterilir. ",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w400,
-                                      height: 1.6,
-                                    ),
-                                    softWrap: true,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _buildIconCounter(Icons.mode_comment_outlined, 0, () {}),
-                              _buildIconCounter(Icons.repeat, 0, () {}),
-                              _buildIconCounter(Icons.favorite_border, 0, () {}),
-                              _buildIconCounter(Icons.thumb_down_alt_outlined, 0, () {}),
-                            ],
-                          ),
-                        ],
-                      ),
+                        ),
+                      
+                      // Modern Delil Görüntüleyici Widget
+                      // Dava seçildiğinde delilleri göster
+                      if (_selectedDavaId != null)
+                        EvidenceViewerWidget(
+                          key: ValueKey(_selectedDavaId), // Dava değiştiğinde widget'ı yeniden oluştur
+                          davaId: _selectedDavaId!.trim(), // Trim yaparak eşleşmeyi garanti et
+                          userEmail: widget.userEmail,
+                          showCaseInfo: true,
+                          caseInfoCard: _buildDavaInfoCard(),
                     ),
                   ],
                 ),
@@ -209,212 +316,172 @@ class DelilleriIncelePage extends StatelessWidget {
     );
   }
 
-  /// Yardımcı Widget: Sayaçlı Icon
-  Widget _buildIconCounter(IconData icon, int count, VoidCallback onPressed) {
-    return Column(
+  /// Dava bilgi kartı oluştur
+  Widget _buildDavaInfoCard() {
+    if (_selectedDavaId == null) return const SizedBox.shrink();
+    
+    // Seçili davayı bul
+    final selectedDava = _acceptedDavalar.firstWhere(
+      (dava) => dava['id'] == _selectedDavaId,
+      orElse: () => {},
+    );
+    
+    if (selectedDava.isEmpty) return const SizedBox.shrink();
+    
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.blue[50]!,
+              Colors.white,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Başlık
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    MdiIcons.gavel,
+                    color: Colors.blue[700],
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        selectedDava['adi'] as String? ?? 'İsimsiz Dava',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (selectedDava['davaKonusu'] != null &&
+                          (selectedDava['davaKonusu'] as String).isNotEmpty)
+                        Text(
+                          selectedDava['davaKonusu'] as String,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 12),
+            
+            // Detaylar
+            Row(
+              children: [
+                Expanded(
+                  child: _buildInfoItem(
+                    'Davacı',
+                    selectedDava['davaci'] as String? ?? '-',
+                    Icons.person,
+                  ),
+                ),
+                Expanded(
+                  child: _buildInfoItem(
+                    'Davalı',
+                    selectedDava['davali'] as String? ?? '-',
+                    Icons.person_outline,
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 12),
+            
+            Row(
+              children: [
+                Expanded(
+                  child: _buildInfoItem(
+                    'Görev',
+                    selectedDava['userRole'] as String? ?? '-',
+                    Icons.badge,
+                  ),
+                ),
+                Expanded(
+                  child: _buildInfoItem(
+                    'Kalan Süre',
+                    selectedDava['kalanSure'] as String? ?? '-',
+                    MdiIcons.timerSand,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Bilgi item widget'ı
+  Widget _buildInfoItem(String label, String value, IconData icon) {
+    return Row(
       children: [
-        IconButton(icon: Icon(icon, color: Colors.grey), onPressed: onPressed),
-        Text('$count'),
+        Icon(
+          icon,
+          size: 16,
+          color: Colors.blue[700],
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
 // Reused Widgets from GelenDavalarPage
-class ZeroWhoboomSearchMessage extends StatelessWidget {
-  const ZeroWhoboomSearchMessage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-                  color: Color(0xFF059669),
-                ),
-                child: const Text(
-                  'Who',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.only(
-                    topRight: Radius.circular(8),
-                    bottomRight: Radius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Boom',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
-          Icon(
-            MdiIcons.chatOutline,
-            size: 24,
-            color: Colors.black54,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class OneFriendPhoneBellMenu extends StatelessWidget {
-  const OneFriendPhoneBellMenu({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const SizedBox(width: 8),
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Flexible(
-                child: Icon(
-                  MdiIcons.accountHeart,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-              Flexible(
-                child: Icon(
-                  MdiIcons.phoneClassic,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-              Flexible(
-                child: Icon(
-                  MdiIcons.bell,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-              Flexible(
-                child: Icon(
-                  MdiIcons.menuOpen,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant extends StatelessWidget {
-  const SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Column(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: const [
-            Icon(Icons.account_circle, size: 60),
-          ],
-        ),
-        const SizedBox(width: 0.5),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Nasrullah KESKİN',
-                style: TextStyle(fontWeight: FontWeight.normal, color: Colors.black),
-              ),
-              const ProfileIconsRow(),
-              Row(
-                children: [
-                  const SizedBox(width: 1),
-                  Icon(
-                    MdiIcons.pictureInPictureTopRight,
-                    size: 24,
-                    color: Colors.black54,
-                  ),
-                  const SizedBox(width: 48),
-                  Icon(
-                    Icons.record_voice_over_sharp,
-                    color: Colors.black54,
-                    size: 24,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        Row(
-          children: [
-            IconButton(
-              icon: CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.grey.shade200,
-                child: Image.asset(
-                  'lib/icons/03_davala_ana_icon.png',
-                  width: 38,
-                  height: 38,
-                ),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CategoryPage(),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              icon: CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.grey.shade200,
-                child: Image.asset(
-                  'lib/icons/03_haykir_ana_icon.png',
-                  width: 38,
-                  height: 38,
-                ),
-              ),
-              onPressed: () {},
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
 
 class FiveCardCaseInformation extends StatelessWidget {
   final Dava dava;
@@ -444,7 +511,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
+                      const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
@@ -452,8 +519,8 @@ class FiveCardCaseInformation extends StatelessWidget {
                             size: 19,
                             color: Colors.green,
                           ),
-                          const SizedBox(width: 4),
-                          const Text(
+                          SizedBox(width: 4),
+                          Text(
                             'Haklı... ',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             textAlign: TextAlign.center,
@@ -464,7 +531,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                         padding: const EdgeInsets.all(5.0),
                         child: Image.asset(dava.profilResmi, width: 60, height: 50),
                       ),
-                      Row(
+                      const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
@@ -472,8 +539,8 @@ class FiveCardCaseInformation extends StatelessWidget {
                             size: 19,
                             color: Colors.redAccent,
                           ),
-                          const SizedBox(width: 4),
-                          const Text(
+                          SizedBox(width: 4),
+                          Text(
                             'Haksız ',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             textAlign: TextAlign.center,
@@ -507,7 +574,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                               children: [
                                 Flexible(child: Text(dava.davali, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                                 const Spacer(),
-                                Icon(Icons.thumb_up_alt_outlined, size: 25, color: Colors.green),
+                                const Icon(Icons.thumb_up_alt_outlined, size: 25, color: Colors.green),
                               ],
                             ),
                           ),

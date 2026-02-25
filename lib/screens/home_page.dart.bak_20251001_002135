@@ -1,0 +1,984 @@
+import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import '../widgets/common_header_widgets.dart';
+import '../widgets/profile_icons_row.dart';
+import 'category_page.dart';
+import 'gelen_davalar_page.dart';
+import 'katildigim_davalar_page.dart';
+import 'yargila_page.dart';
+import 'actigim_davalar_page.dart';
+import '../widgets/energy_bar.dart';
+import 'davaci_unlulur_page.dart';
+import 'trend_dava_page.dart';
+import 'haykir_page.dart';
+import 'haykirislarim_page.dart';
+import 'database_debug_page.dart';
+import 'admin_page.dart';
+import '../services/hive_database_service.dart';
+import '../utils/dialog_utils.dart';
+import '../models/dava.dart' as dava_model;
+
+import 'dava_ac_page.dart'; // New import for dava açma
+import 'hesap_gizlilik_ayarlari_page.dart';
+
+// Eski Dava modeli
+class Dava {
+  final String adi;
+  final String davali;
+  final String mevkii;
+  final String kalanSure;
+  final String profilResmi;
+  final bool isOpened;
+
+  Dava({
+    required this.adi,
+    required this.davali,
+    required this.mevkii,
+    required this.kalanSure,
+    required this.profilResmi,
+    this.isOpened = false,
+  });
+}
+
+class HomePage extends StatefulWidget {
+  final String? userEmail; // Kullanıcı e-posta adresi
+
+  const HomePage({super.key, this.userEmail});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  bool showLeftIcons = false; // Sol ikonların gösterilip gösterilmeyeceğini kontrol eder
+  bool isAdmin = false; // Admin kontrolü
+  List<Dava> davaList = []; // Kaydedilen davalar listesi
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminStatus();
+    _loadSavedDavalar();
+  }
+
+  // Kaydedilen davaları yükle
+  void _loadSavedDavalar() {
+    // Eski davaları yükle
+    setState(() {
+      davaList = [
+        Dava(
+          adi: "Örnek Dava 1",
+          davali: "Örnek Davalı 1",
+          mevkii: "Davalı",
+          kalanSure: "27.03.2024",
+          profilResmi: "lib/icons/07_profil_picture_davaci.png",
+          isOpened: true,
+        ),
+        Dava(
+          adi: "Örnek Dava 2",
+          davali: "Örnek Davalı 2",
+          mevkii: "Davalı",
+          kalanSure: "26.03.2024",
+          profilResmi: "lib/icons/07_profil_picture_davaci.png",
+          isOpened: false,
+        ),
+      ];
+    });
+  }
+
+  /// Kullanıcının admin yetkisi olup olmadığını kontrol eder
+  void _checkAdminStatus() {
+    if (widget.userEmail != null) {
+      isAdmin = HiveDatabaseService.isAdmin(widget.userEmail!);
+    }
+  }
+
+  /// Açtığım davalar dialog'unu göster
+  void _showActigimDavalarDialog() {
+    // Açılan davaları ve beklemede davaları al
+    final List<Map<String, dynamic>> openedDavalar = HiveDatabaseService.getOpenedDavalar();
+    final List<Map<String, dynamic>> savedDavalar = HiveDatabaseService.getSavedDavalar();
+    
+    // Tüm davaları birleştir
+    final List<Map<String, dynamic>> allDavalar = [...openedDavalar, ...savedDavalar];
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.8,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  Colors.green.withOpacity(0.05),
+                  Colors.blue.withOpacity(0.05),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Header Section
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24),
+                    ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.green.shade600,
+                        Colors.blue.shade600,
+                      ],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Icon
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(
+                          Icons.gavel,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // Title
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Açtığım Davalar',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${allDavalar.length} dava bulundu',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white.withOpacity(0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Close Button
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Content Section
+                Expanded(
+                  child: allDavalar.isEmpty
+                      ? _buildEmptyState()
+                      : _buildDavalarList(context, allDavalar),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.gavel_outlined,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Henüz Dava Açmadınız',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade700,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDavalarList(BuildContext context, List<Map<String, dynamic>> davalar) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: ListView.builder(
+        itemCount: davalar.length,
+        itemBuilder: (context, index) {
+          final dava = davalar[index];
+          final isOpened = dava['isOpened'] ?? false;
+          final isBeklemede = dava['davaAdi'] == 'Beklemede';
+          
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  isOpened ? Colors.green.withOpacity(0.02) : Colors.orange.withOpacity(0.02),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  // Sadece beklemede davalar için düzenleme moduna geç
+                  if (isBeklemede && !isOpened) {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => DavaAcPage(
+                          userEmail: widget.userEmail,
+                          editDava: dava_model.Dava.fromMap(dava),
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header Row
+                      Row(
+                        children: [
+                          // Status Icon
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isOpened 
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isOpened ? Icons.check_circle : Icons.schedule,
+                              color: isOpened ? Colors.green.shade600 : Colors.orange.shade600,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          
+                          // Dava Adı
+                          Expanded(
+                            child: Text(
+                              dava['davaAdi'] ?? 'Dava Adı Belirtilmemiş',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          
+                          // Status Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isOpened 
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              isOpened ? 'Açıldı' : 'Beklemede',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isOpened ? Colors.green.shade600 : Colors.orange.shade600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Dava Details
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                        ),
+                        child: Column(
+                          children: [
+                            if (dava['davaci']?.isNotEmpty == true) 
+                              _buildDetailRow('👨‍⚖️ Davacı', dava['davaci']),
+                            if (dava['davali']?.isNotEmpty == true) 
+                              _buildDetailRow('👤 Davalı', dava['davali']),
+                            if (dava['kategori']?.isNotEmpty == true) 
+                              _buildDetailRow('📋 Kategori', dava['kategori']),
+                          ],
+                        ),
+                      ),
+                      
+                      if (isBeklemede && !isOpened) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.touch_app,
+                                size: 16,
+                                color: Colors.blue.shade600,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Düzenlemek için tıklayın',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+
+    return Scaffold(
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => AdminPage(adminEmail: widget.userEmail!),
+                  ),
+                );
+              },
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+              child: const Icon(Icons.admin_panel_settings),
+              tooltip: 'Admin Paneli',
+            )
+          : FloatingActionButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const DatabaseDebugPage(),
+                  ),
+                );
+              },
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+              child: const Icon(Icons.storage),
+              tooltip: 'Veritabanı Debug',
+            ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
+              ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
+              // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
+              ),
+              // ROW 3: Profil Bölümü
+              Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
+                  userEmail: widget.userEmail,
+                  onShowSavedDavalar: () {
+                    // Global utility fonksiyonunu kullan
+                    if (widget.userEmail != null) {
+                      showSavedDavalarDialog(context, widget.userEmail!);
+                    }
+                  },
+                ),
+              ),
+              // ROW 4: Hamburger Iconu, Arama Çubuğu
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TreeMenuPageheadlines(
+                  onMenuPressed: () {
+                    setState(() {
+                      showLeftIcons = !showLeftIcons;
+                    });
+                  },
+                ),
+              ),
+              // ROW 5: 6 Icon Solda, Sağda Text Yazma Alanı (Scrollable with ListTile)
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: showLeftIcons ? 60 : 0,
+                      child: showLeftIcons
+                          ? SingleChildScrollView(
+                              child: Column(
+                              children: [
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => GelenDavalarPage(userEmail: widget.userEmail)),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
+                                    child: Icon(
+                                      MdiIcons.briefcaseArrowLeftRight,
+                                      size: 24,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => YargilaPage(userEmail: widget.userEmail)),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Image.asset('lib/icons/06_yargila_left_row_icon.png', width: 24, height: 24),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => KatildigimDavalarPage(userEmail: widget.userEmail)),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Image.asset('lib/icons/06_left_row_katildigim_davalar_icon.png', width: 24, height: 24),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => ActigimDavalarPage(userEmail: widget.userEmail)),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Image.asset('lib/icons/06_left_row_actigim_davalar_icon.png', width: 24, height: 24),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => DavaciUnlulurPage(userEmail: widget.userEmail),
+                                      ),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Image.asset('lib/icons/06_left_row_unlulerin_actigi_davalar_iconu.png', width: 24, height: 24),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => HaykirislarimPage(userEmail: widget.userEmail),
+                                      ),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Image.asset('lib/icons/06_left_row_haykirislarim.png', width: 24, height: 24),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => TrendDavaPage(userEmail: widget.userEmail),
+                                      ),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Icon(
+                                      MdiIcons.trendingUp,
+                                      size: 24,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => HesapGizlilikAyarlariPage(userEmail: widget.userEmail),
+                                      ),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Icon(
+                                      MdiIcons.cog,
+                                      size: 24,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                          : const SizedBox.shrink(),
+                    ),
+
+                    Expanded(
+                      child: SizedBox(
+                        height: 900, // Adjust height to fit content or screen
+                        child: ListView.builder(
+                          itemCount: davaList.length,
+                          itemBuilder: (context, index) {
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: FiveCardCaseInformation(
+                                dava: davaList[index],
+                                onTap: () {
+                                  print("Tapped on ${davaList[index].adi}");
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+class TreeMenuPageheadlines extends StatelessWidget {
+  final VoidCallback? onMenuPressed;
+  
+  const TreeMenuPageheadlines({super.key, this.onMenuPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          icon: Icon(
+            MdiIcons.menuOpen,
+            size: 34,
+            color: Colors.red,
+          ),
+          onPressed: onMenuPressed ?? () {
+            print("Menu button pressed");
+          },
+        ),
+        const Expanded(
+          child: Center(
+            child: Text(
+              "SEYİR DEFTERİ",
+              style: TextStyle(fontSize: 16),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class FourLeftIcons extends StatelessWidget {
+  const FourLeftIcons({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 50, // Fixed width as in original code
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const GelenDavalarPage()),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
+              child: Icon(
+                MdiIcons.briefcaseArrowLeftRight,
+                size: 24,
+                color: Colors.black54,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const YargilaPage()),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+              child: Image.asset('lib/icons/06_yargila_left_row_icon.png', width: 24, height: 24),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const KatildigimDavalarPage()),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+              child: Image.asset('lib/icons/06_left_row_katildigim_davalar_icon.png', width: 24, height: 24),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              // Açtığım davalar dialog'unu göster
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ActigimDavalarPage()),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+              child: Image.asset('lib/icons/06_left_row_actigim_davalar_icon.png', width: 24, height: 24),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DavaciUnlulurPage(),
+                  ),
+                );
+              },
+              child: Image.asset('lib/icons/06_left_row_unlulerin_actigi_davalar_iconu.png', width: 24, height: 24),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const HaykirPage(),
+                  ),
+                );
+              },
+              child: Image.asset('lib/icons/06_left_row_haykirislarim.png', width: 24, height: 24),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TrendDavaPage(),
+                  ),
+                );
+              },
+              child: Icon(
+                MdiIcons.trendingUp,
+                size: 24,
+                color: Colors.black54,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class FiveCardCaseInformation extends StatelessWidget {
+  final Dava dava;
+  final VoidCallback? onTap;
+
+  const FiveCardCaseInformation({super.key, required this.dava, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Card(
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            MdiIcons.homeFlood,
+                            size: 19,
+                            color: Colors.green,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'Onayla',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                      Image.asset(dava.profilResmi, width: 60, height: 50),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            MdiIcons.giftOpen,
+                            size: 19,
+                            color: Colors.green,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'Onayla',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Dava Adı    :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 4),
+                          Flexible(child: Text(dava.adi, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Text('Davalı         :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Flexible(child: Text(dava.davali, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                                const Spacer(),
+                                Icon(Icons.thumb_down_alt_outlined, size: 25, color: Colors.red),
+                                Icon(Icons.thumb_up_alt_outlined, size: 25, color: Colors.green),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Görev        :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 4),
+                          Flexible(child: Text(dava.mevkii, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(MdiIcons.timerAlertOutline, size: 19, color: Colors.green),
+                          const SizedBox(width: 4),
+                          const Text('Kalan Süre :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              dava.kalanSure,
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Hükmüm  :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 4),
+                          Icon(Icons.insert_emoticon, size: 24, color: Colors.green),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

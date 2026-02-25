@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.2
+  sdk: '>=3.2.3 <4.0.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -33,13 +33,51 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
+  cupertino_icons: ^1.0.2
   flutter_feather_icons: ^2.0.0+1
   country_picker: ^2.0.27
   material_design_icons_flutter: ^7.0.7296
   carousel_slider: ^5.1.1
   url_launcher: ^6.3.2
+  fluttertoast: ^8.2.12
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.0.11
+  uuid: ^4.5.1  # Delil ID'leri için benzersiz tanımlayıcı
+  image_picker: ^1.0.7  # Resim ve video seçimi için
+  file_picker: ^8.0.0+1  # PDF dosya seçimi için
+  video_player: ^2.8.2  # Video oynatma için
+  flutter_pdfview: ^1.3.2  # PDF görüntüleme için
+  provider: ^6.1.5+1
+  font_awesome_flutter: ^10.9.1
+  lottie: ^3.1.2  # Lottie animasyonları için
+  flutter_chat_ui: ^1.6.15  # Mesajlaşma UI'sı için
+  # Firebase paketleri - Real-time mesajlaşma için
+  firebase_core: ^3.6.0
+  cloud_firestore: ^5.4.3
+  firebase_messaging: ^15.1.3  # Push notification için
+  firebase_storage: ^12.3.4  # Ses dosyaları için Firebase Storage - sesli mesaj özelliği
+  flutter_local_notifications: ^19.5.0  # Yerel bildirimler için
+  timezone: ^0.10.1  # Zamanlanmış bildirimler için timezone desteği (flutter_local_notifications 19.5.0 gereksinimi)
+  cached_network_image: ^3.3.1  # Avatar ve görseller için cache desteği - performans iyileştirmesi
+  timeago: ^3.6.3  # "2 dakika önce" formatı için - performans ve kullanıcı deneyimi iyileştirmesi
+  record: ^5.2.1  # Ses kaydı için - sesli mesaj özelliği
+  just_audio: ^0.9.40  # Ses oynatma için - sesli mesaj özelliği
+  permission_handler: ^11.3.1  # Mikrofon izni için - sesli mesaj özelliği
+  pull_to_refresh: ^2.0.0  # Liste yenileme için - UI iyileştirmesi
+  shimmer: ^3.0.0  # Loading animasyonları için - UI iyileştirmesi
+  flutter_link_previewer: ^3.2.2  # Link önizlemesi için - UI iyileştirmesi (flutter_chat_ui ile uyumlu)
+  # emoji_picker_flutter: ^1.6.3  # Sorunlu paket, kaldırıldı
+  # Basit emoji picker widget'ı kendimiz yapacağız
 
+  flutter_chat_types: any
+  intl: ^0.20.2  # Türkçe dil desteği için (flutter_localizations ile uyumlu)
+  flutter_localizations:
+    sdk: flutter  # Türkçe locale desteği için
+  # AdMob paketleri geçici olarak devre dışı bırakıldı - daha sonra uygulanacak
+  # google_mobile_ads: ^7.0.0
+  in_app_purchase: ^3.2.3
+  shared_preferences: ^2.2.2  # "Beni anımsa" özelliği için giriş bilgilerini saklama
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -49,7 +87,14 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^3.0.0
+  hive_generator: ^2.0.1
+  build_runner: ^2.4.7
+
+# Dependency overrides to fix package compatibility issues
+  path_provider_platform_interface: any
+dependency_overrides:
+  record_linux: ^1.2.1  # Fix for missing startStream implementation
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -96,6 +141,6 @@ flutter:
   assets:
     - lib/icons/
   fonts:
-    - family: Cocon
+    - family: cocon
       fonts:
         - asset: lib/fonts/cocon_regular.otf

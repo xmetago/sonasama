@@ -5,7 +5,7 @@ import 'category_page.dart';
 
 class KatildigimDavalarKactanePage extends StatelessWidget {
   static const int iconCount = 13;
-  const KatildigimDavalarKactanePage({Key? key}) : super(key: key);
+  const KatildigimDavalarKactanePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -91,30 +91,35 @@ class KatildigimDavalarKactanePage extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(4.0),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: const [
+                  const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
                       Icon(Icons.account_circle, size: 60),
                     ],
                   ),
                   const SizedBox(width: 0.5),
-                  Expanded(
+                  const Expanded(
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('YARGIÇ ADI', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const ProfileIconsRow(),
+                        Text('YARGIÇ ADI', style: TextStyle(fontWeight: FontWeight.bold)),
+                        SizedBox(height: 4),
+                        ProfileIconsRow(),
+                        SizedBox(height: 4),
                         Row(
                           children: [
-                            const SizedBox(width: 18),
-                            const Icon(
+                            SizedBox(width: 18),
+                            Icon(
                               Icons.picture_in_picture,
                               color: Colors.lime,
                               size: 18,
                             ),
-                            const SizedBox(width: 38),
-                            const Icon(
+                            SizedBox(width: 38),
+                            Icon(
                               Icons.record_voice_over_sharp,
                               color: Colors.lime,
                               size: 18,
@@ -213,7 +218,7 @@ class KatildigimDavalarKactanePage extends StatelessWidget {
                                 crossAxisSpacing: 16,
                                 mainAxisSpacing: 16,
                                 shrinkWrap: true,
-                                physics: NeverScrollableScrollPhysics(),
+                                physics: const NeverScrollableScrollPhysics(),
                                 children: List.generate(KatildigimDavalarKactanePage.iconCount, (index) => GestureDetector(
                                   onTap: () {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -256,14 +261,14 @@ class _MyCheckboxWidgetState extends State<MyCheckboxWidget> {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: [ SizedBox(width: 5),
+      children: [ const SizedBox(width: 5),
 
         const Text(
           'KATILDIĞIM  DAVALAR KAÇ TANE ',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
 
         ),
-        SizedBox(width: 19),
+        const SizedBox(width: 19),
         Stack(
           children: [
             Image.asset(
@@ -275,18 +280,18 @@ class _MyCheckboxWidgetState extends State<MyCheckboxWidget> {
               right: 0,
               top: 0,
               child: Container(
-                padding: EdgeInsets.all(3),
+                padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
                   color: Colors.red,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                constraints: BoxConstraints(
+                constraints: const BoxConstraints(
                   minWidth: 18,
                   minHeight: 18,
                 ),
                 child: Text(
                   KatildigimDavalarKactanePage.iconCount.toString(), // Buradaki sayı dinamik (şimdi 13)
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,

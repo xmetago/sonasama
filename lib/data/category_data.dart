@@ -30,14 +30,36 @@ class CategoryData {
       categories.values.expand((x) => x).length;
 
   /// Arama sorgusuna göre kategorileri filtreler
+  /// Hem ana kategorileri hem de alt kategorileri arar
   static List<String> filterCategories(String query) {
     if (query.isEmpty) {
       return categories.keys.toList();
     }
-    return categories.keys
-        .where((category) =>
-            category.toLowerCase().contains(query.toLowerCase()))
-        .toList();
+    
+    final queryLower = query.toLowerCase();
+    final matchingCategories = <String>{};
+    
+    // Ana kategorileri ara
+    for (final category in categories.keys) {
+      if (category.toLowerCase().contains(queryLower)) {
+        matchingCategories.add(category);
+      }
+    }
+    
+    // Alt kategorileri ara
+    for (final entry in categories.entries) {
+      final category = entry.key;
+      final subCategories = entry.value;
+      
+      for (final subCategory in subCategories) {
+        if (subCategory.toLowerCase().contains(queryLower)) {
+          matchingCategories.add(category);
+          break; // Bu kategoriyi bir kez ekledikten sonra diğer alt kategorilerini aramaya gerek yok
+        }
+      }
+    }
+    
+    return matchingCategories.toList();
   }
 
   /// Belirli bir kategorinin alt kategorilerini döndürür

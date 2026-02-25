@@ -2,20 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import '../widgets/profile_icons_row.dart';
-import 'category_page.dart';
-import 'gelen_davalar_kactane.dart';
-import 'delilleri_incele_page.dart';
-import '../widgets/my_checkbox_widget_yargila.dart';
-import 'masraflar_page.dart';
+import '../widgets/common_header_widgets.dart';
 import 'cezalar_page.dart';
 import 'yargila_page.dart';
-import 'package:flutter/services.dart';
-import 'package:carousel_slider/carousel_slider.dart';
-import 'package:carousel_slider/carousel_controller.dart';
-import 'package:flutter/widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:carousel_slider/carousel_slider.dart';
 
 
 // Model class for Dava
@@ -37,7 +27,9 @@ class Dava {
 
 // Masraflar Sayfası
 class MasraflarPage extends StatefulWidget {
-  const MasraflarPage({super.key});
+  final String? userEmail; // Kullanıcı e-posta adresi
+
+  const MasraflarPage({super.key, this.userEmail});
 
   @override
   State<MasraflarPage> createState() => _MasraflarPageState();
@@ -133,16 +125,22 @@ class _MasraflarPageState extends State<MasraflarPage> {
           child: Column(
             children: [
               // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
-              ZeroWhoboomSearchMessage(),
+              ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
               // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: OneFriendPhoneBellMenu(),
+                child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
               ),
               // ROW 3: Profil Bölümü
               Padding(
                 padding: const EdgeInsets.all(4.0),
-                child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(),
+                child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
+                  userEmail: widget.userEmail,
+                  onShowSavedDavalar: () {
+                    // Masraflar sayfasında kaydedilen davalar dialog'u açılamaz
+                    // Bu sayfa sadece masraf işlemleri için
+                  },
+                ),
               ),
               // ROW 4: Hamburger Iconu, Checkbox ve bilgi satırı
               Padding(
@@ -158,7 +156,7 @@ class _MasraflarPageState extends State<MasraflarPage> {
                       onPressed: () {},
                     ),
                     const SizedBox(width: 68),
-                    Center(child: Text("MASRAFLAR ",style: TextStyle(fontSize: 19),),)
+                    const Center(child: Text("MASRAFLAR ",style: TextStyle(fontSize: 19),),)
                   ],
                 ),
               ),
@@ -173,8 +171,8 @@ class _MasraflarPageState extends State<MasraflarPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
                             child: Icon(
                               Icons.gavel_outlined,
                               size: 24,
@@ -187,10 +185,10 @@ class _MasraflarPageState extends State<MasraflarPage> {
                             child: IconButton(
                               icon: Icon(MdiIcons.cartHeart, size: 24, color: Colors.black54),
                               onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const CezalarPage()),
-                                );
+                                                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
+                                    );
                               },
                             ),
                           ),
@@ -200,10 +198,10 @@ class _MasraflarPageState extends State<MasraflarPage> {
                             padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
                             child: GestureDetector(
                               onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const MasraflarPage()),
-                                );
+                                                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => MasraflarPage(userEmail: widget.userEmail)),
+                                    );
                               },
                               child: Icon(MdiIcons.giftOpenOutline, size: 24, color: Colors.black54),
                             ),
@@ -226,6 +224,7 @@ class _MasraflarPageState extends State<MasraflarPage> {
                                     onTap: () {
                                       print("Tapped on ${davaList[index].adi}");
                                     },
+                                    userEmail: widget.userEmail,
                                   ),
                                 );
                               },
@@ -261,6 +260,7 @@ class _MasraflarPageState extends State<MasraflarPage> {
                                     caption: ad['caption']!,
                                     adTitle: ad['adTitle'] ?? 'Reklam Başlığı',
                                     adCode: ad['adCode'] ?? 'AD-0001',
+                                    userEmail: widget.userEmail,
                                   );
                                 }).toList(),
                               ),
@@ -285,9 +285,9 @@ class _MasraflarPageState extends State<MasraflarPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Padding(
-                                padding: const EdgeInsets.all(14.0),
-                                child: const Text(
+                              const Padding(
+                                padding: EdgeInsets.all(14.0),
+                                child: Text(
                                    '100 \$',
                                   style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
                                 ),
@@ -337,210 +337,13 @@ class _MasraflarPageState extends State<MasraflarPage> {
 }
 
 // Reused Widgets from GelenDavalarPage
-class ZeroWhoboomSearchMessage extends StatelessWidget {
-  const ZeroWhoboomSearchMessage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-                  color: Color(0xFF059669),
-                ),
-                child: const Text(
-                  'Who',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.only(
-                    topRight: Radius.circular(8),
-                    bottomRight: Radius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Boom',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              print("Search button pressed");
-            },
-          ),
-          Icon(
-            MdiIcons.chatOutline,
-            size: 24,
-            color: Colors.black54,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class OneFriendPhoneBellMenu extends StatelessWidget {
-  const OneFriendPhoneBellMenu({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const SizedBox(width: 8),
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Flexible(
-                child: Icon(
-                  MdiIcons.accountHeart,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-              Flexible(
-                child: Icon(
-                  MdiIcons.phoneClassic,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-              Flexible(
-                child: Icon(
-                  MdiIcons.bell,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-              Flexible(
-                child: Icon(
-                  MdiIcons.menuOpen,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant extends StatelessWidget {
-  const SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Column(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: const [
-            Icon(Icons.account_circle, size: 60),
-          ],
-        ),
-        const SizedBox(width: 0.5),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Nasrullah KESKİN',
-                style: TextStyle(fontWeight: FontWeight.normal, color: Colors.black),
-              ),
-              const ProfileIconsRow(),
-              Row(
-                children: [
-                  const SizedBox(width: 1),
-                  Icon(
-                    MdiIcons.pictureInPictureTopRight,
-                    size: 24,
-                    color: Colors.black54,
-                  ),
-                  const SizedBox(width: 48),
-                  Icon(
-                    Icons.record_voice_over_sharp,
-                    color: Colors.black54,
-                    size: 24,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        Row(
-          children: [
-            IconButton(
-              icon: CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.grey.shade200,
-                child: Image.asset(
-                  'lib/icons/03_davala_ana_icon.png',
-                  width: 38,
-                  height: 38,
-                ),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CategoryPage(),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              icon: CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.grey.shade200,
-                child: Image.asset(
-                  'lib/icons/03_haykir_ana_icon.png',
-                  width: 38,
-                  height: 38,
-                ),
-              ),
-              onPressed: () {
-                print("Haykir button pressed");
-              },
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
 
 class FiveCardCaseInformation extends StatelessWidget {
   final Dava dava;
   final VoidCallback? onTap;
+  final String? userEmail; // Kullanıcı e-posta adresi
 
-  const FiveCardCaseInformation({super.key, required this.dava, this.onTap});
+  const FiveCardCaseInformation({super.key, required this.dava, this.onTap, this.userEmail});
 
   @override
   Widget build(BuildContext context) {
@@ -564,7 +367,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
+                      const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
@@ -572,8 +375,8 @@ class FiveCardCaseInformation extends StatelessWidget {
                             size: 19,
                             color: Colors.green,
                           ),
-                          const SizedBox(width: 4),
-                          const Text(
+                          SizedBox(width: 4),
+                          Text(
                             'Haklı... ',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             textAlign: TextAlign.center,
@@ -584,7 +387,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                         padding: const EdgeInsets.all(5.0),
                         child: Image.asset(dava.profilResmi, width: 60, height: 50),
                       ),
-                      Row(
+                      const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
@@ -592,8 +395,8 @@ class FiveCardCaseInformation extends StatelessWidget {
                             size: 19,
                             color: Colors.redAccent,
                           ),
-                          const SizedBox(width: 4),
-                          const Text(
+                          SizedBox(width: 4),
+                          Text(
                             'Haksız ',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             textAlign: TextAlign.center,
@@ -627,7 +430,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                               children: [
                                 Flexible(child: Text(dava.davali, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                                 const Spacer(),
-                                Icon(Icons.thumb_up_alt_outlined, size: 25, color: Colors.green),
+                                const Icon(Icons.thumb_up_alt_outlined, size: 25, color: Colors.green),
                               ],
                             ),
                           ),
@@ -666,7 +469,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                             onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => const YargilaPage()),
+                                MaterialPageRoute(builder: (context) => YargilaPage(userEmail: userEmail)),
                               );
                             },
                             style: ElevatedButton.styleFrom(
@@ -717,6 +520,7 @@ class InstaAdCard extends StatelessWidget {
   final String caption;
   final String adTitle;
   final String adCode;
+  final String? userEmail; // Kullanıcı e-posta adresi
 
   const InstaAdCard({
     super.key,
@@ -729,6 +533,7 @@ class InstaAdCard extends StatelessWidget {
     required this.caption,
     required this.adTitle,
     required this.adCode,
+    this.userEmail,
   });
 
   @override

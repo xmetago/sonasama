@@ -13,9 +13,9 @@ class _MyCheckboxWidgetYargilaState extends State<MyCheckboxWidgetYargila> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return const Row(
       children: [ SizedBox(width: 38),
-        const Text(
+        Text(
           ' YARGILA ',
           style: TextStyle( fontSize: 18,color: Colors.green),
         ),

@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
+import '../screens/friendship_management_page.dart';
 
 /// OneFriendPhoneBellMenu: Arkadaş, Telefon, Bildirim ve Menü ikonlarını yatayda gösteren widget
 /// Material 3 uyumlu, responsive ve sade bir tasarıma sahiptir.
 class OneFriendPhoneBellMenu extends StatelessWidget {
+  final String? userEmail;
   final void Function()? onFriendsTap;
   final void Function()? onPhoneTap;
   final void Function()? onBellTap;
   final void Function()? onMenuTap;
 
   const OneFriendPhoneBellMenu({
-    Key? key,
+    super.key,
+    this.userEmail,
     this.onFriendsTap,
     this.onPhoneTap,
     this.onBellTap,
     this.onMenuTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +28,16 @@ class OneFriendPhoneBellMenu extends StatelessWidget {
         Flexible(
           child: IconButton(
             icon: Image.asset('lib/icons/02_top_row_friends.png', width: 24, height: 24),
-            onPressed: onFriendsTap,
+            onPressed: onFriendsTap ?? () {
+              if (userEmail != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FriendshipManagementPage(userEmail: userEmail!),
+                  ),
+                );
+              }
+            },
             tooltip: 'Arkadaşlar',
           ),
         ),

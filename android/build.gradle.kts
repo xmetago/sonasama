@@ -19,3 +19,12 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+// Java 8 uyarılarını bastır (eski Flutter plugin'leri Java 8 kullanıyor)
+gradle.projectsEvaluated {
+    subprojects.forEach { subproject ->
+        subproject.tasks.withType<JavaCompile>().configureEach {
+            options.compilerArgs.add("-Xlint:-options")
+        }
+    }
+}

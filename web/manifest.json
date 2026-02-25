@@ -1,6 +1,6 @@
 {
-    "name": "its19",
-    "short_name": "its19",
+      "name": "WhoBoom",
+  "short_name": "WhoBoom",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

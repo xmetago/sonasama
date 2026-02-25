@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/country_display_utils.dart';
 
 /// Ülke seçimi için açılır liste sunan, arama destekli widget.
 ///
@@ -62,7 +63,7 @@ class _CountryPickerState extends State<CountryPicker> {
                   child: ListView.builder(
                     itemCount: filteredCountries.length,
                     itemBuilder: (context, index) => ListTile(
-                      title: Text(filteredCountries[index]),
+                      title: Text(CountryDisplayUtils.getDisplayName(filteredCountries[index])),
                       onTap: () {
                         setState(() => _selectedCountry = filteredCountries[index]);
                         Navigator.pop(context);
@@ -81,7 +82,9 @@ class _CountryPickerState extends State<CountryPicker> {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      title: Text(_selectedCountry ?? 'Ülke seçiniz'),
+      title: Text(_selectedCountry != null 
+        ? CountryDisplayUtils.getDisplayName(_selectedCountry!)
+        : 'Ülke seçiniz'),
       trailing: const Icon(Icons.arrow_drop_down),
       onTap: () => _openCountryPicker(context),
     );

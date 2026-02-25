@@ -1,0 +1,60 @@
+# WhoBoom Proje Kuralları
+
+## Genel Kurallar
+
+### 1. Arayüz Değişikliği Kısıtlaması
+- **ARAYÜZ ASLA DEĞİŞMEZ, SADECE EKLEMELER YAPILABİLİR**
+- Mevcut sayfaların veya widget'ların tasarımında, görünümünde veya yapısında değişiklik yapılmaz
+- Sadece yeni sayfa veya widget eklenebilir
+- Kullanıcıdan açıkça izin alınmadan mevcut dosyalarda (özellikle main.dart, home.dart, login.dart gibi) hiçbir görsel veya yapısal değişiklik yapılmaz
+- Row, Column gibi yapısal elemanlar eklenebilir ama silinmez
+
+### 2. Dosya Yönetimi
+- Sadece yeni sayfalar `lib/screens` altına eklenebilir
+- Sadece yeni widget'lar `lib/widgets` altına eklenebilir
+- Temiz mimari benimsenir: `lib/screens`, `lib/widgets`, `lib/models`, `lib/services` dizinleri kullanılır
+
+### 3. UI/UX Standartları
+- Material 3 kullanılır
+- Responsive, modern, erişilebilir ve tutarlı UI sağlanır
+- Her fonksiyon ve sınıf için açıklayıcı yorumlar eklenir
+- Production'da print()/debugPrint() kullanılmaz
+- Performans optimize edilir ve test edilebilir bileşenler yazılır
+- Future<void> hataları uygun try-catch ile ele alınır
+
+### 4. Bağımlılık Yönetimi
+- pubspec.yaml sadece yeni bağımlılıklar eklemek için güncellenir
+- Eklenen bağımlılıklar için nedenler ve mevcut sürümlerle yorumlar eklenir
+
+### 5. Kod Kalitesi
+- Cursor AI ile otomatik kural kontrolleri yapılır
+- Bu kuralları ihlal eden öneriler reddedilir veya manuel olarak revize edilir
+
+## Özel Kurallar
+
+### Admin Sistemi
+- `whoboom@whoboom.com` admin e-postası olarak tanımlanır
+- Sadece bu admin e-postası özel admin sayfalarına erişebilir
+- Admin girişi yapıldığında normal kullanıcılar gibi HomePage'e yönlendirilir
+- HomePage'de sağ alt köşede hamburger menü ikonu gösterilir (sadece admin için)
+
+### Veritabanı Entegrasyonu
+- Hive veritabanı kullanılır
+- Kullanıcı kayıt/giriş sistemi entegre edilir
+- Form validasyonları uygulanır
+- Test kullanıcıları tanımlanır
+- **Gerektiğinde derhal veritabanı ve tabloları oluştur**
+
+### Dava Açma Sistemi
+- Kategori seçimi için veritabanı tabloları gerekirse oluşturulur
+- Dava açma sayfası mevcut tasarımla entegre edilir
+- FloatingActionButton ile erişim sağlanır
+
+## Uygulama Adımları
+- Her komut numaralandırılır (Adım: 1, Adım: 2, vb.)
+- Hangi adımın geri alınacağı belirtilir
+- Kullanıcı yönlendirmesi beklenir
+description:
+globs:
+alwaysApply: false
+---

@@ -1,275 +1,123 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import '../widgets/profile_icons_row.dart';
-import 'category_page.dart';
-import 'gelen_davalar_kactane.dart';
+import '../widgets/common_header_widgets.dart';
+import 'gelen_davalar_page.dart';
+import 'katildigim_davalar_page.dart' as katildigim;
+import 'yargila_page.dart';
+import 'actigim_davalar_page.dart' as actigim;
+import 'trend_insights_page.dart';
+import 'haykir_page.dart';
+import '../services/hive_database_service.dart';
+import '../services/verified_users_service.dart';
+import '../utils/dialog_utils.dart';
 import 'delilleri_incele_page.dart';
-import '../widgets/my_checkbox_widget_yargila.dart';
-import 'masraflar_page.dart';
 import 'cezalar_page.dart';
-import 'sekiz_hukum_page.dart';
-
-// Model class for Dava
-class Dava {
-  final String adi;
-  final String davali;
-  final String mevkii;
-  final String kalanSure;
-  final String profilResmi;
-
-  Dava({
-    required this.adi,
-    required this.davali,
-    required this.mevkii,
-    required this.kalanSure,
-    required this.profilResmi,
-  });
-}
-
-// WhoBoom, Arama Iconu, Chat Iconu
-class ZeroWhoboomSearchMessage extends StatelessWidget {
-  const ZeroWhoboomSearchMessage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-                  color: Color(0xFF059669),
-                ),
-                child: const Text(
-                  'Who',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.only(
-                    topRight: Radius.circular(8),
-                    bottomRight: Radius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Boom',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
-          Icon(
-            MdiIcons.chatOutline,
-            size: 24,
-            color: Colors.black54,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
-class OneFriendPhoneBellMenu extends StatelessWidget {
-  const OneFriendPhoneBellMenu({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const SizedBox(width: 8),
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Flexible(
-                child: Icon(
-                  MdiIcons.accountHeart,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-              Flexible(
-                child: Icon(
-                  MdiIcons.phoneClassic,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-              Flexible(
-                child: Icon(
-                  MdiIcons.bell,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-              Flexible(
-                child: Icon(
-                  MdiIcons.menuOpen,
-                  size: 24,
-                  color: Colors.black54,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Profil Bölümü
-class SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant extends StatelessWidget {
-  const SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Column(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: const [
-            Icon(Icons.account_circle, size: 60),
-          ],
-        ),
-        const SizedBox(width: 0.5),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Nasrullah KESKİN',
-                style: TextStyle(fontWeight: FontWeight.normal, color: Colors.black),
-              ),
-              const ProfileIconsRow(),
-              Row(
-                children: [
-                  const SizedBox(width: 1),
-                  Icon(
-                    MdiIcons.pictureInPictureTopRight,
-                    size: 24,
-                    color: Colors.black54,
-                  ),
-                  const SizedBox(width: 48),
-                  Icon(
-                    Icons.record_voice_over_sharp,
-                    color: Colors.black54,
-                    size: 24,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        Row(
-          children: [
-            IconButton(
-              icon: CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.grey.shade200,
-                child: Image.asset(
-                  'lib/icons/03_davala_ana_icon.png',
-                  width: 38,
-                  height: 38,
-                ),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CategoryPage(),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              icon: CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.grey.shade200,
-                child: Image.asset(
-                  'lib/icons/03_haykir_ana_icon.png',
-                  width: 38,
-                  height: 38,
-                ),
-              ),
-              onPressed: () {},
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
 
 class DavaciUnlulurPage extends StatefulWidget {
-  const DavaciUnlulurPage({super.key});
+  final String? userEmail; // Kullanıcı e-posta adresi
+
+  const DavaciUnlulurPage({super.key, this.userEmail});
 
   @override
   State<DavaciUnlulurPage> createState() => _DavaciUnlulurPageState();
 }
 
 class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
-  int commentCount = 0;
-  int retweetCount = 0;
-  int likeCount = 0;
-  int dislikeCount = 0;
-  bool isUnluDavali = true; // true: Ünlü Davalı, false: Dava Açan Ünlü
-  bool isHukumExpanded = false; // 8-HÜKÜM butonunun açık/kapalı durumu
+  bool isUnluDavali = true; // true: Davacı Ünlü, false: Davalı Ünlü (sekme mantığı tersine çevrildi)
+  bool showLeftIcons = false; // Sol ikonların gösterilip gösterilmeyeceğini kontrol eder
+  List<Map<String, dynamic>> _davaList = []; // Gerçek veriler için
 
-  Widget _buildIconCounter(IconData icon, int count, VoidCallback onPressed) {
-    return Row(
-      children: [
-        IconButton(
-          icon: Icon(icon, color: Colors.green),
-          onPressed: onPressed,
-        ),
-        Text('$count', style: const TextStyle(color: Colors.green)),
-      ],
-    );
+  @override
+  void initState() {
+    super.initState();
+    _loadUnluDavalar();
+  }
+
+  /// Ünlü davaları yükle ve filtrele
+  void _loadUnluDavalar() {
+    // Tüm açılmış ve kaydedilmiş davaları al
+    final openedDavalar = HiveDatabaseService.getOpenedDavalar();
+    final savedDavalar = HiveDatabaseService.getSavedDavalar();
+    final allDavalar = [...openedDavalar, ...savedDavalar];
+
+    // Sekme durumuna göre filtrele
+    final filteredDavalar = allDavalar.where((davaMap) {
+      final davaci = (davaMap['davaci'] ?? '').toString().trim();
+      final davali = (davaMap['davali'] ?? '').toString().trim();
+
+      // ✅ Düzeltme: Email formatındaysa judgeName'e çevir
+      final davaciJudgeName = _normalizeToJudgeName(davaci);
+      final davaliJudgeName = _normalizeToJudgeName(davali);
+
+      if (isUnluDavali) {
+        // Davacı Ünlü sekmesi: davacı verified olmalı
+        return davaciJudgeName.isNotEmpty && VerifiedUsersService.isVerified(davaciJudgeName);
+      } else {
+        // Davalı Ünlü sekmesi: sadece davalı verified ise, davacı verified değilse göster
+        final bool davaciUnlu = davaciJudgeName.isNotEmpty && VerifiedUsersService.isVerified(davaciJudgeName);
+        final bool davaliUnlu = davaliJudgeName.isNotEmpty && VerifiedUsersService.isVerified(davaliJudgeName);
+        return davaliUnlu && !davaciUnlu;
+      }
+    }).toList();
+
+    // Map'leri kart bileşeninin beklediği formata çevir
+    setState(() {
+      _davaList = filteredDavalar
+          .map((davaMap) => _buildCaseData(Map<String, dynamic>.from(davaMap)))
+          .toList();
+    });
+  }
+
+  /// Email veya diğer formatları judgeName'e çevir
+  String _normalizeToJudgeName(String value) {
+    if (value.isEmpty) return '';
+    
+    // Eğer zaten judgeName formatındaysa (email değilse) direkt döndür
+    if (!value.contains('@')) {
+      // "Gizli Yargıç" gibi özel durumları kontrol et
+      if (value == 'Gizli Yargıç') return '';
+      return value;
+    }
+    
+    // Email formatındaysa, email'den judgeName'i bul
+    try {
+      final user = HiveDatabaseService.getRegistrationByEmail(value);
+      return user?.judgeName ?? '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  Map<String, dynamic> _buildCaseData(Map<String, dynamic> davaMap) {
+    final nowIso = DateTime.now().toIso8601String();
+
+    final String davaAdi = (davaMap['davaAdi'] ?? davaMap['adi'] ?? 'Bilinmeyen Dava').toString();
+    final String davaci = (davaMap['davaci'] ?? '').toString();
+    final String davali = (davaMap['davali'] ?? '').toString();
+    final String profil = (davaMap['profilResmi'] ?? 'lib/icons/03_davala_ana_icon.png').toString();
+
+    return {
+      ...davaMap,
+      'id': (davaMap['id'] ?? davaMap['davaId'] ?? 'dava_${davaAdi.hashCode}_${davali.hashCode}').toString(),
+      'davaAdi': davaAdi,
+      'adi': davaMap['adi'] ?? davaAdi,
+      'davaci': davaci,
+      'davali': davali,
+      'profilResmi': profil,
+      'mevkii': (davaMap['mevkii'] ?? (isUnluDavali ? 'Davacı' : 'Davalı')).toString(),
+      'kalanSure': (davaMap['kalanSure'] ?? 'Bilinmiyor').toString(),
+      'davaKonusu': (davaMap['davaKonusu'] ?? '').toString(),
+      'acceptedAt': (davaMap['acceptedAt'] ??
+              davaMap['openedAt'] ??
+              davaMap['createdAt'] ??
+              nowIso)
+          .toString(),
+      'isOpened': davaMap['isOpened'] ?? true,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
-    // Sample data for Dava instances
-    final List<Dava> davaList = [
-      Dava(
-        adi: "Ünlü Davası 1",
-        davali: "Ünlü 1",
-        mevkii: "Davalı",
-        kalanSure: "72 saat (3 gün)",
-        profilResmi: "lib/icons/03_davala_ana_icon.png",
-      ),
-      Dava(
-        adi: "Ünlü Davası 2",
-        davali: "Ünlü 2",
-        mevkii: "Davalı",
-        kalanSure: "48 saat (2 gün)",
-        profilResmi: "lib/icons/03_haykir_ana_icon.png",
-      ),
-    ];
 
     return Scaffold(
       body: SafeArea(
@@ -277,16 +125,24 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
           child: Column(
             children: [
               // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
-              ZeroWhoboomSearchMessage(),
+              ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
               // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: OneFriendPhoneBellMenu(),
+                child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
               ),
               // ROW 3: Profil Bölümü
               Padding(
                 padding: const EdgeInsets.all(4.0),
-                child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(),
+                child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
+                  userEmail: widget.userEmail,
+                  onShowSavedDavalar: () {
+                    // Global utility fonksiyonunu kullan
+                    if (widget.userEmail != null) {
+                      showSavedDavalarDialog(context, widget.userEmail!);
+                    }
+                  },
+                ),
               ),
               // ROW 4: Hamburger Iconu ve Sekmeler
               Padding(
@@ -294,12 +150,16 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Image.asset(
-                        'lib/icons/menu_red.png',
-                        width: 24,
-                        height: 24,
+                      icon: Icon(
+                        MdiIcons.menuOpen,
+                        size: 34,
+                        color: Colors.red,
                       ),
-                      onPressed: () {},
+                      onPressed: () {
+                        setState(() {
+                          showLeftIcons = !showLeftIcons;
+                        });
+                      },
                     ),
                     const SizedBox(width: 68),
                     // İki sekme
@@ -312,6 +172,7 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
                                 setState(() {
                                   isUnluDavali = true;
                                 });
+                                _loadUnluDavalar(); // Verileri yeniden yükle
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -337,6 +198,7 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
                                 setState(() {
                                   isUnluDavali = false;
                                 });
+                                _loadUnluDavalar(); // Verileri yeniden yükle
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -361,170 +223,183 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
                   ],
                 ),
               ),
-              // Arama Row'u
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 50), // Sol ikonlar için boşluk
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 0.5),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.search, color: Colors.grey[600]),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                decoration: InputDecoration(
-                                  hintText: 'Ara...',
-                                  border: InputBorder.none,
-                                  hintStyle: TextStyle(color: Colors.grey[600]),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+
               // ROW 5: 6 Icon Solda, Sağda Card ile Dava Bilgileri
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 50,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
-                            child: Icon(Icons.save_outlined, size: 24,  color: Colors.black54),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                            child: IconButton(
-                              icon: Icon(Icons.content_paste_search, size: 24,  color: Colors.black54),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const DelilleriIncelePage()),
-                                );
-                              },
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: showLeftIcons ? 60 : 0,
+                      child: showLeftIcons
+                          ? SingleChildScrollView(
+                              child: Column(
+                              children: [
+                                GestureDetector(
+                                  onTap: () {
+                                                                      Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => GelenDavalarPage(userEmail: widget.userEmail)),
+                                  );
+                                  },
+                                  child: const Padding(
+                                    padding: EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
+                                    child: Icon(Icons.save_outlined, size: 24,  color: Colors.black54),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                                                      Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => YargilaPage(userEmail: widget.userEmail)),
+                                  );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: IconButton(
+                                      icon: const Icon(Icons.content_paste_search, size: 24,  color: Colors.black54),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const DelilleriIncelePage()),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                                                      Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => katildigim.KatildigimDavalarPage(userEmail: widget.userEmail)),
+                                  );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Icon(MdiIcons.briefcaseEditOutline, size: 24, color: Colors.black54),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                                                      Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => actigim.ActigimDavalarPage(userEmail: widget.userEmail)),
+                                  );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: IconButton(
+                                      icon: Icon(MdiIcons.handcuffs, size: 24, color: Colors.black54),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const CezalarPage()),
+                                    );
+                                  },
+                                ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const DavaciUnlulurPage(),
+                                      ),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Image.asset('lib/icons/06_left_row_unlulerin_actigi_davalar_iconu.png', width: 24, height: 24),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                                                      Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => HaykirPage(userEmail: widget.userEmail),
+                                    ),
+                                  );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Image.asset('lib/icons/06_left_row_haykirislarim.png', width: 24, height: 24),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                                                      Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (context) => TrendInsightsPage(userEmail: widget.userEmail),
+                                    ),
+                                  );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+                                    child: Icon(
+                                      MdiIcons.trendingUp,
+                                      size: 24,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                            child: IconButton(
-                              icon: Icon(MdiIcons.briefcaseEditOutline, size: 24, color: Colors.black54),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const CezalarPage()),
-                                );
-                              },
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                            child: IconButton(
-                              icon: Icon(MdiIcons.handcuffs, size: 24, color: Colors.black54),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const CezalarPage()),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
+                          )
+                          : const SizedBox.shrink(),
+                    ),
+                    const SizedBox(
+
                     ),
 
                     Expanded(
-                      child: SizedBox(
-                        height: 500,
-                        child: ListView.builder(
-                          itemCount: davaList.length, // davaList.length kullan
-                          itemBuilder: (context, index) {
-                            return Column(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: FiveCardCaseInformation(
-                                    dava: davaList[index],
-                                    onTap: () {
-                                      setState(() {
-                                        isHukumExpanded = !isHukumExpanded;
-                                      });
-                                    },
-                                  ),
-                                ),
-                                // 8-HÜKÜM açılır metin alanı
-                                if (isHukumExpanded)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(12.0),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[100],
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.grey[300]!),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Hüküm Detayları - ${isUnluDavali ? "Ünlü Davalı" : "Dava Açan Ünlü"}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          const TextField(
-                                            maxLines: 3,
-                                            decoration: InputDecoration(
-                                              hintText: "Hüküm detaylarını buraya yazın...",
-                                              border: OutlineInputBorder(),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          // Delilleri incele sayfasındaki ikonlar
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                            children: [
-                                              _buildIconCounter(Icons.mode_comment_outlined, commentCount, () {
-                                                setState(() => commentCount++);
-                                              }),
-                                              _buildIconCounter(Icons.repeat, retweetCount, () {
-                                                setState(() => retweetCount++);
-                                              }),
-                                              _buildIconCounter(Icons.favorite_border, likeCount, () {
-                                                setState(() => likeCount++);
-                                              }),
-                                              _buildIconCounter(Icons.thumb_down_alt_outlined, dislikeCount, () {
-                                                setState(() => dislikeCount++);
-                                              }),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
+                      child: _davaList.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Henüz ünlü dava yok',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    isUnluDavali
+                                        ? 'Davacı ünlü olan dava bulunamadı'
+                                        : 'Davalı ünlü olan dava bulunamadı',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _davaList.length,
+                              itemBuilder: (context, index) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: katildigim.FiveCardCaseInformation(
+                                    davaData: _davaList[index],
+                                    userEmail: widget.userEmail,
+                                    onRefresh: _loadUnluDavalar,
+                                  ),
+                                );
+                              },
+                            ),
                     ),
                   ],
                 ),
@@ -536,157 +411,3 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
     );
   }
 }
-
-class FiveCardCaseInformation extends StatelessWidget {
-  final Dava dava;
-  final VoidCallback? onTap;
-
-  const FiveCardCaseInformation({super.key, required this.dava, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 80,
-                padding: const EdgeInsets.all(9),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          MdiIcons.homeFlood,
-                          size: 19,
-                          color: Colors.green,
-                        ),
-                        const Text('Onayla', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                      ],
-                    ),
-                    Image.asset(dava.profilResmi, width: 60, height: 50),
-                    Row(
-                      children: [
-                        Icon(
-                          MdiIcons.giftOpen,
-                          size: 19,
-                          color: Colors.green,
-                        ),
-                        const Text('Onayla', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text('Dava Adı    :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 4),
-                        Expanded(child: Text(dava.adi, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Text('Davalı :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Flexible(child: Text(dava.davali, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                              const Spacer(),
-                              Icon(Icons.thumb_up_alt_outlined, size: 25, color: Colors.green),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('Görev        :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 4),
-                        Flexible(child: Text(dava.mevkii, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(MdiIcons.timerAlertOutline, size: 19, color: Colors.green),
-                        const SizedBox(width: 4),
-                        const Text('Kalan Süre :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 5),
-                        Flexible(
-                          child: Text(
-                            dava.kalanSure,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueAccent),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Bu buton tıklandığında açılır alan açılacak
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                              minimumSize: const Size(60, 30),
-                            ),
-                            child: Text("DESTEK ", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Bu buton tıklandığında açılır alan açılacak
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                              minimumSize: const Size(60, 30),
-                            ),
-                            child: Text("KINA", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-} 

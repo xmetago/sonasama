@@ -38,7 +38,7 @@ class ProfileIconsRow extends StatelessWidget {
           color: Colors.black54,
         ),
         // Rütbe Loading ikonu (Enerji Bar)
-        SizedBox(
+        const SizedBox(
           width: 100,
           height: 19,
           child: EnergyBar(value: 0.7),
