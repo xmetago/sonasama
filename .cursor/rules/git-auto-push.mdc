@@ -1,0 +1,16 @@
+---
+description: Tamamlanan kod değişikliklerinden sonra GitHub'a commit ve push yap
+alwaysApply: true
+---
+
+# GitHub otomatik senkron
+
+Kullanıcı açıkça istemedikçe boş veya yarım commit yapma. Ancak anlamlı bir görev tamamlandığında ve çalışma dizininde kaynak kodu değişikliği varsa:
+
+1. `build/`, `.dart_tool/`, `.idea/`, `*.iml` ve benzeri üretim/IDE dosyalarını commit etme.
+2. Yalnızca ilgili kaynak dosyalarını stage et.
+3. Değişikliğin amacını özetleyen Türkçe veya repodaki stile uygun commit mesajı yaz.
+4. `git push -u origin HEAD` ile GitHub'a gönder (remote yoksa veya izin yoksa kullanıcıyı bilgilendir).
+5. Push sonrası kısa özet ver: commit hash, branch, hangi dosyaların gittiği.
+
+Kullanıcı "commit etme" veya "push yapma" derse bu kuralı o oturum için yok say.
