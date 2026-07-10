@@ -2,7 +2,7 @@ import '../models/dava_halk_karari_result.dart';
 import 'dava_hukum_service.dart';
 import 'hive_database_service.dart';
 
-/// Davanın 76 günlük halk desteği penceresine dair yardımcı servis.
+/// Davanın halk desteği penceresine (hüküm süresi) dair yardımcı servis.
 class DavaHalkKarariService {
   /// Halk kararını hesaplar ve varsa kalıcı veriyi döner.
   static Future<DavaHalkKarariResult> evaluate({

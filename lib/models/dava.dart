@@ -1,3 +1,5 @@
+import '../utils/dava_map_utils.dart';
+
 /// Basit Dava sınıfı - dialog_utils.dart ve diğer yerlerde kullanım için
 class Dava {
   final String id;
@@ -29,7 +31,7 @@ class Dava {
     return Dava(
       id: map['id'] ?? '',
       davaAdi: map['davaAdi'] ?? map['adi'] ?? '',
-      kategori: map['kategori'] ?? '',
+      kategori: resolveDavaKategoriFromMap(map),
       davaci: map['davaci'] ?? '',
       davali: map['davali'] ?? '',
       mevkii: map['mevkii'] ?? '',
@@ -42,17 +44,16 @@ class Dava {
 
   // Dava'dan Map oluşturma
   Map<String, dynamic> toMap() {
-    return {
+    return withDavaKategoriFields({
       'id': id,
       'davaAdi': davaAdi,
-      'kategori': kategori,
       'davaci': davaci,
       'davali': davali,
       'mevkii': mevkii,
       'kalanSure': kalanSure,
       'profilResmi': profilResmi,
-      'davaKonusu': davaKonusu, // Dava konusu alanı eklendi
+      'davaKonusu': davaKonusu,
       'isOpened': isOpened,
-    };
+    }, kategori);
   }
 }

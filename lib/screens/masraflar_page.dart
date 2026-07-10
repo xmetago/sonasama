@@ -37,6 +37,7 @@ class MasraflarPage extends StatefulWidget {
 
 class _MasraflarPageState extends State<MasraflarPage> {
   int _current = 0;
+  bool _isHeaderCollapsed = true;
   final CarouselSliderController _carouselController = CarouselSliderController();
 
   void _goToPrevious() {
@@ -124,41 +125,64 @@ class _MasraflarPageState extends State<MasraflarPage> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
-              ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
-              // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
-              ),
-              // ROW 3: Profil Bölümü
-              Padding(
-                padding: const EdgeInsets.all(4.0),
-                child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
-                  userEmail: widget.userEmail,
-                  onShowSavedDavalar: () {
-                    // Masraflar sayfasında kaydedilen davalar dialog'u açılamaz
-                    // Bu sayfa sadece masraf işlemleri için
-                  },
-                ),
-              ),
-              // ROW 4: Hamburger Iconu, Checkbox ve bilgi satırı
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Image.asset(
-                        'lib/icons/menu_red.png',
-                        width: 24,
-                        height: 24,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                height: _isHeaderCollapsed ? 40 : null,
+                child: _isHeaderCollapsed
+                    ? CollapsedWbHeaderRow(
+                        title: 'MASRAFLAR ',
+                        onExpandHeader: () => setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
+                        onToggleLeftNav: () {},
+                      )
+                    : Column(
+                        children: [
+                          // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
+                          ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
+                          // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
+                          ),
+                          // ROW 3: Profil Bölümü
+                          Padding(
+                            padding: const EdgeInsets.all(4.0),
+                            child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
+                              userEmail: widget.userEmail,
+                              onShowSavedDavalar: () {
+                                // Masraflar sayfasında kaydedilen davalar dialog'u açılamaz
+                                // Bu sayfa sadece masraf işlemleri için
+                              },
+                            ),
+                          ),
+                          // ROW 4: Hamburger Iconu, Checkbox ve bilgi satırı
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  icon: Image.asset(
+                                    'lib/icons/menu_red.png',
+                                    width: 24,
+                                    height: 24,
+                                  ),
+                                  onPressed: () {},
+                                ),
+                                const Spacer(),
+                                const Text(
+                                  "MASRAFLAR ",
+                                  style: TextStyle(fontSize: 19),
+                                ),
+                                const Spacer(),
+                                IconButton(
+                                  icon: const Icon(Icons.keyboard_arrow_up, color: Colors.black54),
+                                  tooltip: 'Arayüzü Kapat',
+                                  onPressed: () => setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      onPressed: () {},
-                    ),
-                    const SizedBox(width: 68),
-                    const Center(child: Text("MASRAFLAR ",style: TextStyle(fontSize: 19),),)
-                  ],
-                ),
               ),
               // ROW 5: 6 Icon Solda, Sağda Card ile Dava Bilgileri
               Padding(

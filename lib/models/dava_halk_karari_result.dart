@@ -33,7 +33,7 @@ class DavaHalkKarariResult {
   });
 
   /// Varsayılan boş durum.
-  factory DavaHalkKarariResult.empty(String davaId, {int requiredDays = 76}) {
+  factory DavaHalkKarariResult.empty(String davaId, {int requiredDays = 19}) {
     return DavaHalkKarariResult(
       davaId: davaId,
       totalSupport: 0,

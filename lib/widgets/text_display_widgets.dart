@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/app_theme.dart';
+import '../utils/hashtag_text_helper.dart';
 
 /// Dava Konusu Görüntüleme Widget'ı
 /// Metin okuma odaklı, yüksek okunabilirlik için optimize edilmiş
@@ -79,9 +80,14 @@ class DavaKonusuDisplay extends StatelessWidget {
               ),
             )
           else
-            SelectableText(
-              davaKonusu,
-              style: AppTheme.davaContent,
+            SelectableText.rich(
+              TextSpan(
+                style: AppTheme.davaContent,
+                children: buildHashtagAwareSpans(
+                  davaKonusu,
+                  baseStyle: AppTheme.davaContent,
+                ),
+              ),
               textAlign: TextAlign.left,
             ),
         ],
@@ -173,9 +179,14 @@ class HaykirContentDisplay extends StatelessWidget {
               ),
             )
           else
-            SelectableText(
-              content,
-              style: AppTheme.haykirContent,
+            SelectableText.rich(
+              TextSpan(
+                style: AppTheme.haykirContent,
+                children: buildHashtagAwareSpans(
+                  content,
+                  baseStyle: AppTheme.haykirContent,
+                ),
+              ),
               textAlign: TextAlign.left,
             ),
         ],
@@ -268,9 +279,14 @@ class LongTextDisplay extends StatelessWidget {
               ),
             )
           else
-            SelectableText(
-              text,
-              style: textStyle ?? AppTheme.davaContent,
+            SelectableText.rich(
+              TextSpan(
+                style: textStyle ?? AppTheme.davaContent,
+                children: buildHashtagAwareSpans(
+                  text,
+                  baseStyle: textStyle ?? AppTheme.davaContent,
+                ),
+              ),
               textAlign: TextAlign.left,
             ),
         ],

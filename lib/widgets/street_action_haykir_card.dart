@@ -38,7 +38,7 @@ class _StreetActionHaykirCardState extends State<StreetActionHaykirCard> {
   late final TextEditingController _sloganController;
   String? _selectedDiren;
   bool _hasUnsavedChanges = false;
-  final bool _canHaykir = true; // Haykırma durumunu kontrol eder
+  bool _canHaykir = true; // Haykırma durumunu kontrol eder
   bool _showConfetti = false; // Konfeti animasyonunu göster/gizle
   bool _showLottieAnimation = false; // Lottie animasyonunu göster/gizle
 

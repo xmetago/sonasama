@@ -70,6 +70,15 @@ class _YargilaPageState extends State<YargilaPage> {
 
       for (final Map<String, dynamic> davaMap in acceptedDavalar) {
         final String davaId = (davaMap['id'] ?? '').toString();
+        final openedMeta = HiveDatabaseService.getOpenedDavaById(davaId);
+        if (openedMeta != null && openedMeta['isArchived'] == true) {
+          continue;
+        }
+        if (openedMeta != null &&
+            openedMeta['davaOverallStatus']?.toString() ==
+                'Reddedildi/Çekildi') {
+          continue;
+        }
         final DateTime? acceptedAt = _parseDateTimeOrNull(
               davaMap['acceptedAt'],
             ) ??
@@ -116,8 +125,12 @@ class _YargilaPageState extends State<YargilaPage> {
     return Row(
       children: [
         IconButton(
-          icon: Icon(icon, color: Colors.green),
+          icon: Icon(icon, size: 24, color: Colors.green.shade700),
           onPressed: onPressed,
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.green.withOpacity(0.10),
+            padding: const EdgeInsets.all(10),
+          ),
         ),
         Text('$count', style: const TextStyle(color: Colors.green)),
       ],
@@ -127,7 +140,7 @@ class _YargilaPageState extends State<YargilaPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50, // Beyaz alanı kaldırmak için arka plan rengi
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -158,32 +171,42 @@ class _YargilaPageState extends State<YargilaPage> {
               ),
               // ROW 4: Hamburger Iconu, Checkbox ve bilgi satırı
               Padding(
-                padding: const EdgeInsets.all(8.0),
+                padding: const EdgeInsets.all(2.0),
                 child: Row(
                   children: [
                     IconButton(
                       icon: Icon(
                         MdiIcons.menuOpen,
-                        size: 34,
-                        color: Colors.red,
+                        size: 19,
+                        color: Colors.red.shade700,
                       ),
                       onPressed: () {
                         setState(() {
                           showLeftIcons = !showLeftIcons;
                         });
                       },
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.red.withOpacity(0.10),
+                        padding: const EdgeInsets.all(10),
+                      ),
                     ),
-                    const SizedBox(width: 68),
+
                     // Fixed YARGILA Row
                     Expanded(
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Text(
-                            "YARGILA",
-                            style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                            "YARGILA ||",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontStyle: FontStyle.normal,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.8,
+                              color: Color(0xFF2F3E35),
+                            ),
                           ),
-                          const SizedBox(width: 95),
+
                           Image.asset(
                             'lib/icons/06_yargila_left_row_icon.png',
                             width: 24,
@@ -218,25 +241,41 @@ class _YargilaPageState extends State<YargilaPage> {
                             Padding(
                               padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
                               child: IconButton(
-                                icon: Icon(MdiIcons.briefcaseEditOutline, size: 24, color: Colors.black54),
+                                icon: Icon(
+                                  MdiIcons.briefcaseEditOutline,
+                                  size: 26,
+                                  color: Colors.blue.shade700,
+                                ),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
                                   );
                                 },
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.blue.withOpacity(0.10),
+                                  padding: const EdgeInsets.all(10),
+                                ),
                               ),
                             ),
                             Padding(
                               padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
                               child: IconButton(
-                                icon: Icon(MdiIcons.handcuffs, size: 24, color: Colors.black54),
+                                icon: Icon(
+                                  MdiIcons.handcuffs,
+                                  size: 26,
+                                  color: Colors.blueGrey.shade700,
+                                ),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
                                   );
                                 },
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.blueGrey.withOpacity(0.10),
+                                  padding: const EdgeInsets.all(10),
+                                ),
                               ),
                             ),
                           ],
@@ -292,7 +331,7 @@ class _YargilaPageState extends State<YargilaPage> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Padding(
-                                      padding: const EdgeInsets.only(top: 8.0),
+                                      padding: const EdgeInsets.only(top: 1.0),
                                       child: ModernYargilaCard(
                                         dava: dava,
                                         userEmail: widget.userEmail,
@@ -338,17 +377,14 @@ class _YargilaPageState extends State<YargilaPage> {
 
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF172A3A), Color(0xFF1F5F8B)],
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8E6), width: 1.3),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF0F1A17).withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -361,24 +397,25 @@ class _YargilaPageState extends State<YargilaPage> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
+                  color: const Color(0xFFEAF7EF),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.balance,
-                  color: Colors.white,
+                  color: Colors.green.shade700,
                   size: 24,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
+
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'HÜKMÜNÜ BURAYA YAZ',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.95),
+                        color: const Color(0xFF1B2A23),
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.6,
@@ -387,8 +424,8 @@ class _YargilaPageState extends State<YargilaPage> {
                     const SizedBox(height: 4),
                     Text(
                       'Davacı ${dava.davaci.isNotEmpty ? dava.davaci : ' '} ile davalı ${dava.davali.isNotEmpty ? dava.davali : ' '} arasındaki uyuşmazlık için son söz sizde.',
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
                         fontSize: 13,
                         height: 1.4,
                       ),
@@ -398,11 +435,14 @@ class _YargilaPageState extends State<YargilaPage> {
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          _buildDashedLine(Colors.green.shade300),
           const SizedBox(height: 20),
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFDCE8DF)),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             child: TextField(
@@ -425,12 +465,15 @@ class _YargilaPageState extends State<YargilaPage> {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: const Color(0xFFF1F8F3),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -438,17 +481,16 @@ class _YargilaPageState extends State<YargilaPage> {
                       ? 'Kalan karakter: $remaining'
                       : 'Karakter sınırı aşıldı',
                   style: TextStyle(
-                    color: remaining >= 0 ? Colors.white : const Color(0xFFFFC9C9),
+                    color: remaining >= 0 ? Colors.green.shade800 : const Color(0xFFB42318),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              const Spacer(),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF174E68),
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
@@ -457,7 +499,7 @@ class _YargilaPageState extends State<YargilaPage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Hüküm kaydetme işlemi yakında eklenecek.'),
-                      backgroundColor: Colors.blueGrey,
+                      backgroundColor: Color(0xFF2D6A4F),
                     ),
                   );
                 },
@@ -470,6 +512,16 @@ class _YargilaPageState extends State<YargilaPage> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDashedLine(Color color) {
+    return SizedBox(
+      height: 10,
+      child: CustomPaint(
+        size: const Size(double.infinity, 10),
+        painter: DashedLinePainter(color: color, strokeWidth: 1.6),
       ),
     );
   }
@@ -610,8 +662,8 @@ class FiveCardCaseInformation extends StatelessWidget {
   }
 }
 
-// Modern Yargıla Card (unchanged)
-class ModernYargilaCard extends StatelessWidget {
+// Modern Yargıla Card — Dava Künyesi: collapsing (expand/collapse) başlık + içerik
+class ModernYargilaCard extends StatefulWidget {
   final Dava dava;
   final String? userEmail;
   final VoidCallback? onTap;
@@ -626,64 +678,148 @@ class ModernYargilaCard extends StatelessWidget {
   });
 
   @override
+  State<ModernYargilaCard> createState() => _ModernYargilaCardState();
+}
+
+class _ModernYargilaCardState extends State<ModernYargilaCard> {
+  bool _kunyeExpanded = true;
+
+  @override
   Widget build(BuildContext context) {
+    final dava = widget.dava;
+    final acceptedAt = widget.acceptedAt;
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.blue.shade50, Colors.blue.shade100],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.blue.shade300,
-          width: 2,
+          color: const Color(0xFFDDE9E2),
+          width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withValues(alpha: 0.2),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF101815).withValues(alpha: 0.07),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Dava Bilgileri Container
+        child: Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+                // Dava Künyesi — collapsing toolbar benzeri: sabit başlık çubuğu, içerik açılır/kapanır
                 Container(
-                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade200),
+                    border: Border.all(color: const Color(0xFFDCE7E1)),
                   ),
+                  clipBehavior: Clip.antiAlias,
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildInfoRow('Göreviniz', dava.mevkii, Icons.gavel_outlined),
-                      const Divider(height: 24),
-                      _buildInfoRow('Dava Adı', dava.adi, Icons.description),
-                      const Divider(height: 24),
-                      _buildInfoRow('Davacı', dava.davaci, Icons.person),
-                      const Divider(height: 24),
-                      _buildInfoRow('Davalı', dava.davali, Icons.person_outline),
-                      const Divider(height: 24),
-                      _buildCountdownRow(
-                        context: context,
-                        acceptedAt: acceptedAt,
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            setState(() => _kunyeExpanded = !_kunyeExpanded);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Center(
+                                        child: Text(
+                                          ' || Dava Künyesi ||',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.2,
+                                            color: const Color(0xFF1B2A23),
+                                          ),
+                                        ),
+                                      ),
+
+                                    ],
+                                  ),
+                                ),
+                                AnimatedRotation(
+                                  turns: _kunyeExpanded ? 0.5 : 0,
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                  child: Icon(
+                                    Icons.expand_more,
+                                    color: Colors.grey.shade600,
+                                    size: 26,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      AnimatedCrossFade(
+                        firstCurve: Curves.easeOutCubic,
+                        secondCurve: Curves.easeInCubic,
+                        sizeCurve: Curves.easeInOutCubic,
+                        duration: const Duration(milliseconds: 280),
+                        crossFadeState: _kunyeExpanded
+                            ? CrossFadeState.showSecond
+                            : CrossFadeState.showFirst,
+                        firstChild: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildInfoRow('Göreviniz', dava.mevkii, Icons.gavel_outlined),
+                              const SizedBox(height: 3),
+                              _buildDashedLine(const Color(0xFFD8E5DE)),
+                              const SizedBox(height: 3),
+                              _buildInfoRow('Dava Adı', dava.adi, Icons.description),
+                              const SizedBox(height: 3),
+                              _buildDashedLine(const Color(0xFFD8E5DE)),
+                              const SizedBox(height: 3),
+                              _buildInfoRow('Davacı', dava.davaci, Icons.person),
+                              const SizedBox(height: 3),
+                              _buildDashedLine(const Color(0xFFD8E5DE)),
+                              const SizedBox(height: 3),
+                              _buildInfoRow('Davalı', dava.davali, Icons.person_outline),
+                              const SizedBox(height: 3),
+                              _buildDashedLine(const Color(0xFFD8E5DE)),
+                              const SizedBox(height: 1),
+                              _buildCountdownRow(
+                                context: context,
+                                acceptedAt: acceptedAt,
+                              ),
+                            ],
+                          ),
+                        ),
+                        secondChild: const SizedBox.shrink(),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: widget.onTap,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                 // Dava Konusu
                 dava.davaKonusu.isNotEmpty
                     ? Column(
@@ -691,36 +827,37 @@ class ModernYargilaCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
+                              color: const Color(0xFFF6FBF8),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.blue.shade200),
+                              border: Border.all(color: const Color(0xFFDCE7E1)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.article, color: Colors.blue.shade700, size: 18),
+                                    Icon(Icons.article, color: Colors.green.shade700, size: 18),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Dava Konusu:',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.blue.shade700,
+                                        color: Colors.green.shade700,
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                Text(
+                                SelectableText(
                                   dava.davaKonusu,
+                                  textAlign: TextAlign.justify,
                                   style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey.shade800,
-                                    height: 1.4,
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                    height: 1.5,
                                   ),
-                                ),
+                                )
                               ],
                             ),
                           ),
@@ -738,25 +875,40 @@ class ModernYargilaCard extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (context) => DelilleriIncelePage(
-                                userEmail: userEmail,
+                                userEmail: widget.userEmail,
                                 davaId: dava.id, // Seçili davanın ID'sini geç
                               ),
                             ),
                           );
                         },
-                        icon: const Icon(Icons.content_paste_search, size: 18),
-                        label: const Text('Delilleri İncele'),
+                        icon: Icon(
+                          Icons.content_paste_search,
+                          size: 24,
+                          color: Colors.blue.shade700,
+                        ),
+                        label: Text(
+                          'Deliller',
+                          style: TextStyle(
+                            color: Colors.blue.shade800,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade700,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: Colors.blue.withOpacity(0.10),
+                          foregroundColor: Colors.blue.shade800,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(18),
+                            side: BorderSide(
+                              color: Colors.blue.withOpacity(0.20),
+                              width: 1.2,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 34),
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () {
@@ -774,38 +926,62 @@ class ModernYargilaCard extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (context) => SekizHukumPage(
-                                userEmail: userEmail,
+                                userEmail: widget.userEmail,
                                 arguments: arguments,
                               ),
                             ),
                           );
                         },
-                        icon: Icon(MdiIcons.accountDetails, size: 18),
-                        label: const Text('8-HÜKÜM'),
+                        icon: Icon(
+                          MdiIcons.accountDetails,
+                          size: 24,
+                          color: Colors.green.shade700,
+                        ),
+                        label: Text(
+                          '8-HÜKÜM',
+                          style: TextStyle(
+                            color: Colors.green.shade800,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade700,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: Colors.green.withOpacity(0.10),
+                          foregroundColor: Colors.green.shade800,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(18),
+                            side: BorderSide(
+                              color: Colors.green.withOpacity(0.20),
+                              width: 1.2,
+                            ),
                           ),
                         ),
                       ),
                     ),
+
                   ],
+                ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
         ),
-      ),
     );
   }
 
   Widget _buildDashedLine(Color color) {
-    return Container(
-
-      );
+    return SizedBox(
+      height: 10,
+      child: CustomPaint(
+        size: const Size(double.infinity, 10),
+        painter: DashedLinePainter(color: color, strokeWidth: 1.6),
+      ),
+    );
 
   }
 
@@ -816,7 +992,7 @@ class ModernYargilaCard extends StatelessWidget {
         Icon(
           icon,
           size: 20,
-          color: isHighlight ? Colors.red.shade600 : Colors.blue.shade600,
+          color: isHighlight ? Colors.red.shade600 : Colors.green.shade700,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -863,13 +1039,14 @@ class DashedLinePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     const dashWidth = 5;
-    const dashSpace = 5;
+    const dashSpace = 6;
+    final y = size.height / 2;
     double startX = 0;
 
     while (startX < size.width) {
       canvas.drawLine(
-        Offset(startX, 0),
-        Offset(startX + dashWidth, 0),
+        Offset(startX, y),
+        Offset(startX + dashWidth, y),
         paint,
       );
       startX += dashWidth + dashSpace;
@@ -899,7 +1076,7 @@ Widget _buildCountdownRow({
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: Colors.blue.shade700,
+            color: Colors.green.shade700,
           ),
         ),
       ),

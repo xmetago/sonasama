@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 import '../services/statistics_analytics_service.dart';
+import '../services/dava_hukum_service.dart';
 import '../services/hive_database_service.dart';
 import 'home_page.dart';
 import 'chat_page.dart';
@@ -859,10 +860,10 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                     icon: Icons.event_note_rounded,
                     label: 'Dava Sonucu Tarihi',
                     value: insight.resultAt == null
-                        ? '${_formatDateTime(insight.openedAt.add(const Duration(days: 76)))} (-> 76 gün sonra)'
+                        ? '${_formatDateTime(insight.openedAt.add(Duration(days: DavaHukumService.hukumSuresiGun)))} (-> ${DavaHukumService.hukumSuresiGun} gün sonra)'
                         : _formatDateTime(insight.resultAt!),
                     tooltip: insight.resultAt == null
-                        ? 'Dava açılış tarihinden 76 gün sonra sonuçlanır'
+                        ? 'Dava açılış tarihinden ${DavaHukumService.hukumSuresiGun} gün sonra sonuçlanır'
                         : null,
                   ),
                   const SizedBox(height: 24),

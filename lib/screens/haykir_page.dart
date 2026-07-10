@@ -7,6 +7,7 @@ import '../utils/dialog_utils.dart';
 import '../data/direm_data.dart';
 import '../providers/dava_provider.dart';
 import 'saved_widgets_page.dart';
+import '../widgets/expandable_comment_text.dart';
 
 // Model class for Haykir
 class Haykir {
@@ -294,7 +295,7 @@ class _HaykirPageState extends State<HaykirPage> {
       categories[uyelerdenIndex] = DiremCategory(
         name: 'Üyelerden',
         icon: '👥',
-        color: const Color(0xFF10B981), // Yeşil
+        color: Color(0xFF10B981), // Yeşil
         diremler: uniqueDiremler,
       );
     }
@@ -309,7 +310,7 @@ class _HaykirPageState extends State<HaykirPage> {
         categories[baskaBirDiremIndex] = DiremCategory(
           name: 'Başka bir diren',
           icon: '✨',
-          color: const Color(0xFF9B59B6), // Mor
+          color: Color(0xFF9B59B6), // Mor
           diremler: ozelDiremler,
         );
       } else {
@@ -317,7 +318,7 @@ class _HaykirPageState extends State<HaykirPage> {
         categories.add(DiremCategory(
           name: 'Başka bir diren',
           icon: '✨',
-          color: const Color(0xFF9B59B6), // Mor
+          color: Color(0xFF9B59B6), // Mor
           diremler: ozelDiremler,
         ));
       }
@@ -392,26 +393,13 @@ class _HaykirPageState extends State<HaykirPage> {
             // Tab Section
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 53.0, vertical: 8.0),
               child: Row(
                 children: [
                   // Menü ikonu - tıklanabilir
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        showLeftIcons = !showLeftIcons;
-                      });
-                    },
-                    child: Icon(
-                      MdiIcons.menuOpen,
-                      size: 34,
-                      color: Colors.red,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
                       decoration: BoxDecoration(
                         color: Colors.orangeAccent,
                         borderRadius: BorderRadius.circular(12),
@@ -447,7 +435,7 @@ class _HaykirPageState extends State<HaykirPage> {
                           child: Column(
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.campaign, size: 24, color: Colors.black54),
+                                icon: Icon(Icons.campaign, size: 24, color: Colors.black54),
                                 onPressed: () {
                                   setState(() {
                                     showCreateForm = !showCreateForm;
@@ -505,87 +493,112 @@ class _HaykirPageState extends State<HaykirPage> {
                                       ),
                                       const SizedBox(height: 20),
                                       
-                                      // Haykırış Adı
-                                      TextField(
-                                        controller: _adiController,
-                                        decoration: InputDecoration(
-                                          labelText: 'Haykırış Adı',
-                                          hintText: 'Haykırışınızın adını girin',
-                                          prefixIcon: const Icon(Icons.campaign),
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          filled: true,
-                                          fillColor: Colors.white,
-                                        ),
-                                        onChanged: (_) => setState(() {}),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      
-                                      // Slogan
-                                      TextField(
-                                        controller: _sloganController,
-                                        decoration: InputDecoration(
-                                          labelText: 'Slogan',
-                                          hintText: 'Sloganınızı girin',
-                                          prefixIcon: const Icon(Icons.format_quote),
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          filled: true,
-                                          fillColor: Colors.white,
-                                        ),
-                                        maxLines: 2,
-                                        onChanged: (_) => setState(() {}),
-                                      ),
-                                      const SizedBox(height: 16),
-
-                                      // Seçilen yada yazılan diren burda görünür
+                                      // Haykırış Adı + Slogan + Seçilen Diren — tek bütün
                                       Container(
                                         padding: const EdgeInsets.all(16),
                                         decoration: BoxDecoration(
-                                          color: Colors.blue.shade50,
+                                          color: Colors.orange.shade50,
                                           borderRadius: BorderRadius.circular(12),
                                           border: Border.all(
-                                            color: Colors.blue.shade200,
+                                            color: Colors.orange.shade200,
                                             width: 1.5,
                                           ),
                                         ),
-                                        child: Row(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            const Icon(Icons.flag, color: Colors.orangeAccent, size: 40),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    'Seçilen/Yazılan Direm:',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Colors.blue.shade700,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    _selectedDireme ?? (_ozelDiremController.text.trim().isNotEmpty 
-                                                        ? _ozelDiremController.text.trim() 
-                                                        : 'Henüz direm seçilmedi'),
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight: FontWeight.w500,
-                                                      color: (_selectedDireme != null || _ozelDiremController.text.trim().isNotEmpty)
-                                                          ? Colors.black87 
-                                                          : Colors.grey,
-                                                    ),
-                                                  ),
-                                                ],
+                                            TextField(
+                                              controller: _adiController,
+                                              decoration: InputDecoration(
+                                                labelText: 'Haykırış Adı',
+                                                hintText: 'Haykırışınızın adını girin',
+                                                prefixIcon: const Icon(Icons.campaign),
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                filled: true,
+                                                fillColor: Colors.white,
                                               ),
+                                              onChanged: (_) => setState(() {}),
+                                            ),
+                                            const SizedBox(height: 19),
+                                            TextField(
+                                              controller: _sloganController,
+                                              decoration: InputDecoration(
+                                                labelText: 'Slogan',
+                                                hintText: 'Sloganınızı girin',
+                                                prefixIcon: const Icon(Icons.format_quote),
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                filled: true,
+                                                fillColor: Colors.white,
+                                              ),
+                                              maxLines: 2,
+                                              onChanged: (_) => setState(() {}),
+                                            ),
+                                            Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    const Expanded(child: Divider(height: 24, thickness: 1)),Text(
+                                                      'Seçilen Diren:',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.orange.shade700,
+                                                      ),
+                                                    ),
+                                                    Padding(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                      child: Transform.rotate(
+                                                        angle: 120 * (3.141592653589793 / 180), // 45 derecenin radyan karşılığı
+                                                        child: Icon(
+                                                          Icons.flashlight_on_outlined,
+                                                          color: Colors.orangeAccent,
+                                                          size: 19,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const Expanded(child: Divider(height: 24, thickness: 1)),
+                                                  ],
+                                                ),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.local_fire_department,
+                                                      color: Colors.orangeAccent,
+                                                      size: 40,
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            _selectedDireme ?? (_ozelDiremController.text.trim().isNotEmpty
+                                                                ? _ozelDiremController.text.trim()
+                                                                : 'Henüz direm seçilmedi'),
+                                                            style: TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight: FontWeight.w500,
+                                                              color: (_selectedDireme != null || _ozelDiremController.text.trim().isNotEmpty)
+                                                                  ? Colors.black87
+                                                                  : Colors.grey,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
                                       ),
+                                      const SizedBox(height: 16),
                                       // DİREN Bölümü
                                       Container(
                                         padding: const EdgeInsets.all(16),
@@ -610,56 +623,59 @@ class _HaykirPageState extends State<HaykirPage> {
                                               ),
                                             ),
                                             const SizedBox(height: 12),
-                                            
+
                                             // Kategori Sekmeleri
                                             SizedBox(
                                               height: 50,
-                                              child: ListView.builder(
+                                              child: ListView.separated(
                                                 scrollDirection: Axis.horizontal,
                                                 itemCount: allCategories.length,
+                                                separatorBuilder: (context, index) => VerticalDivider(
+                                                  width: 16,
+                                                  thickness: 1,
+                                                  color: Colors.grey.shade400,
+                                                ),
                                                 itemBuilder: (context, index) {
                                                   final category = allCategories[index];
                                                   final isSelected = _selectedCategoryIndex == index;
-                                                  return Padding(
-                                                    padding: const EdgeInsets.only(right: 8.0),
-                                                    child: FilterChip(
-                                                      label: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          Text(category.icon),
-                                                          const SizedBox(width: 4),
-                                                          Text(
-                                                            category.name,
-                                                            style: TextStyle(
-                                                              fontSize: 12,
-                                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                                            ),
+                                                  return FilterChip(
+                                                    label: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(category.icon),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          category.name,
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                                           ),
-                                                        ],
-                                                      ),
-                                                      selected: isSelected,
-                                                      onSelected: (selected) {
-                                                        setState(() {
-                                                          if (selected) {
-                                                            _selectedCategoryIndex = index;
-                                                            _selectedDireme = null;
-                                                          }
-                                                        });
-                                                      },
-                                                      selectedColor: category.color.withOpacity(0.3),
-                                                      checkmarkColor: category.color,
-                                                      backgroundColor: Colors.white,
-                                                      side: BorderSide(
-                                                        color: isSelected ? category.color : Colors.grey.shade300,
-                                                        width: isSelected ? 2 : 1,
-                                                      ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    selected: isSelected,
+                                                    onSelected: (selected) {
+                                                      setState(() {
+                                                        if (selected) {
+                                                          _selectedCategoryIndex = index;
+                                                          _selectedDireme = null;
+                                                        }
+                                                      });
+                                                    },
+                                                    selectedColor: category.color.withOpacity(0.3),
+                                                    checkmarkColor: category.color,
+                                                    backgroundColor: Colors.white,
+                                                    side: BorderSide(
+                                                      color: isSelected ? category.color : Colors.grey.shade300,
+                                                      width: isSelected ? 2 : 1,
                                                     ),
                                                   );
                                                 },
                                               ),
                                             ),
-                                            
-                                            const SizedBox(height: 16),
+
+                                            const Divider(height: 24),
+
                                             // Seçili Kategorinin Diremleri
                                             Container(
                                               constraints: const BoxConstraints(maxHeight: 200),
@@ -695,9 +711,9 @@ class _HaykirPageState extends State<HaykirPage> {
                                                 ),
                                               ),
                                             ),
-                                            
-                                            const SizedBox(height: 16),
-                                            
+
+                                            const Divider(height: 24),
+
                                             // Özel Direm Oluşturma Alanı
                                             Container(
                                               padding: const EdgeInsets.all(12),
@@ -724,7 +740,7 @@ class _HaykirPageState extends State<HaykirPage> {
                                                         counterStyle: TextStyle(
                                                           fontSize: 10,
                                                           color: _ozelDiremController.text.length > 19
-                                                            ? Colors.red 
+                                                            ? Colors.red
                                                             : Colors.grey,
                                                         ),
                                                       ),
@@ -753,15 +769,14 @@ class _HaykirPageState extends State<HaykirPage> {
                                                           }
                                                           return;
                                                         }
-                                                        
+
                                                         try {
-                                                          // ✅ Üyelerden kategorisine kaydet
                                                           await HiveDatabaseService.addUyelerdenDirem(diremText);
-                                                          
+
                                                           setState(() {
                                                             _selectedDireme = null;
                                                           });
-                                                          
+
                                                           if (mounted) {
                                                             ScaffoldMessenger.of(context).showSnackBar(
                                                               SnackBar(
@@ -785,6 +800,8 @@ class _HaykirPageState extends State<HaykirPage> {
                                                     style: ElevatedButton.styleFrom(
                                                       backgroundColor: Colors.green.shade700,
                                                       foregroundColor: Colors.white,
+                                                      minimumSize: const Size(0, 40),
+                                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                                       shape: RoundedRectangleBorder(
                                                         borderRadius: BorderRadius.circular(8),
@@ -856,7 +873,7 @@ class _HaykirPageState extends State<HaykirPage> {
                                                   borderRadius: BorderRadius.circular(8),
                                                 ),
                                               ),
-                                              child: const Text('KAYDET'),
+                                              child: const Text('İPTAL'),
                                             ),
                                           ),
                                           const SizedBox(width: 12),
@@ -878,8 +895,9 @@ class _HaykirPageState extends State<HaykirPage> {
                                               icon: const Icon(Icons.campaign, size: 20),
                                               label: const Text('HAYKIR'),
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.orange,
+                                                backgroundColor: Colors.orange.shade600,
                                                 foregroundColor: Colors.white,
+                                                minimumSize: const Size(0, 48),
                                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                                 shape: RoundedRectangleBorder(
                                                   borderRadius: BorderRadius.circular(8),
@@ -915,40 +933,49 @@ class _HaykirPageState extends State<HaykirPage> {
                                       }
                                     });
                                   },
-                                  onClose: () async {
-                                    // ✅ Haykırışı haykir_page'den gizle
-                                    if (haykirData != null && haykirData['id'] != null) {
-                                      try {
-                                        await HiveDatabaseService.updateHaykir(
-                                          haykirData['id'].toString(),
-                                          {'isVisibleInHaykirPage': 'false'},
-                                        );
-                                        setState(() {
-                                          // Listeyi yenile
-                                        });
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('✅ Haykırış gizlendi. Haykırışlarım sayfasından görüntüleyebilirsiniz.'),
-                                              backgroundColor: Colors.green,
-                                            ),
-                                          );
+                                  onClose: haykirData != null &&
+                                          haykirData['id'] != null &&
+                                          widget.userEmail != null &&
+                                          haykirData['userEmail']?.toString() == widget.userEmail
+                                      ? () async {
+                                          final haykirId = haykirData['id'].toString();
+                                          try {
+                                            await HiveDatabaseService.deleteHaykir(haykirId);
+
+                                            if (widget.userEmail != null) {
+                                              final davaProvider = Provider.of<DavaProvider>(
+                                                context,
+                                                listen: false,
+                                              );
+                                              await davaProvider.refreshAll();
+                                            }
+
+                                            if (mounted) {
+                                              setState(() {});
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    '✅ Haykırış silindi ve seyir defterinden kaldırıldı.',
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                          } catch (e) {
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('❌ Hata: $e'),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            }
+                                          }
                                         }
-                                      } catch (e) {
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('❌ Hata: $e'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    }
-                                  },
+                                      : null,
                                 ),
                               );
-                            }),
+                            }).toList(),
                           ],
                         ),
                       ),
@@ -1044,7 +1071,21 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
     );
     
     // ✅ Adım 4: Etkileşim istatistiklerini veritabanından yükle
+    _initPublishedState();
     _loadInteractionStats();
+  }
+
+  void _initPublishedState() {
+    final publishedFlag = widget.haykirData?['isPublishedOnCard'];
+    final isPublished = publishedFlag is bool
+        ? publishedFlag
+        : publishedFlag?.toString().toLowerCase() == 'true';
+    if (isPublished) {
+      isHaykirPressed = true;
+      showSocialIcons = true;
+      showSuccessAnimation = true;
+      _animationController?.value = 1.0;
+    }
   }
   
   // ✅ Etkileşim istatistiklerini veritabanından yükle
@@ -1151,12 +1192,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Close butonu
-                  if (widget.onClose != null)
+                  // Close butonu — yalnızca henüz yayınlanmamış haykırlarda
+                  if (widget.onClose != null && !isHaykirPressed)
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.red),
                       onPressed: widget.onClose,
-                      tooltip: 'Haykırışı gizle',
+                      tooltip: 'Haykırışı sil',
                     )
                   else
                     const SizedBox.shrink(),
@@ -1167,23 +1208,35 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                     child: ElevatedButton.icon(
                       onPressed: isHaykirPressed
                           ? null // ✅ Basıldıktan sonra inaktif
-                          : () {
+                          : () async {
                               setState(() {
                                 showSocialIcons = true;
                                 isHaykirPressed = true;
                                 showSuccessAnimation = true;
                               });
                               _animationController?.forward();
+
+                              if (widget.haykirData?['id'] != null) {
+                                try {
+                                  await HiveDatabaseService.updateHaykir(
+                                    widget.haykirData!['id'].toString(),
+                                    {'isPublishedOnCard': 'true'},
+                                  );
+                                } catch (e) {
+                                  print('⚠️ Haykır yayın durumu kaydedilemedi: $e');
+                                }
+                              }
+
                               // Başarı mesajı göster
                               Future.delayed(const Duration(milliseconds: 500), () {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: const Row(
+                                      content: Row(
                                         children: [
-                                          Icon(Icons.celebration, color: Colors.white),
-                                          SizedBox(width: 8),
-                                          Text('🎉 Haykırışınız yayınlandı!'),
+                                          const Icon(Icons.celebration, color: Colors.white),
+                                          const SizedBox(width: 8),
+                                          const Text('🎉 Haykırışınız yayınlandı!'),
                                         ],
                                       ),
                                       duration: const Duration(seconds: 2),
@@ -1199,15 +1252,17 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                             },
                       icon: Icon(
                         isHaykirPressed ? Icons.check_circle : Icons.campaign,
-                        size: 16,
+                        size: 19,
                       ),
                       label: Text(
                         isHaykirPressed ? 'YAYINLANDI' : 'HAYKIR',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isHaykirPressed ? Colors.green : Colors.orange,
+                        backgroundColor: isHaykirPressed ? Colors.green.shade700 : Colors.orange.shade600,
                         foregroundColor: Colors.white,
+                        minimumSize: const Size(0, 40),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -1225,9 +1280,9 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: Colors.orange.shade200),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1256,7 +1311,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                         Expanded(
                           child: Text(
                             widget.haykir.slogan,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               color: Colors.black,
                               fontStyle: FontStyle.normal,
@@ -1330,12 +1385,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                           ),
                         ],
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.celebration, color: Colors.orange, size: 28),
-                          SizedBox(width: 8),
-                          Text(
+                          const Icon(Icons.celebration, color: Colors.orange, size: 28),
+                          const SizedBox(width: 8),
+                          const Text(
                             ' Haykırışınız Aktif! ',
                             style: TextStyle(
                               fontSize: 16,
@@ -1343,8 +1398,8 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                               color: Colors.orange,
                             ),
                           ),
-                          SizedBox(width: 8),
-                          Icon(Icons.celebration, color: Colors.orange, size: 28),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.celebration, color: Colors.orange, size: 28),
                         ],
                       ),
                     ),
@@ -1681,17 +1736,18 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                                               ],
                                             ),
                                             const SizedBox(height: 6),
-                                            Text(
-                                              comment['commentText']?.toString() ?? '',
+                                            ExpandableCommentText(
+                                              text: comment['commentText']?.toString() ?? '',
                                               style: const TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.black87,
                                               ),
+                                              maxLines: 4,
                                             ),
                                           ],
                                         ),
                                       );
-                                    }),
+                                    }).toList(),
                                 ],
                               ),
                             ),
@@ -2035,6 +2091,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.grey[300],
                               foregroundColor: Colors.black87,
+                              minimumSize: const Size(0, 48),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -2058,6 +2115,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                             style: ElevatedButton.styleFrom(
                               backgroundColor: selectedOption != null ? Colors.orange : Colors.grey,
                               foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 48),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),

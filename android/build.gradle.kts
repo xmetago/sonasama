@@ -2,6 +2,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Maven Central alternatifi (repo.maven.apache.org erişilemezse)
+        maven { url = uri("https://repo1.maven.org/maven2/") }
     }
 }
 

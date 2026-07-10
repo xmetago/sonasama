@@ -295,7 +295,7 @@ class _OneFriendPhoneBellMenuState extends State<OneFriendPhoneBellMenu> {
         clipBehavior: Clip.none,
         children: [
           Container(
-            padding: const EdgeInsets.fromLTRB(19, 0, 60.0, 0),
+            padding: const EdgeInsets.fromLTRB(19, 0, 24.0, 0),
             decoration: BoxDecoration(
               color: Colors.grey.shade100,
               shape: BoxShape.circle,
@@ -1032,7 +1032,7 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
                     );
                   }
                 : null, // Kendi profilini gösteriyorsa tıklama yok
-            child: CircleAvatar( //PROFİL RESMİ ALANI
+            child: CircleAvatar( //PROFİL RESMİ ALANI //rengini değiştir
               radius: 30,
               backgroundColor: Colors.grey[200],
               backgroundImage: displayProfileImageUrl != null && displayProfileImageUrl.isNotEmpty
@@ -1281,4 +1281,84 @@ class _ModernKelimeKartState extends State<_ModernKelimeKart>
       ),
     );
   }
-} 
+}
+
+/// Collapsed (tek satır) üst başlık satırı — [DavaAcPage] ile aynı düzen.
+class CollapsedWbHeaderRow extends StatelessWidget {
+  final String title;
+  final VoidCallback onExpandHeader;
+  final VoidCallback onToggleLeftNav;
+
+  const CollapsedWbHeaderRow({
+    super.key,
+    required this.title,
+    required this.onExpandHeader,
+    required this.onToggleLeftNav,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                gradient: const LinearGradient(
+                  colors: <Color>[Color(0xFF059669), Colors.green],
+                ),
+              ),
+              child: const Text(
+                'WB',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            icon: const Icon(Icons.search, size: 16),
+            onPressed: () {},
+          ),
+          const SizedBox(width: 4),
+          Icon(MdiIcons.chatOutline, size: 16, color: Colors.black54),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onToggleLeftNav,
+            child: Icon(MdiIcons.menuOpen, size: 16, color: Colors.black54),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            icon: const Icon(
+              Icons.keyboard_arrow_down,
+              size: 18,
+              color: Colors.black,
+            ),
+            onPressed: onExpandHeader,
+            tooltip: 'Arayüzü Aç',
+          ),
+        ],
+      ),
+    );
+  }
+}

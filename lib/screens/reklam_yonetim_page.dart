@@ -612,6 +612,7 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: selectedKategori,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Kategori *',
                       border: OutlineInputBorder(),
@@ -619,7 +620,11 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
                     items: _kategoriler.map((kategori) {
                       return DropdownMenuItem(
                         value: kategori,
-                        child: Text(kategori),
+                        child: Text(
+                          kategori,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       );
                     }).toList(),
                     onChanged: (value) {
@@ -651,9 +656,15 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
                     children: [
                       Expanded(
                         child: ListTile(
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          contentPadding: EdgeInsets.zero,
                           title: Text(baslangicTarihi == null
                               ? 'Başlangıç Tarihi'
-                              : 'Başlangıç: ${baslangicTarihi!.day}/${baslangicTarihi!.month}/${baslangicTarihi!.year}'),
+                              : 'Başlangıç: ${baslangicTarihi!.day}/${baslangicTarihi!.month}/${baslangicTarihi!.year}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           trailing: const Icon(Icons.calendar_today),
                           onTap: () async {
                             final date = await showDatePicker(
@@ -676,9 +687,15 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
                     children: [
                       Expanded(
                         child: ListTile(
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          contentPadding: EdgeInsets.zero,
                           title: Text(bitisTarihi == null
                               ? 'Bitiş Tarihi'
-                              : 'Bitiş: ${bitisTarihi!.day}/${bitisTarihi!.month}/${bitisTarihi!.year}'),
+                              : 'Bitiş: ${bitisTarihi!.day}/${bitisTarihi!.month}/${bitisTarihi!.year}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           trailing: const Icon(Icons.calendar_today),
                           onTap: () async {
                             final date = await showDatePicker(

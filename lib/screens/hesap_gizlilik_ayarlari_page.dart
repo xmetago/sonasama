@@ -200,7 +200,7 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
             ayarBolumu("SEYİR DEFTERİMİ GÖRSÜN", [
               ayarSatiri("Arkadaşlar", "seyir_arkadaslar"),
               ayarSatiri("Takipçiler", "seyir_takipciler"),
-              ayarSatiri("Davalllarım", "seyir_davalllarim"),
+              ayarSatiri("Davalılarım", "seyir_davalllarim"),
               ayarSatiri("Herkes", "seyir_herkes"),
             ]),
             ayarBolumu("ONLINE GÖRÜNME", [
@@ -278,7 +278,7 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
               ayarSatiri("+18 Dava, Reklam", "genel_18"),
               ayarSatiri("Bana Dava Açılsın", "genel_davaacilsin"),
               ayarSatiri("Postrestant adresim", "genel_postrestant"),
-              ayarSatiri("Tanımak", "genel_tanimak"),
+              ayarSatiri("Tanınmak", "genel_tanimak"),
             ]),
             ayarBolumu("DAVETLER", [
               ayarSatiri("Eylem Davetleri", "davet_eylem"),

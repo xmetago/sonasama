@@ -8,12 +8,17 @@ class HukumSentimentSelector extends StatelessWidget {
   final ValueChanged<HukumSentiment
   > onSentimentSelected;
   final bool isDisabled;
+  final bool hidePartySideLabels;
+  /// Hüküm kesinleşince veya üst widget gizlediğinde başlık satırını gösterme.
+  final bool hidePromptTitle;
 
   const HukumSentimentSelector({
     super.key,
     required this.selectedSentiment,
     required this.onSentimentSelected,
     this.isDisabled = false,
+    this.hidePartySideLabels = false,
+    this.hidePromptTitle = false,
   });
 
   @override
@@ -21,14 +26,16 @@ class HukumSentimentSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          'Hüküm Yönünüzü Seçin',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: isDisabled ? Colors.grey.shade500 : Colors.grey.shade800,
-              ),
-        ),
-        const SizedBox(height: 8),
+        if (!hidePromptTitle) ...<Widget>[
+          Text(
+            'Hüküm Yönünüzü Seçin',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isDisabled ? Colors.grey.shade500 : Colors.grey.shade800,
+                ),
+          ),
+          const SizedBox(height: 8),
+        ],
         Row(
           children: <Widget>[
             Expanded(child: _buildOption(context, HukumSentiment.positive)),
@@ -114,19 +121,21 @@ class HukumSentimentSelector extends StatelessWidget {
                                 : (disabled ? baseColor.withOpacity(0.6) : baseColor),
                           ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      sentiment == HukumSentiment.positive
-                          ? 'Destekleyici, yapıcı yorum'
-                          : 'Eleştirel, karşı fikirli yorum',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: isSelected
-                                ? Colors.white.withOpacity(0.9)
-                                : (disabled
-                                    ? Colors.grey.shade500
-                                    : Colors.grey.shade700),
-                          ),
-                    ),
+                    if (!hidePartySideLabels) ...<Widget>[
+                      const SizedBox(height: 2),
+                      Text(
+                        sentiment == HukumSentiment.positive
+                            ? 'Davacı Haklı'
+                            : 'Davalı Haklı',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isSelected
+                                  ? Colors.white.withOpacity(0.9)
+                                  : (disabled
+                                      ? Colors.grey.shade500
+                                      : Colors.grey.shade700),
+                            ),
+                      ),
+                    ],
                   ],
                 ),
               ),

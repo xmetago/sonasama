@@ -31,9 +31,17 @@ class EvidenceCommentService {
     required String userEmail,
     required String commentText,
     String criticism = 'neutral',
+    bool isEvidenceValid = true,
   }) async {
     try {
       await initialize();
+
+      if (!isEvidenceValid && criticism == 'positive') {
+        return {
+          'success': false,
+          'error': 'Geçersiz delilde olumlu yorum yapılamaz',
+        };
+      }
       
       // Benzersiz ID oluştur
       final commentId = EvidenceCommentModel.generateCommentId(

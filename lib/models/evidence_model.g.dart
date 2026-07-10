@@ -30,6 +30,7 @@ class EvidenceModelAdapter extends TypeAdapter<EvidenceModel> {
       userId: fields[10] as String,
       likeCount: fields[11] as int,
       dislikeCount: fields[12] as int,
+      neutralCount: fields[14] == null ? 0 : fields[14] as int,
       likedBy: (fields[13] as Map?)?.cast<String, String>(),
     );
   }
@@ -37,7 +38,7 @@ class EvidenceModelAdapter extends TypeAdapter<EvidenceModel> {
   @override
   void write(BinaryWriter writer, EvidenceModel obj) {
     writer
-      ..writeByte(14)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -64,6 +65,8 @@ class EvidenceModelAdapter extends TypeAdapter<EvidenceModel> {
       ..write(obj.likeCount)
       ..writeByte(12)
       ..write(obj.dislikeCount)
+      ..writeByte(14)
+      ..write(obj.neutralCount)
       ..writeByte(13)
       ..write(obj.likedBy);
   }

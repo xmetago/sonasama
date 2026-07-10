@@ -116,6 +116,13 @@ class AuthProvider extends BaseProvider {
           throw Exception('Bu e-posta adresi zaten kayıtlı');
         }
 
+        // Yargıç adı benzersizlik kontrolü (case-insensitive)
+        final existingJudgeName =
+            HiveDatabaseService.getRegistrationByJudgeName(registration.judgeName);
+        if (existingJudgeName != null) {
+          throw Exception('Bu Yargıç Adı zaten kullanımda');
+        }
+
         // Kullanıcıyı kaydet
         await HiveDatabaseService.addRegistration(registration);
 

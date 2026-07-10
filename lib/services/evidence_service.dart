@@ -248,11 +248,11 @@ class EvidenceService {
         evidence.likedBy.remove(userEmail);
         evidence.likeCount = (evidence.likeCount - 1).clamp(0, 999999);
       } else {
-        // Önce dislike varsa kaldır
         if (currentVote == 'dislike') {
           evidence.dislikeCount = (evidence.dislikeCount - 1).clamp(0, 999999);
+        } else if (currentVote == 'neutral') {
+          evidence.neutralCount = (evidence.neutralCount - 1).clamp(0, 999999);
         }
-        // Like ekle
         evidence.likedBy[userEmail] = 'like';
         evidence.likeCount++;
       }
@@ -281,11 +281,11 @@ class EvidenceService {
         evidence.likedBy.remove(userEmail);
         evidence.dislikeCount = (evidence.dislikeCount - 1).clamp(0, 999999);
       } else {
-        // Önce like varsa kaldır
         if (currentVote == 'like') {
           evidence.likeCount = (evidence.likeCount - 1).clamp(0, 999999);
+        } else if (currentVote == 'neutral') {
+          evidence.neutralCount = (evidence.neutralCount - 1).clamp(0, 999999);
         }
-        // Dislike ekle
         evidence.likedBy[userEmail] = 'dislike';
         evidence.dislikeCount++;
       }
@@ -295,6 +295,178 @@ class EvidenceService {
     } catch (e) {
       print('❌ Dislike eklenirken hata: $e');
       rethrow;
+    }
+  }
+
+  /// Nötr oy ekle/kaldır (toggle)
+  Future<void> toggleNeutral(String evidenceId, String userEmail) async {
+    try {
+      final evidence = _evidenceBox.get(evidenceId);
+      if (evidence == null) {
+        print('❌ Delil bulunamadı: $evidenceId');
+        return;
+      }
+
+      final currentVote = evidence.getUserVote(userEmail);
+
+      if (currentVote == 'neutral') {
+        evidence.likedBy.remove(userEmail);
+        evidence.neutralCount = (evidence.neutralCount - 1).clamp(0, 999999);
+      } else {
+        if (currentVote == 'like') {
+          evidence.likeCount = (evidence.likeCount - 1).clamp(0, 999999);
+        } else if (currentVote == 'dislike') {
+          evidence.dislikeCount = (evidence.dislikeCount - 1).clamp(0, 999999);
+        }
+        evidence.likedBy[userEmail] = 'neutral';
+        evidence.neutralCount++;
+      }
+
+      await evidence.save();
+      print('✅ Nötr oy güncellendi - Delil: ${evidence.title}, Nötr: ${evidence.neutralCount}');
+    } catch (e) {
+      print('❌ Nötr oy eklenirken hata: $e');
+      rethrow;
+    }
+  }
+
+  /// Kullanıcı oyunu doğrudan ayarla: `like` | `dislike` | `neutral`
+  Future<void> setUserVote(
+    String evidenceId,
+    String userEmail,
+    String vote,
+  ) async {
+    if (vote != 'like' && vote != 'dislike' && vote != 'neutral') {
+      return;
+    }
+    try {
+      final evidence = _evidenceBox.get(evidenceId);
+      if (evidence == null) return;
+
+      final currentVote = evidence.getUserVote(userEmail);
+      if (currentVote == vote) return;
+
+      if (currentVote == 'like') {
+        evidence.likeCount = (evidence.likeCount - 1).clamp(0, 999999);
+      } else if (currentVote == 'dislike') {
+        evidence.dislikeCount = (evidence.dislikeCount - 1).clamp(0, 999999);
+      } else if (currentVote == 'neutral') {
+        evidence.neutralCount = (evidence.neutralCount - 1).clamp(0, 999999);
+      }
+
+      evidence.likedBy[userEmail] = vote;
+      if (vote == 'like') {
+        evidence.likeCount++;
+      } else if (vote == 'dislike') {
+        evidence.dislikeCount++;
+      } else {
+        evidence.neutralCount++;
+      }
+
+      await evidence.save();
+    } catch (e) {
+      print('❌ Delil oyu ayarlanırken hata: $e');
+      rethrow;
+    }
+  }
+
+  /// Hüküm finalize olduktan sonra kullanıcının delil oyunu zorunlu yöne çeker.
+  ///
+  /// - `isPositive == true` ise tüm delillerde kullanıcı oyu "like" olur.
+  /// - `isPositive == false` ise tüm delillerde kullanıcı oyu "dislike" olur.
+  /// - Kullanıcının mevcut oyu hedef yöndeyse değiştirilmez.
+  Future<void> applyForcedVoteForUser(
+    String davaId,
+    String userEmail, {
+    required bool isPositive,
+  }) async {
+    try {
+      final String trimmedDavaId = davaId.trim();
+      final String trimmedUserEmail = userEmail.trim();
+      if (trimmedDavaId.isEmpty || trimmedUserEmail.isEmpty) {
+        return;
+      }
+
+      final String targetVote = isPositive ? 'like' : 'dislike';
+      final evidences = getEvidenceByDavaId(trimmedDavaId);
+      if (evidences.isEmpty) {
+        return;
+      }
+
+      for (final evidence in evidences) {
+        final currentVote = evidence.getUserVote(trimmedUserEmail);
+        if (currentVote == targetVote) {
+          continue;
+        }
+
+        if (currentVote == 'like') {
+          evidence.likeCount = (evidence.likeCount - 1).clamp(0, 999999);
+        } else if (currentVote == 'dislike') {
+          evidence.dislikeCount = (evidence.dislikeCount - 1).clamp(0, 999999);
+        } else if (currentVote == 'neutral') {
+          evidence.neutralCount = (evidence.neutralCount - 1).clamp(0, 999999);
+        }
+
+        evidence.likedBy[trimmedUserEmail] = targetVote;
+        if (targetVote == 'like') {
+          evidence.likeCount++;
+        } else {
+          evidence.dislikeCount++;
+        }
+
+        await evidence.save();
+      }
+    } catch (e) {
+      print('❌ Zorunlu delil oyu uygulanırken hata: $e');
+    }
+  }
+
+  /// Dava süresi dolduğunda oy vermeyen kullanıcıları varsayılan "beğen" olarak işaretle.
+  ///
+  /// - Sadece bu dava delilleri güncellenir.
+  /// - Kullanıcının delilde mevcut bir oyu varsa (like/dislike) dokunulmaz.
+  Future<void> applyDefaultLikesForUsers(
+    String davaId,
+    List<String> userEmails,
+  ) async {
+    try {
+      if (davaId.trim().isEmpty || userEmails.isEmpty) {
+        return;
+      }
+
+      final normalizedEmails = userEmails
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList();
+
+      if (normalizedEmails.isEmpty) {
+        return;
+      }
+
+      final evidences = getEvidenceByDavaId(davaId);
+      if (evidences.isEmpty) {
+        return;
+      }
+
+      for (final evidence in evidences) {
+        bool changed = false;
+
+        for (final email in normalizedEmails) {
+          final currentVote = evidence.getUserVote(email);
+          if (currentVote == null || currentVote.isEmpty) {
+            evidence.likedBy[email] = 'like';
+            evidence.likeCount++;
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          await evidence.save();
+        }
+      }
+    } catch (e) {
+      print('❌ Varsayılan delil beğenileri uygulanırken hata: $e');
     }
   }
 

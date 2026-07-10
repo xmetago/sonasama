@@ -273,12 +273,21 @@ class CommonDavaCardWidget extends StatelessWidget {
   }
 
   Widget _buildCountdownSection(BuildContext context) {
-    // Dava açılış tarihini al
-    final startTime = acceptedAt ?? createdAt ?? DateTime.now();
-    final totalDuration = acceptedAt != null
+    final DateTime startTime = acceptedAt ?? createdAt ?? DateTime.now();
+    final Duration totalDuration = acceptedAt != null
         ? DavaTimerService.acceptedHukumWindow
         : DavaTimerService.incomingAcceptanceWindow;
-    
+
+    DavaIncomingCountdownSegment? phaseSeg;
+    if (!isAccepted && createdAt != null) {
+      phaseSeg =
+          DavaTimerService.buildIncomingListCountdown(openedAt: createdAt!);
+    }
+
+    final timerStart = phaseSeg?.segmentStart ?? startTime;
+    final timerDuration = phaseSeg?.totalDuration ?? totalDuration;
+    final accent = phaseSeg?.accentColor;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -291,7 +300,7 @@ class CommonDavaCardWidget extends StatelessWidget {
           Icon(MdiIcons.timerSand, color: AppTheme.infoColor, size: 20),
           const SizedBox(width: 8),
           Text(
-            'Kalan Süre:',
+            phaseSeg != null ? '${phaseSeg.phaseLabel}:' : 'Kalan Süre:',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -301,8 +310,9 @@ class CommonDavaCardWidget extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: CountdownTimerWidget(
-              startTime: startTime,
-              totalDuration: totalDuration,
+              startTime: timerStart,
+              totalDuration: timerDuration,
+              accentColor: accent,
               showHourglass: true,
               onTimeUp: () {
                 ScaffoldMessenger.of(context).showSnackBar(

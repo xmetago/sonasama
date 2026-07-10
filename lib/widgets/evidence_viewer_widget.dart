@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../services/evidence_service.dart';
+import '../services/hive_database_service.dart';
 import '../models/evidence_model.dart';
 import '../screens/delil_detay_page.dart';
 
@@ -18,6 +19,9 @@ class EvidenceViewerWidget extends StatefulWidget {
   
   /// Kullanıcı e-posta adresi (opsiyonel)
   final String? userEmail;
+
+  /// Kullanıcının bu davadaki rolü (opsiyonel)
+  final String? userRole;
   
   /// Widget başlığı (opsiyonel)
   final String? title;
@@ -32,6 +36,7 @@ class EvidenceViewerWidget extends StatefulWidget {
     super.key,
     required this.davaId,
     this.userEmail,
+    this.userRole,
     this.title,
     this.showCaseInfo = false,
     this.caseInfoCard,
@@ -191,7 +196,7 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
               ),
               const SizedBox(width: 8),
               Text(
-                'Delil Türleri',
+                'Delil Türlerini İncele',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -317,6 +322,7 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
           typeInfo: typeInfo,
           davaId: widget.davaId,
           userEmail: widget.userEmail,
+          userRole: widget.userRole,
         ),
       ),
     ).then((_) {
@@ -348,11 +354,13 @@ class _EvidenceListPage extends StatefulWidget {
   final EvidenceTypeInfo typeInfo;
   final String davaId;
   final String? userEmail;
+  final String? userRole;
 
   const _EvidenceListPage({
     required this.typeInfo,
     required this.davaId,
     this.userEmail,
+    this.userRole,
   });
 
   @override
@@ -365,6 +373,9 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
   bool _loading = true;
   final Map<String, bool> _userLikes = {}; // evidenceId -> isLiked
   final Map<String, bool> _userDislikes = {}; // evidenceId -> isDisliked
+  final Map<String, bool> _userNeutral = {}; // evidenceId -> nötr oy
+  bool _isVoteLockedByFinalizedHukum = false;
+  bool _forcedValidVote = false;
 
   @override
   void initState() {
@@ -375,6 +386,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
   Future<void> _load() async {
     try {
       await _service.initialize();
+      await _syncVoteLockWithFinalizedHukum();
       final all = _service.getAllEvidence();
       final targetType = widget.typeInfo.type;
       
@@ -392,6 +404,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
           final vote = evidence.getUserVote(widget.userEmail!);
           _userLikes[evidence.id] = vote == 'like';
           _userDislikes[evidence.id] = vote == 'dislike';
+          _userNeutral[evidence.id] = vote == 'neutral';
         }
       }
       
@@ -411,6 +424,45 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
         _loading = false;
       });
     }
+  }
+
+  String _normalizeRole(String role) {
+    final trimmed = role.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    return trimmed.endsWith('Kararı') ? trimmed : '$trimmed Kararı';
+  }
+
+  Future<void> _syncVoteLockWithFinalizedHukum() async {
+    final userEmail = widget.userEmail?.trim() ?? '';
+    final normalizedRole = _normalizeRole(widget.userRole ?? '');
+    if (userEmail.isEmpty || normalizedRole.isEmpty || widget.davaId.trim().isEmpty) {
+      _isVoteLockedByFinalizedHukum = false;
+      return;
+    }
+
+    final hukum = await HiveDatabaseService.getHukumByDavaIdAndRole(
+      widget.davaId.trim(),
+      normalizedRole,
+    );
+    final isFinalized = (hukum?['isFinalized'] as bool?) ?? false;
+    final sentiment = (hukum?['hukumSentiment'] as String?) ?? '';
+    final isPositive = sentiment == 'positive';
+    final isNegative = sentiment == 'negative';
+
+    if (isFinalized && (isPositive || isNegative)) {
+      await _service.applyForcedVoteForUser(
+        widget.davaId,
+        userEmail,
+        isPositive: isPositive,
+      );
+      _isVoteLockedByFinalizedHukum = true;
+      _forcedValidVote = isPositive;
+      return;
+    }
+
+    _isVoteLockedByFinalizedHukum = false;
   }
 
   @override
@@ -640,6 +692,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
     final userEmail = widget.userEmail ?? '';
     final isLiked = _userLikes[evidence.id] ?? false;
     final isDisliked = _userDislikes[evidence.id] ?? false;
+    final isNeutral = _userNeutral[evidence.id] ?? false;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -651,73 +704,154 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildLikeButton(
-            icon: Icons.thumb_up_rounded,
-            label: 'Beğen',
-            count: evidence.likeCount,
-            color: Colors.blue,
-            onTap: () async {
-              if (userEmail.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Beğenmek için giriş yapmalısınız'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-                return;
-              }
-              
-              await _service.toggleLike(evidence.id, userEmail);
-              
-              setState(() {
-                _userLikes[evidence.id] = !isLiked;
-                if (!isLiked && isDisliked) {
-                  _userDislikes[evidence.id] = false;
+          Expanded(
+            child: _buildLikeButton(
+              icon: Icons.thumb_up_rounded,
+              label: 'Geçerli',
+              count: evidence.likeCount,
+              color: Colors.blue,
+              isDisabled: _isVoteLockedByFinalizedHukum,
+              onTap: () async {
+                if (_isVoteLockedByFinalizedHukum) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _forcedValidVote
+                            ? 'Hükmünüz kesinleşti: deliller geçerli kabul edildi.'
+                            : 'Hükmünüz kesinleşti: deliller geçersiz kabul edildi.',
+                      ),
+                      backgroundColor: Colors.blueGrey,
+                    ),
+                  );
+                  return;
                 }
-              });
-              
-              // Delil listesini yenile
-              _load();
-            },
+                if (userEmail.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Geçerli için giriş yapmalısınız'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                await _service.toggleLike(evidence.id, userEmail);
+
+                setState(() {
+                  _userLikes[evidence.id] = !isLiked;
+                  if (_userLikes[evidence.id] == true) {
+                    _userDislikes[evidence.id] = false;
+                    _userNeutral[evidence.id] = false;
+                  }
+                });
+
+                _load();
+              },
+              isActive: isLiked,
+            ),
           ),
-          
           Container(
             width: 1,
             height: 24,
             color: Colors.grey[300],
           ),
-          
-          _buildLikeButton(
-            icon: Icons.thumb_down_rounded,
-            label: 'Beğenme',
-            count: evidence.dislikeCount,
-            color: Colors.red,
-            onTap: () async {
-              if (userEmail.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Beğenmemek için giriş yapmalısınız'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-                return;
-              }
-              
-              await _service.toggleDislike(evidence.id, userEmail);
-              
-              setState(() {
-                _userDislikes[evidence.id] = !isDisliked;
-                if (!isDisliked && isLiked) {
-                  _userLikes[evidence.id] = false;
+          Expanded(
+            child: _buildLikeButton(
+              icon: Icons.remove,
+              label: 'Nötr',
+              count: evidence.neutralCount,
+              color: Colors.grey,
+              isDisabled: _isVoteLockedByFinalizedHukum,
+              onTap: () async {
+                if (_isVoteLockedByFinalizedHukum) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _forcedValidVote
+                            ? 'Hükmünüz kesinleşti: deliller geçerli kabul edildi.'
+                            : 'Hükmünüz kesinleşti: deliller geçersiz kabul edildi.',
+                      ),
+                      backgroundColor: Colors.blueGrey,
+                    ),
+                  );
+                  return;
                 }
-              });
-              
-              // Delil listesini yenile
-              _load();
-            },
-            isActive: isDisliked,
+                if (userEmail.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Nötr oy için giriş yapmalısınız'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                await _service.toggleNeutral(evidence.id, userEmail);
+
+                setState(() {
+                  _userNeutral[evidence.id] = !isNeutral;
+                  if (_userNeutral[evidence.id] == true) {
+                    _userLikes[evidence.id] = false;
+                    _userDislikes[evidence.id] = false;
+                  }
+                });
+
+                _load();
+              },
+              isActive: isNeutral,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 24,
+            color: Colors.grey[300],
+          ),
+          Expanded(
+            child: _buildLikeButton(
+              icon: Icons.thumb_down_rounded,
+              label: 'Geçersiz',
+              count: evidence.dislikeCount,
+              color: Colors.red,
+              isDisabled: _isVoteLockedByFinalizedHukum,
+              onTap: () async {
+                if (_isVoteLockedByFinalizedHukum) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _forcedValidVote
+                            ? 'Hükmünüz kesinleşti: deliller geçerli kabul edildi.'
+                            : 'Hükmünüz kesinleşti: deliller geçersiz kabul edildi.',
+                      ),
+                      backgroundColor: Colors.blueGrey,
+                    ),
+                  );
+                  return;
+                }
+                if (userEmail.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Geçersiz  için giriş yapmalısınız'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                await _service.toggleDislike(evidence.id, userEmail);
+
+                setState(() {
+                  _userDislikes[evidence.id] = !isDisliked;
+                  if (_userDislikes[evidence.id] == true) {
+                    _userLikes[evidence.id] = false;
+                    _userNeutral[evidence.id] = false;
+                  }
+                });
+
+                _load();
+              },
+              isActive: isDisliked,
+            ),
           ),
         ],
       ),
@@ -732,18 +866,27 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
     required Color color,
     required VoidCallback onTap,
     bool isActive = false,
+    bool isDisabled = false,
   }) {
     return InkWell(
-      onTap: onTap,
+      onTap: isDisabled ? null : onTap,
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? color.withValues(alpha: 0.15) : Colors.white,
+          color: isDisabled
+              ? Colors.grey[200]
+              : isActive
+                  ? color.withValues(alpha: 0.15)
+                  : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive ? color : color.withValues(alpha: 0.3),
+            color: isDisabled
+                ? Colors.grey[400]!
+                : isActive
+                    ? color
+                    : color.withValues(alpha: 0.3),
             width: isActive ? 2 : 1,
           ),
         ),
@@ -753,7 +896,11 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
             Icon(
               icon,
               size: 20,
-              color: isActive ? color : color.withValues(alpha: 0.7),
+              color: isDisabled
+                  ? Colors.grey[500]
+                  : isActive
+                      ? color
+                      : color.withValues(alpha: 0.7),
             ),
             const SizedBox(width: 8),
             Column(
@@ -764,7 +911,11 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
                   label,
                   style: TextStyle(
                     fontSize: 11,
-                    color: isActive ? color : Colors.grey[600],
+                    color: isDisabled
+                        ? Colors.grey[600]
+                        : isActive
+                            ? color
+                            : Colors.grey[600],
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
@@ -773,7 +924,11 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: isActive ? color : color.withValues(alpha: 0.8),
+                    color: isDisabled
+                        ? Colors.grey[600]
+                        : isActive
+                            ? color
+                            : color.withValues(alpha: 0.8),
                   ),
                 ),
               ],

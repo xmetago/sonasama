@@ -402,14 +402,20 @@ class _AdminPageState extends State<AdminPage> {
                               ),
                             ),
                           ),
-                          ElevatedButton.icon(
-                            onPressed: _addNewCategory,
-                            icon: const Icon(Icons.add),
-                            label: const Text('Yeni Kategori'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF059669),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          SizedBox(
+                            width: 148,
+                            child: ElevatedButton.icon(
+                              onPressed: _addNewCategory,
+                              icon: const Icon(Icons.add),
+                              label: const Text('Yeni Kategori'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF059669),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -1307,7 +1313,12 @@ class _AdminPageState extends State<AdminPage> {
                   SwitchListTile(
                     title: Row(
                       children: [
-                        const Text('Mavi Tik (Ünlü Kişi)'),
+                        const Flexible(
+                          child: Text(
+                            'Mavi Tik (Ünlü Kişi)',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                         const SizedBox(width: 8),
                         Icon(
                           Icons.verified,

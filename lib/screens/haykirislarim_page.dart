@@ -72,6 +72,40 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
     }
   }
 
+  /// Katıldığım haykır verisini seyir defteri post formatına dönüştürür
+  Map<String, dynamic> _katildigimHaykirToPost(Map<String, dynamic> haykir) {
+    final haykirId =
+        haykir['haykirId']?.toString() ?? haykir['id']?.toString() ?? '';
+    final freshData =
+        haykirId.isNotEmpty ? HiveDatabaseService.getHaykir(haykirId) : null;
+    final source = freshData ?? haykir;
+
+    return {
+      'id': 'katildigim_$haykirId',
+      'type': 'haykir',
+      'createdAt': haykir['participatedAt']?.toString() ??
+          source['createdAt']?.toString() ??
+          DateTime.now().toIso8601String(),
+      'authorEmail': source['userEmail']?.toString(),
+      'payload': {
+        'haykirId': haykirId,
+        'adi': source['adi']?.toString() ?? 'Haykırış',
+        'slogan': source['slogan']?.toString() ?? '',
+        'direme': source['direme']?.toString() ?? '',
+        'detaylar': source['detaylar']?.toString() ?? '',
+        'createdAt': source['createdAt']?.toString() ??
+            DateTime.now().toIso8601String(),
+        'shareCount': 0,
+        'commentCount': 0,
+        'retweetCount': 0,
+        'likeCount': 0,
+        'kinaCount': 0,
+        'isSaved': false,
+        'isLiked': false,
+      },
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -107,7 +141,16 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
       }
     }
 
-    // Haykir model listesine dönüştür
+    // Gösterilecek haykır postları (seyir defteri formatında)
+    final List<Map<String, dynamic>> haykirPostsToShow;
+    if (isHaykirislarim) {
+      haykirPostsToShow = haykirPostsFromFeed;
+    } else {
+      haykirPostsToShow =
+          haykirDataList.map(_katildigimHaykirToPost).toList();
+    }
+
+    // Haykir model listesine dönüştür (eski sistem geriye dönük uyumluluk)
     final List<Haykir> haykirList = haykirDataList.map((data) {
       return Haykir(
         adi: data['adi']?.toString() ?? 'Haykırış',
@@ -258,7 +301,7 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                                 padding: const EdgeInsets.symmetric(vertical: 12.0),
                                 decoration: BoxDecoration(
                                   gradient: !isHaykirislarim
-                                      ? const LinearGradient(
+                                      ? LinearGradient(
                                           colors: [Colors.black87, Colors.black54],
                                           begin: Alignment.topLeft,
                                           end: Alignment.bottomRight,
@@ -327,15 +370,15 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                           child: Column(
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.campaign, size: 24, color: Colors.black54),
+                                icon: Icon(Icons.campaign, size: 24, color: Colors.black54),
                                 onPressed: () {
                                   // Megafon/ses işlevselliği
                                 },
                               ),
                               const SizedBox(height: 76),
-                              const Icon(Icons.save_as_outlined, size: 24, color: Colors.black54),
+                              Icon(Icons.save_as_outlined, size: 24, color: Colors.black54),
                               const SizedBox(height: 76),
-                              const Icon(Icons.edit_document, size: 24, color: Colors.black54),
+                              Icon(Icons.edit_document, size: 24, color: Colors.black54),
                               const SizedBox(height: 76),
                               Image.asset('lib/icons/06_left_row_ahizelitelefon_icon.png', width: 24, height: 24),
                             ],
@@ -347,20 +390,20 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
 
                     // Cards Section
                     Expanded(
-                      child: isHaykirislarim && haykirPostsFromFeed.isNotEmpty
+                      child: haykirPostsToShow.isNotEmpty
                           ? ListView.builder(
-                              // ✅ Adım 3: Seyir defterindeki haykır postlarını göster (X close ikonu olmadan)
-                              itemCount: haykirPostsFromFeed.length,
+                              itemCount: haykirPostsToShow.length,
                               itemBuilder: (context, index) {
-                                final post = haykirPostsFromFeed[index];
+                                final post = haykirPostsToShow[index];
                                 final safePost = asStringDynamicMap(post);
-                                final payload = asStringDynamicMap(safePost['payload'] ?? {});
+                                final payload =
+                                    asStringDynamicMap(safePost['payload'] ?? {});
                                 return HaykirCardWidget(
                                   post: safePost,
                                   payload: payload,
                                   davaProvider: davaProvider,
                                   userEmail: widget.userEmail,
-                                  showCloseButton: false, // ✅ Arşiv sayfasında X close ikonu yok
+                                  showCloseButton: false,
                                 );
                               },
                             )
@@ -547,7 +590,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
   @override
   Widget build(BuildContext context) {
     // ✅ Teal (turkuaz) rengi kullanıyoruz - farklı ve uygun bir ton
-    const primaryColor = Colors.teal;
+    final primaryColor = Colors.teal;
     
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),

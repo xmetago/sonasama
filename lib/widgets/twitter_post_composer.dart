@@ -7,11 +7,356 @@ import '../providers/dava_provider.dart';
 import '../services/hive_database_service.dart';
 import '../utils/map_safety.dart';
 
+/// Twitter/X anket mavi tonu (görseldeki çerçeve/metin rengine yakın)
+const Color _kTwitterPollBlue = Color(0xFF1D9BF0);
+
+/// Anket alanını ayırt etmek için (adalet terazisi)
+Widget pollTypeBadgeIcon({double size = 18}) {
+  return Icon(
+    Icons.balance,
+    size: size,
+    color: _kTwitterPollBlue.withValues(alpha: 0.9),
+  );
+}
+
+/// Anket bitişine kalan tam gün sayısı (eski kayıtlar için `createdAt` + `duration` ile tahmin)
+int pollDaysLeftFromData(Map<String, dynamic> pollData) {
+  final endsAtStr = pollData['endsAt']?.toString();
+  DateTime? end;
+  if (endsAtStr != null && endsAtStr.isNotEmpty) {
+    end = DateTime.tryParse(endsAtStr);
+  }
+  if (end == null) {
+    final created =
+        DateTime.tryParse(pollData['createdAt']?.toString() ?? '') ??
+            DateTime.now();
+    final dur = pollData['duration'];
+    final days = dur is int ? dur : int.tryParse(dur.toString()) ?? 1;
+    end = created.add(Duration(days: days));
+  }
+  final diff = end.difference(DateTime.now());
+  if (diff.isNegative) return 0;
+  return diff.inDays.clamp(0, 3650);
+}
+
+int pollAsInt(dynamic value) {
+  if (value == null) return 0;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString()) ?? 0;
+}
+
+/// Seyir defteri anket alanı: oy sonrası UI güncellemesi, hover, çift tıklama koruması
+class TwitterFeedPollSection extends StatefulWidget {
+  final Map<String, dynamic> post;
+  final Map<String, dynamic> pollData;
+  final String postId;
+
+  /// Giriş yapmış kullanıcı e-postası (oy anahtarı). Boşsa yazar e-postası kullanılır.
+  final String? viewerEmail;
+  final VoidCallback? onVoteSubmitted;
+
+  const TwitterFeedPollSection({
+    super.key,
+    required this.post,
+    required this.pollData,
+    required this.postId,
+    this.viewerEmail,
+    this.onVoteSubmitted,
+  });
+
+  @override
+  State<TwitterFeedPollSection> createState() => _TwitterFeedPollSectionState();
+}
+
+class _TwitterFeedPollSectionState extends State<TwitterFeedPollSection> {
+  bool _submitting = false;
+  String? _hoveredOption;
+  Map<String, dynamic>? _pendingPoll;
+
+  String get _voterKey {
+    final v = (widget.viewerEmail ?? '').trim();
+    if (v.isNotEmpty) return v;
+    final payload = asStringDynamicMap(widget.post['payload']);
+    return (payload['userEmail'] ?? '').toString().trim();
+  }
+
+  @override
+  void didUpdateWidget(TwitterFeedPollSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.pollData, widget.pollData)) {
+      _pendingPoll = null;
+    }
+  }
+
+  Future<void> _submitVote(String option) async {
+    final pollData = _pendingPoll ?? widget.pollData;
+    final userVotes = asStringDynamicMap(pollData['userVotes']);
+    final existing = userVotes[_voterKey]?.toString();
+    final alreadyVoted = existing != null && existing.isNotEmpty;
+    if (_submitting ||
+        alreadyVoted ||
+        widget.postId.isEmpty ||
+        _voterKey.isEmpty) {
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final davaProvider = Provider.of<DavaProvider>(context, listen: false);
+      final updatedPoll = Map<String, dynamic>.from(pollData);
+      final updatedVotes = asStringDynamicMap(updatedPoll['votes']);
+      final updatedUserVotes = asStringDynamicMap(updatedPoll['userVotes']);
+      final currentCount = pollAsInt(updatedVotes[option]);
+      updatedVotes[option] = currentCount + 1;
+      updatedUserVotes[_voterKey] = option;
+      updatedPoll['votes'] = updatedVotes;
+      updatedPoll['userVotes'] = updatedUserVotes;
+
+      final updatedPost = Map<String, dynamic>.from(widget.post);
+      final updatedPayload = asStringDynamicMap(updatedPost['payload']);
+      updatedPayload['poll'] = updatedPoll;
+      updatedPayload['hasPoll'] = true;
+      updatedPost['payload'] = updatedPayload;
+
+      await davaProvider.updateHomeFeedPost(widget.postId, updatedPost);
+      if (!mounted) return;
+      setState(() => _pendingPoll = updatedPoll);
+      widget.onVoteSubmitted?.call();
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pollData = _pendingPoll ?? widget.pollData;
+    final options = pollData['options'] as List<dynamic>? ?? [];
+    final question = pollData['question']?.toString() ?? '';
+    final votes = asStringDynamicMap(pollData['votes']);
+    final userVotes = asStringDynamicMap(pollData['userVotes']);
+    final userVote = userVotes[_voterKey]?.toString();
+    final hasVoted = userVote != null && userVote.isNotEmpty;
+    final totalVotes =
+        votes.values.fold<int>(0, (sum, count) => sum + pollAsInt(count));
+    final daysLeft = pollDaysLeftFromData(pollData);
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFCFD9DE), width: 1),
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (question.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, right: 8),
+                    child: pollTypeBadgeIcon(size: 22),
+                  ),
+                  Expanded(
+                    child: Text(
+                      question,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: pollTypeBadgeIcon(size: 22),
+              ),
+            ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(8, question.isEmpty ? 8 : 0, 8, 8),
+            child: Column(
+              children: options.map<Widget>((dynamic raw) {
+                final option = raw as String;
+                final voteCount = pollAsInt(votes[option]);
+                final percentage =
+                    totalVotes > 0 ? (voteCount / totalVotes * 100) : 0.0;
+                final isUserChoice = userVote == option;
+
+                if (!hasVoted) {
+                  final hovered = _hoveredOption == option;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: MouseRegion(
+                      // InkWell kaldırıldı: Material hover katmanı kutu rengini bastırıyordu.
+                      cursor: SystemMouseCursors.click,
+                      opaque: true,
+                      onEnter: (_) {
+                        if (_submitting) return;
+                        setState(() => _hoveredOption = option);
+                      },
+                      onExit: (_) {
+                        if (_hoveredOption == option) {
+                          setState(() => _hoveredOption = null);
+                        }
+                      },
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _submitting ? null : () => _submitVote(option),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          curve: Curves.easeOut,
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: hovered
+                                  ? _kTwitterPollBlue.withValues(alpha: 0.95)
+                                  : _kTwitterPollBlue.withValues(alpha: 0.65),
+                              width: hovered ? 1.5 : 1,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            color: hovered
+                                ? _kTwitterPollBlue.withValues(alpha: 0.16)
+                                : Colors.white,
+                          ),
+                          child: Text(
+                            option,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: hovered
+                                  ? _kTwitterPollBlue
+                                  : _kTwitterPollBlue.withValues(alpha: 0.92),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Stack(
+                      children: [
+                        Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: const Color(0xFFCFD9DE),
+                              width: 1,
+                            ),
+                            color: Colors.white,
+                          ),
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: percentage / 100,
+                            child: Container(
+                              color: _kTwitterPollBlue.withValues(
+                                alpha: isUserChoice ? 0.28 : 0.14,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          height: 44,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    option,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: isUserChoice
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${percentage.round()}%',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFEFF3F4)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Text(
+                  '$totalVotes oy',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                Expanded(
+                  child: Center(child: pollTypeBadgeIcon(size: 17)),
+                ),
+                Text(
+                  '$daysLeft gün kaldı',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum ComposerQuickAction {
+  text,
+  image,
+  video,
+  poll,
+}
+
 /// Twitter/X benzeri post paylaşım widget'ı
 class TwitterPostComposer extends StatefulWidget {
   final String? userEmail;
-  
-  const TwitterPostComposer({super.key, this.userEmail});
+  final ComposerQuickAction quickAction;
+
+  const TwitterPostComposer({
+    super.key,
+    this.userEmail,
+    this.quickAction = ComposerQuickAction.text,
+  });
 
   @override
   State<TwitterPostComposer> createState() => _TwitterPostComposerState();
@@ -24,7 +369,31 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
   bool _isExpanded = false;
   List<XFile> _selectedMedia = [];
   Map<String, dynamic>? _pollData;
-  
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      switch (widget.quickAction) {
+        case ComposerQuickAction.image:
+          await _addMedia();
+          break;
+        case ComposerQuickAction.video:
+          await _addVideo();
+          break;
+        case ComposerQuickAction.poll:
+          await _addPoll();
+          break;
+        case ComposerQuickAction.text:
+          // Varsayılan metin paylaşımı
+          break;
+      }
+    });
+  }
+
   @override
   void dispose() {
     _textController.dispose();
@@ -53,34 +422,39 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
                 Builder(
                   builder: (context) {
                     // Kullanıcının profil resmi URL'sini Hive'dan al
-                    final settings = widget.userEmail != null && widget.userEmail!.isNotEmpty 
-                        ? HiveDatabaseService.getSettings(widget.userEmail!)
-                        : null;
+                    final settings =
+                        widget.userEmail != null && widget.userEmail!.isNotEmpty
+                            ? HiveDatabaseService.getSettings(widget.userEmail!)
+                            : null;
                     final profileImageUrl = settings?.profileImageUrl;
-                    
+
                     return CircleAvatar(
                       radius: 24,
                       backgroundColor: Colors.grey[200],
-                      backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? NetworkImage(profileImageUrl) as ImageProvider<Object>
-                          : null,
-                      onBackgroundImageError: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? (exception, stackTrace) {
-                              // Resim yüklenemezse varsayılan ikonu göster
-                            }
-                          : null,
-                      child: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? null
-                          : Icon(
-                              Icons.person,
-                              color: Colors.grey[600],
-                              size: 28,
-                            ),
+                      backgroundImage:
+                          profileImageUrl != null && profileImageUrl.isNotEmpty
+                              ? NetworkImage(profileImageUrl)
+                                  as ImageProvider<Object>
+                              : null,
+                      onBackgroundImageError:
+                          profileImageUrl != null && profileImageUrl.isNotEmpty
+                              ? (exception, stackTrace) {
+                                  // Resim yüklenemezse varsayılan ikonu göster
+                                }
+                              : null,
+                      child:
+                          profileImageUrl != null && profileImageUrl.isNotEmpty
+                              ? null
+                              : Icon(
+                                  Icons.person,
+                                  color: Colors.grey[600],
+                                  size: 28,
+                                ),
                     );
                   },
                 ),
                 const SizedBox(width: 12),
-                
+
                 // Metin alanı ve butonlar
                 Expanded(
                   child: Column(
@@ -115,19 +489,19 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
                           counterText: '',
                         ),
                       ),
-                      
+
                       // Seçilen medya önizlemeleri
                       if (_selectedMedia.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         _buildMediaPreview(),
                       ],
-                      
+
                       // Anket önizlemesi
                       if (_pollData != null) ...[
                         const SizedBox(height: 12),
                         _buildPollPreview(),
                       ],
-                      
+
                       // Alt butonlar
                       if (_isExpanded || _textController.text.isNotEmpty) ...[
                         const SizedBox(height: 16),
@@ -153,7 +527,7 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
                             ),
 
                             const Spacer(),
-                            
+
                             // Karakter sayısı ve Post butonu
                             Flexible(
                               child: Row(
@@ -163,16 +537,19 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
                                   if (_textController.text.length >= 240)
                                     Flexible(
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 4, vertical: 3),
                                         decoration: BoxDecoration(
                                           color: _getCharacterCountColor(),
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
                                         ),
                                         child: Text(
                                           '${_textController.text.length}/280',
                                           style: TextStyle(
                                             fontSize: 10,
-                                            color: _getCharacterCountTextColor(),
+                                            color:
+                                                _getCharacterCountTextColor(),
                                             fontWeight: FontWeight.w500,
                                           ),
                                           overflow: TextOverflow.ellipsis,
@@ -181,14 +558,17 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
                                     ),
                                   if (_textController.text.length >= 240)
                                     const SizedBox(width: 6),
-                                  
+
                                   // Post butonu
                                   ElevatedButton(
                                     onPressed: _canPost() ? _postContent : null,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: _canPost() ? Colors.green : Colors.grey[300],
+                                      backgroundColor: _canPost()
+                                          ? Colors.green
+                                          : Colors.grey[300],
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 8),
                                       minimumSize: const Size(60, 36),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(20),
@@ -297,74 +677,121 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
 
   Widget _buildPollPreview() {
     if (_pollData == null) return const SizedBox.shrink();
-    
-    final options = _pollData!['options'] as List<String>;
-    
+
+    final options = List<String>.from(_pollData!['options'] as List? ?? []);
+    final question = _pollData!['question']?.toString() ?? '';
+    final votes = asStringDynamicMap(_pollData!['votes']);
+    final totalVotes = votes.values.fold<int>(
+        0, (sum, c) => sum + (c is int ? c : int.tryParse(c.toString()) ?? 0));
+    final daysLeft = pollDaysLeftFromData(_pollData!);
+
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300, width: 1),
-        borderRadius: BorderRadius.circular(12),
-        color: Colors.grey.shade50,
+        border: Border.all(color: const Color(0xFFCFD9DE), width: 1),
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  FaIcon(
-                    FontAwesomeIcons.squarePollVertical,
-                    size: 16,
-                    color: Colors.blue.shade700,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Anket',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade700,
-                    ),
-                  ),
-                ],
-              ),
-              InkWell(
-                onTap: () {
-                  setState(() {
-                    _pollData = null;
-                  });
-                },
-                child: const Icon(
-                  Icons.close,
-                  size: 20,
-                  color: Colors.grey,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 4, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, right: 8),
+                  child: pollTypeBadgeIcon(size: 22),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: question.isEmpty
+                      ? Text(
+                          'Anket',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade800,
+                            height: 1.35,
+                          ),
+                        )
+                      : Text(
+                          question,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                            height: 1.35,
+                          ),
+                        ),
+                ),
+                IconButton(
+                  onPressed: () => setState(() => _pollData = null),
+                  icon: const Icon(Icons.close, size: 20),
+                  color: Colors.grey,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          ...options.map((option) => Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade400, width: 1),
-              borderRadius: BorderRadius.circular(8),
-              color: Colors.white,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Column(
+              children: options
+                  .map(
+                    (option) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _kTwitterPollBlue.withOpacity(0.65),
+                            width: 1,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.white,
+                        ),
+                        child: Text(
+                          option,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: _kTwitterPollBlue,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
-            child: Text(
-              option,
-              style: const TextStyle(fontSize: 14),
-            ),
-          )),
-          const SizedBox(height: 4),
-          Text(
-            '${_pollData!['duration']} gün',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
+          ),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFEFF3F4)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Text(
+                  '$totalVotes oy',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                Expanded(
+                  child: Center(child: pollTypeBadgeIcon(size: 17)),
+                ),
+                Text(
+                  '$daysLeft gün kaldı',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -373,8 +800,14 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
   }
 
   bool _canPost() {
-    return _textController.text.trim().isNotEmpty && 
-           _textController.text.length <= 280;
+    // Twitter/X benzeri paylaşımda bazen sadece görsel veya sadece anket yeterli olabiliyor.
+    // Bu yüzden metin boş olsa bile medya veya anket varsa Post'u aktif ediyoruz.
+    final hasText = _textController.text.trim().isNotEmpty;
+    final hasMedia = _selectedMedia.isNotEmpty;
+    final hasPoll = _pollData != null;
+
+    return (hasText || hasMedia || hasPoll) &&
+        _textController.text.length <= 280;
   }
 
   Color _getCharacterCountColor() {
@@ -397,10 +830,10 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
     try {
       final davaProvider = Provider.of<DavaProvider>(context, listen: false);
       final postId = 'user_post_${DateTime.now().millisecondsSinceEpoch}';
-      
+
       // Medya dosya yollarını al
       final mediaList = _selectedMedia.map((file) => file.path).toList();
-      
+
       final postData = {
         'id': postId,
         'type': 'user_post',
@@ -408,7 +841,10 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
         'authorEmail': widget.userEmail,
         'payload': {
           'content': _textController.text.trim(),
-          'userName': HiveDatabaseService.getRegistrationByEmail(widget.userEmail ?? '')?.judgeName ?? 'Bilinmeyen',
+          'userName':
+              HiveDatabaseService.getRegistrationByEmail(widget.userEmail ?? '')
+                      ?.judgeName ??
+                  'Bilinmeyen',
           'userEmail': widget.userEmail,
           'likes': 0,
           'retweets': 0,
@@ -424,7 +860,7 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
       };
 
       await davaProvider.addHomeFeedPost(postData);
-      
+
       // Başarı mesajı
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -433,7 +869,7 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
           duration: Duration(seconds: 2),
         ),
       );
-      
+
       // Alanı temizle
       _textController.clear();
       _selectedMedia.clear();
@@ -442,7 +878,6 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
       setState(() {
         _isExpanded = false;
       });
-      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -460,7 +895,7 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
         imageQuality: 85,
         maxWidth: 1920,
       );
-      
+
       if (images.isNotEmpty) {
         setState(() {
           _selectedMedia.addAll(images);
@@ -493,7 +928,7 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
         source: ImageSource.gallery,
         maxDuration: const Duration(seconds: 140),
       );
-      
+
       if (video != null) {
         setState(() {
           _selectedMedia = [video]; // Video için sadece tek dosya
@@ -550,7 +985,13 @@ class TwitterPostCard extends StatelessWidget {
   final VoidCallback? onRetweet;
   final VoidCallback? onComment;
   final VoidCallback? onShare;
-  
+
+  /// Anket oyu vb. sonrası feed listesini yenilemek için (PagedList önbelleği).
+  final VoidCallback? onPostUpdated;
+
+  /// Oy veren kullanıcı (giriş e-postası). Boşsa post yazarının e-postası kullanılır.
+  final String? viewerEmail;
+
   const TwitterPostCard({
     super.key,
     required this.post,
@@ -558,6 +999,8 @@ class TwitterPostCard extends StatelessWidget {
     this.onRetweet,
     this.onComment,
     this.onShare,
+    this.onPostUpdated,
+    this.viewerEmail,
   });
 
   @override
@@ -565,7 +1008,7 @@ class TwitterPostCard extends StatelessWidget {
     // Güvenli tip dönüşümü
     final safePost = asStringDynamicMap(post);
     final payload = asStringDynamicMap(safePost['payload']);
-    
+
     final content = payload['content'] ?? '';
     final userName = payload['userName'] ?? 'Bilinmeyen';
     final userEmail = payload['userEmail'] ?? '';
@@ -578,7 +1021,8 @@ class TwitterPostCard extends StatelessWidget {
     final hasMedia = payload['hasMedia'] ?? false;
     final poll = asStringDynamicMap(payload['poll']);
     final hasPoll = payload['hasPoll'] ?? false;
-    
+    final postId = safePost['id']?.toString() ?? '';
+
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -597,29 +1041,33 @@ class TwitterPostCard extends StatelessWidget {
                 Builder(
                   builder: (context) {
                     // Kullanıcının profil resmi URL'sini Hive'dan al
-                    final settings = userEmail.isNotEmpty 
+                    final settings = userEmail.isNotEmpty
                         ? HiveDatabaseService.getSettings(userEmail)
                         : null;
                     final profileImageUrl = settings?.profileImageUrl;
-                    
+
                     return CircleAvatar(
                       radius: 20,
                       backgroundColor: Colors.grey[200],
-                      backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? NetworkImage(profileImageUrl) as ImageProvider<Object>
-                          : null,
-                      onBackgroundImageError: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? (exception, stackTrace) {
-                              // Resim yüklenemezse varsayılan ikonu göster
-                            }
-                          : null,
-                      child: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? null
-                          : Icon(
-                              Icons.person,
-                              color: Colors.grey[600],
-                              size: 20,
-                            ),
+                      backgroundImage:
+                          profileImageUrl != null && profileImageUrl.isNotEmpty
+                              ? NetworkImage(profileImageUrl)
+                                  as ImageProvider<Object>
+                              : null,
+                      onBackgroundImageError:
+                          profileImageUrl != null && profileImageUrl.isNotEmpty
+                              ? (exception, stackTrace) {
+                                  // Resim yüklenemezse varsayılan ikonu göster
+                                }
+                              : null,
+                      child:
+                          profileImageUrl != null && profileImageUrl.isNotEmpty
+                              ? null
+                              : Icon(
+                                  Icons.person,
+                                  color: Colors.grey[600],
+                                  size: 20,
+                                ),
                     );
                   },
                 ),
@@ -655,9 +1103,9 @@ class TwitterPostCard extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // İçerik
             Text(
               content,
@@ -667,21 +1115,27 @@ class TwitterPostCard extends StatelessWidget {
                 color: Colors.black,
               ),
             ),
-            
+
             // Medya gösterimi
             if (hasMedia && media != null && media.isNotEmpty) ...[
               const SizedBox(height: 12),
               _buildPostMediaGallery(media),
             ],
-            
+
             // Anket gösterimi
             if (hasPoll && poll.isNotEmpty) ...[
               const SizedBox(height: 12),
-              _buildPollWidget(poll, userEmail),
+              TwitterFeedPollSection(
+                post: post,
+                pollData: poll,
+                postId: postId,
+                viewerEmail: viewerEmail,
+                onVoteSubmitted: onPostUpdated,
+              ),
             ],
-            
+
             const SizedBox(height: 12),
-            
+
             // Alt butonlar
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -706,7 +1160,9 @@ class TwitterPostCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildActionButton(
-                    icon: userLiked ? FontAwesomeIcons.solidHeart : FontAwesomeIcons.heart,
+                    icon: userLiked
+                        ? FontAwesomeIcons.solidHeart
+                        : FontAwesomeIcons.heart,
                     count: likes,
                     isActive: userLiked,
                     activeColor: const Color(0xFFE0245E),
@@ -772,107 +1228,6 @@ class TwitterPostCard extends StatelessWidget {
       return '${(count / 1000).toStringAsFixed(1)}K';
     }
     return count.toString();
-  }
-
-  Widget _buildPollWidget(Map<String, dynamic> pollData, String currentUserEmail) {
-    final options = pollData['options'] as List<dynamic>? ?? [];
-    final votes = asStringDynamicMap(pollData['votes']);
-    final totalVotes = votes.values.fold<int>(0, (sum, count) => sum + (count as int));
-    final userVotes = asStringDynamicMap(pollData['userVotes']);
-    final userVote = userVotes[currentUserEmail] as String?;
-    final hasVoted = userVote != null;
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300, width: 1),
-        borderRadius: BorderRadius.circular(12),
-        color: Colors.grey.shade50,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ...options.asMap().entries.map((entry) {
-            final option = entry.value as String;
-            final voteCount = votes[option] ?? 0;
-            final percentage = totalVotes > 0 ? (voteCount / totalVotes * 100) : 0.0;
-            final isUserChoice = userVote == option;
-            
-            return GestureDetector(
-              onTap: hasVoted ? null : () {
-                // Oy verme işlemi - Provider üzerinden güncelleme yapılabilir
-              },
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Stack(
-                  children: [
-                    // Arkaplan progress
-                    Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        color: isUserChoice 
-                          ? Colors.blue.shade100
-                          : Colors.grey.shade200,
-                      ),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: hasVoted ? (percentage / 100) : 0,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            color: isUserChoice 
-                              ? Colors.blue.shade400
-                              : Colors.grey.shade400,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Metin
-                    Container(
-                      height: 40,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              option,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: isUserChoice ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
-                          ),
-                          if (hasVoted)
-                            Text(
-                              '${percentage.toStringAsFixed(1)}%',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-          const SizedBox(height: 8),
-          Text(
-            '$totalVotes oy • ${pollData['duration']} gün',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildPostMediaGallery(List<dynamic> media) {
@@ -951,9 +1306,13 @@ class TwitterPostCard extends StatelessWidget {
       itemCount: media.length > 4 ? 4 : media.length,
       itemBuilder: (context, index) {
         return ClipRRect(
-          borderRadius: BorderRadius.circular(index == 0 ? 16 : 
-                                              index == 1 ? 16 : 
-                                              index == 2 ? 16 : 16),
+          borderRadius: BorderRadius.circular(index == 0
+              ? 16
+              : index == 1
+                  ? 16
+                  : index == 2
+                      ? 16
+                      : 16),
           child: Image.file(
             File(media[index]),
             fit: BoxFit.cover,
@@ -971,6 +1330,7 @@ class _PollCreationDialog extends StatefulWidget {
 }
 
 class _PollCreationDialogState extends State<_PollCreationDialog> {
+  final TextEditingController _questionController = TextEditingController();
   final List<TextEditingController> _optionControllers = [
     TextEditingController(),
     TextEditingController(),
@@ -979,6 +1339,7 @@ class _PollCreationDialogState extends State<_PollCreationDialog> {
 
   @override
   void dispose() {
+    _questionController.dispose();
     for (var controller in _optionControllers) {
       controller.dispose();
     }
@@ -1003,22 +1364,26 @@ class _PollCreationDialogState extends State<_PollCreationDialog> {
   }
 
   bool _canCreate() {
-    return _optionControllers.every((controller) => controller.text.trim().isNotEmpty);
+    if (_questionController.text.trim().isEmpty) return false;
+    return _optionControllers
+        .every((controller) => controller.text.trim().isNotEmpty);
   }
 
   void _createPoll() {
     if (!_canCreate()) return;
 
-    final options = _optionControllers
-        .map((controller) => controller.text.trim())
-        .toList();
+    final options =
+        _optionControllers.map((controller) => controller.text.trim()).toList();
+    final now = DateTime.now();
 
     final pollData = {
+      'question': _questionController.text.trim(),
       'options': options,
       'duration': _durationDays,
+      'endsAt': now.add(Duration(days: _durationDays)).toIso8601String(),
       'votes': {for (var option in options) option: 0},
       'userVotes': {},
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': now.toIso8601String(),
     };
 
     Navigator.of(context).pop(pollData);
@@ -1057,6 +1422,25 @@ class _PollCreationDialogState extends State<_PollCreationDialog> {
               ],
             ),
             const SizedBox(height: 24),
+
+            TextField(
+              controller: _questionController,
+              maxLength: 120,
+              maxLines: 3,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Anket sorusu',
+                hintText: 'Örn: Favori sporunuz hangisi?',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // Seçenekler
             ..._optionControllers.asMap().entries.map((entry) {

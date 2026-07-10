@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // TextInputFormatter için
-import 'package:flutter_localizations/flutter_localizations.dart'; // Türkçe locale için
 import 'package:flutter_feather_icons/flutter_feather_icons.dart';
-import 'package:country_picker/country_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart' as intl; // Türkçe locale için
+import 'dart:async';
 import 'package:its19/screens/forgot_password_page.dart';
 import 'package:its19/screens/home_page.dart';
 import 'package:its19/screens/privacy_policy_page.dart';
@@ -24,6 +22,8 @@ import 'package:its19/utils/app_theme.dart';
 import 'package:its19/utils/country_display_utils.dart';
 import 'package:its19/utils/country_picker_extension.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:its19/screens/tutorial_case_page.dart';
+import 'package:its19/screens/gunun_haykirisi_page.dart';
 
 void main() async {
   // Flutter binding'i başlat (dosya sistemi ve async işlemler için gerekli)
@@ -387,18 +387,28 @@ class WhoBoomApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'WhoBoom',
-      theme: AppTheme.lightTheme,
-      // Türkçe dil desteği
-      locale: const Locale('tr', 'TR'),
-      supportedLocales: const [
-        Locale('tr', 'TR'), // Türkçe
-        Locale('en', 'US'), // İngilizce (fallback)
-      ],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
+      debugShowCheckedModeBanner: false, // O çirkin debug bandını kaldıralım
+      theme: ThemeData(
+        useMaterial3: true, // Modern Android/Flutter görünümü için şart
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1CB5B5), // Görseldeki ana turkuaz
+          primary: const Color(0xFF1CB5B5),
+          surface: const Color(0xFFF8FBFB), // Saf beyaz yerine çok hafif maviye çalan beyaz
+        ),
+        // Proje içi tanımlı yerel fontu kullan
+        fontFamily: 'cocon',
+
+        // Butonları görseldeki gibi yuvarlak ve gölgeli yapalım
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1CB5B5),
+            foregroundColor: Colors.white,
+            minimumSize: const Size(double.infinity, 52),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            elevation: 2,
+          ),
+        ),
+      ),
       home: const WhoBoomLoginPage(),
     );
   }
@@ -415,6 +425,8 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
   bool _showPassword = false;
   bool _isLogin = true;
   bool _rememberMe = false;
+  bool _pendingHaykirAfterLogin = false;
+  Timer? _postRegisterNavTimer;
   final _formData = {
     'name': '',
     'judgeName': '',
@@ -430,6 +442,12 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
   void initState() {
     super.initState();
     _loadRememberedCredentials();
+  }
+
+  @override
+  void dispose() {
+    _postRegisterNavTimer?.cancel();
+    super.dispose();
   }
 
   /// Kaydedilmiş giriş bilgilerini yükle
@@ -490,12 +508,22 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
         if (!_isLogin) {
           final judgeName = _formData['judgeName'] as String;
           if (judgeName.isNotEmpty) {
+            if (judgeName.contains(RegExp(r'\s'))) {
+              newErrors['judgeName'] = 'Yargıç adı boşluk içeremez.';
+            } else
             if (judgeName.length < 8) {
               newErrors['judgeName'] = 'Yargıç adı en az 8 karakter olmalıdır.';
             } else if (judgeName.length > 171) {
               newErrors['judgeName'] = 'Yargıç adı en fazla 171 karakter olabilir.';
-            } else if (!RegExp(r'^[a-zA-ZğüşıöçĞÜŞİÖÇ\s]+$').hasMatch(judgeName)) {
+            } else if (!RegExp(r'^[a-zA-ZğüşıöçĞÜŞİÖÇ]+$').hasMatch(judgeName)) {
               newErrors['judgeName'] = 'Yargıç adı sadece harf içermelidir.';
+            } else {
+              // Kayıt sırasında Yargıç Adı benzersizlik kontrolü
+              final existingByJudgeName =
+                  HiveDatabaseService.getRegistrationByJudgeName(judgeName);
+              if (existingByJudgeName != null) {
+                newErrors['judgeName'] = 'Bu Yargıç Adı zaten kullanımda.';
+              }
             }
           }
         }
@@ -558,12 +586,20 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
       final judgeName = _formData['judgeName'] as String;
       if (judgeName.isEmpty) {
         newErrors['judgeName'] = 'Yargıç adı boş olamaz.';
+      } else if (judgeName.contains(RegExp(r'\s'))) {
+        newErrors['judgeName'] = 'Yargıç adı boşluk içeremez.';
       } else if (judgeName.length < 8) {
         newErrors['judgeName'] = 'Yargıç adı en az 8 karakter olmalıdır.';
       } else if (judgeName.length > 171) {
         newErrors['judgeName'] = 'Yargıç adı en fazla 171 karakter olabilir.';
-      } else if (!RegExp(r'^[a-zA-ZğüşıöçĞÜŞİÖÇ\s]+$').hasMatch(judgeName)) {
+      } else if (!RegExp(r'^[a-zA-ZğüşıöçĞÜŞİÖÇ]+$').hasMatch(judgeName)) {
         newErrors['judgeName'] = 'Yargıç adı sadece harf içermelidir.';
+      } else {
+        final existingByJudgeName =
+            HiveDatabaseService.getRegistrationByJudgeName(judgeName);
+        if (existingByJudgeName != null) {
+          newErrors['judgeName'] = 'Bu Yargıç Adı zaten kullanımda.';
+        }
       }
 
       // Ülke Kontrolü
@@ -630,7 +666,7 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
@@ -697,16 +733,16 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.of(context).pop();
+                      Navigator.of(dialogContext).pop();
                       if (isSuccess) {
-                        // Başarılı kayıt sonrası otomatik giriş
-                        Future.delayed(const Duration(milliseconds: 500), () {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (context) => HomePage(userEmail: _formData['email'] as String),
-                            ),
-                          );
-                        });
+                        // Başarılı kayıt sonrası tekil navigasyon (timer varsa iptal et)
+                        _postRegisterNavTimer?.cancel();
+                        if (!mounted) return;
+                        Navigator.of(this.context, rootNavigator: true).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (context) => HomePage(userEmail: _formData['email'] as String),
+                          ),
+                        );
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -748,283 +784,38 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
   /// Günün Davası modalını gösterir
   /// Ekranı kaplayan tam ekran modal, sağ altta X ikonu ile kapatılabilir
   void _showGununDavasiModal() {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.black.withOpacity(0.7),
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: AppTheme.scaffoldBackgroundColor,
-            child: SafeArea(
-              child: Stack(
-                children: [
-                  // İçerik
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 60), // X butonu için boşluk
-                        // Başlık
-                        Row(
-                          children: [
-                            Icon(
-                              MdiIcons.gavel,
-                              size: 24,
-                              color: AppTheme.iconPrimary,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Günün Davası',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Sessizliğin Kırılması Davası',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        // İçerik kartı
-                        Card(
-                          color: Colors.white,
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Dava Detayları',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Bu dava hakkında detaylı bilgiler burada yer alacaktır. Kullanıcılar üye olmadan bu içeriği okuyabilirler.',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppTheme.textSecondary,
-                                    height: 1.6,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Dava konusu ve detayları buraya eklenecektir. Bu bir önizleme içeriğidir.',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppTheme.textSecondary,
-                                    height: 1.6,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                  ),
-                  // Sağ altta X kapatma butonu
-                  Positioned(
-                    right: 16,
-                    bottom: 16,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => Navigator.of(context).pop(),
-                        borderRadius: BorderRadius.circular(30),
-                        child: Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.7),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close_rounded,
-                            color: Colors.red,
-                            size: 38,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TutorialCasePage(
+          isAuthenticated: false,
+          userEmail: null,
+          onRequestLogin: () {
+            if (!mounted) return;
+            setState(() => _isLogin = true);
+            Navigator.of(context).maybePop();
+          },
+        ),
+      ),
     );
   }
 
-  /// Haykıra Katıl modalını gösterir
-  /// Ekranı kaplayan tam ekran modal, sağ altta X ikonu ile kapatılabilir
+  /// Günün Haykırışı sayfasını gösterir (Günün Davası gibi tam sayfa, sonda HAYDİ HAYKIR)
   void _showHaykiraKatilModal() {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.black.withOpacity(0.7),
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: AppTheme.scaffoldBackgroundColor,
-            child: SafeArea(
-              child: Stack(
-                children: [
-                  // İçerik
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 60), // X butonu için boşluk
-                        // Başlık
-                        Row(
-                          children: [
-                            Image.asset(
-                              'lib/icons/00_giris_haykira_katil_icon.png',
-                              width: 24,
-                              height: 24,
-                              fit: BoxFit.contain,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Haykıra Katıl',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Ses ver, tarafını seç!',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        // İçerik kartı
-                        Card(
-                          color: Colors.white,
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Haykırış Detayları',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Bu haykırış hakkında detaylı bilgiler burada yer alacaktır. Kullanıcılar üye olmadan bu içeriği okuyabilirler.',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppTheme.textSecondary,
-                                    height: 1.6,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Haykırış konusu ve detayları buraya eklenecektir. Bu bir önizleme içeriğidir.',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppTheme.textSecondary,
-                                    height: 1.6,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                  ),
-                  // Sağ altta X kapatma butonu
-                  Positioned(
-                    right: 16,
-                    bottom: 16,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => Navigator.of(context).pop(),
-                        borderRadius: BorderRadius.circular(30),
-                        child: Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: Colors.orangeAccent.withOpacity(0.7),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close_rounded,
-                            color: Colors.red,
-                            size: 38,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GununHaykirisiPage(
+          isAuthenticated: false,
+          userEmail: null,
+          onRequestLogin: () {
+            if (!mounted) return;
+            setState(() {
+              _isLogin = true;
+              _pendingHaykirAfterLogin = true;
+            });
+            Navigator.of(context).maybePop();
+          },
+        ),
+      ),
     );
   }
 
@@ -1065,18 +856,27 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
         final password = _formData['password'] as String;
         
         final success = await authProvider.login(email, password);
+        if (!mounted) return;
         
         if (success) {
           // "Beni anımsa" seçiliyse bilgileri kaydet
           await _saveRememberedCredentials();
+          if (!mounted) return;
           
           // Kullanıcı verilerini yükle
           await davaProvider.loadUserData(email);
-          
+          if (!mounted) return;
+
+          final openHaykirAfterLogin = _pendingHaykirAfterLogin;
+          _pendingHaykirAfterLogin = false;
+
           // Tüm kullanıcılar ana sayfaya yönlendirilir
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => HomePage(userEmail: email),
+              builder: (context) => HomePage(
+                userEmail: email,
+                openHaykirOnStart: openHaykirAfterLogin,
+              ),
             ),
           );
         } else {
@@ -1098,23 +898,36 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
         );
 
         final success = await authProvider.register(registration);
+        if (!mounted) return;
         
         if (success) {
           // Kullanıcı verilerini yükle
           await davaProvider.loadUserData(registration.email);
+          if (!mounted) return;
           
           // Modern başarı mesajı ve otomatik geçiş
           _showModernSuccess('Kayıt işlemi başarılı! Hoş geldiniz! 🎉\n\nOtomatik olarak giriş yapılıyor...');
           
-          // 2 saniye sonra otomatik geçiş
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => HomePage(userEmail: _formData['email'] as String),
-                ),
-              );
+          final openHaykirAfterRegister = _pendingHaykirAfterLogin;
+          _pendingHaykirAfterLogin = false;
+
+          // 2 saniye sonra otomatik geçiş (tekil, iptal edilebilir)
+          _postRegisterNavTimer?.cancel();
+          _postRegisterNavTimer = Timer(const Duration(seconds: 2), () {
+            if (!mounted) return;
+            final rootNav = Navigator.of(context, rootNavigator: true);
+            if (rootNav.canPop()) {
+              // Başarı dialog'u hala açıksa kapat
+              rootNav.pop();
             }
+            rootNav.pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => HomePage(
+                  userEmail: _formData['email'] as String,
+                  openHaykirOnStart: openHaykirAfterRegister,
+                ),
+              ),
+            );
           });
         } else {
           _showModernError(authProvider.error ?? 'Kayıt olurken hata oluştu. Lütfen tekrar deneyin! 🔄');
@@ -1129,6 +942,9 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        // Daha fazla cihazda kaydırmasız görünüm için eşik yükseltildi
+        final isCompact = screenHeight < 800;
         return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -1164,7 +980,7 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                       ),
                       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                     ),
-                    padding: const EdgeInsets.all(14),
+                    padding: EdgeInsets.all(isCompact ? 10 : 14),
                     child: Column(
                       children: [
                         Row(
@@ -1219,7 +1035,7 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
                         Text(
                           'Hükmünü ver, adaleti sağla.',
                           textAlign: TextAlign.center,
@@ -1229,7 +1045,7 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                             fontSize: 19, // Maksimum font boyutu
                             fontWeight: FontWeight.w900, // Çok kalın
                             letterSpacing: 1.0, // Çok dilli uyumlu harf aralığı
-                            height: 1.3,
+                            height: 0.9,
                             color: Colors.white, // Beyaz renk - çok belirgin
                             shadows: [
                               Shadow(
@@ -1256,7 +1072,7 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
 
                   // Login/Register Toggle
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(isCompact ? 12 : 16),
                     child: Container(
                       decoration: BoxDecoration(
                         color: AppTheme.primaryUltraLight,
@@ -1316,7 +1132,7 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
 
                   // Form
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: EdgeInsets.symmetric(horizontal: isCompact ? 20 : 24),
                     child: Column(
                       children: [
                         if (!_isLogin) ...[
@@ -1328,6 +1144,12 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                             field: 'judgeName',
                             error: _errors['judgeName'],
                             onChanged: (value) => _handleInputChange('judgeName', value),
+                            inputFormatters: [
+                              // Yargıç adında boşluk yok; sadece harf (TR dahil)
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[a-zA-ZğüşıöçĞÜŞİÖÇ]'),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 16),
                         ],
@@ -1630,10 +1452,11 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                   ),
 
                   // Daily Case & Virtual Action
-                  if (_isLogin) ...[
+                  // Küçük ekranlarda kaydırma olmadan sığması için bu bölümü gizle
+                  if (_isLogin && !isCompact) ...[
                     Container(
                       color: const Color(0xFFF5FBF9),
-                      padding: const EdgeInsets.all(24),
+                      padding: EdgeInsets.all(isCompact ? 16 : 24),
                       child: Column(
                         children: [
                           // Günün Davası
@@ -1651,7 +1474,7 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                                 hoverColor: const Color(0xFF88D3C5).withOpacity(0.3),
                                 splashColor: const Color(0xFF88D3C5).withOpacity(0.2),
                                 child: Container(
-                                  height: 100,
+                                  height: isCompact ? 72 : 100,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: const Border(
@@ -1681,7 +1504,7 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        'Sessizliğin Kırılması Davası',
+                                        'Sessizliğin Kırılması ',
                                         style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                                       ),
                                     ],
@@ -1706,7 +1529,7 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                                 hoverColor: const Color(0xFF88D3C5).withOpacity(0.3),
                                 splashColor: const Color(0xFF88D3C5).withOpacity(0.2),
                                 child: Container(
-                                  height: 100,
+                                  height: isCompact ? 72 : 100,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: const Border(
@@ -1751,10 +1574,10 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                     ),
                   ],
 
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   // Footer - Vurgulu Metin
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 16.0),
+                    padding: EdgeInsets.fromLTRB(24.0, isCompact ? 16.0 : 12.0, 12.0, 16.0),
                     child: Text(
                       'Düşün; ölç ve biç. Tanrının adaletine katıl',
                       textAlign: TextAlign.center,
@@ -1801,6 +1624,7 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
     Function(String)? onChanged,
     TextInputType? keyboardType,
     Widget? suffixIcon,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1815,15 +1639,15 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 2),
         TextField(
           obscureText: obscureText,
           keyboardType: keyboardType,
-          // Türkçe karakter desteği - tüm karakterleri kabul et
-          inputFormatters: [
-            // Türkçe karakterler dahil tüm karakterleri kabul et
-            FilteringTextInputFormatter.allow(RegExp(r'[\s\S]')),
-          ],
+          // Türkçe karakter desteği - tüm karakterleri kabul et (override edilebilir)
+          inputFormatters: inputFormatters ??
+              [
+                FilteringTextInputFormatter.allow(RegExp(r'[\s\S]')),
+              ],
           decoration: InputDecoration(
             hintText: placeholder.isNotEmpty ? placeholder : null, // Boş placeholder gösterilmez
             errorText: error,

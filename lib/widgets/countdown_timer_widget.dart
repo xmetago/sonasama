@@ -6,6 +6,8 @@ class CountdownTimerWidget extends StatefulWidget {
   final Duration totalDuration;
   final VoidCallback? onTimeUp;
   final bool showHourglass;
+  /// Faz rengi (yeşil/turuncu/kırmızı) — verilmezse süreye göre varsayılan renk kullanılır.
+  final Color? accentColor;
 
   const CountdownTimerWidget({
     super.key,
@@ -13,6 +15,7 @@ class CountdownTimerWidget extends StatefulWidget {
     required this.totalDuration,
     this.onTimeUp,
     this.showHourglass = true,
+    this.accentColor,
   });
 
   @override
@@ -129,6 +132,10 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
   }
 
   Color _getTimerColor() {
+    if (widget.accentColor != null) {
+      if (_isTimeUp) return Colors.red;
+      return widget.accentColor!;
+    }
     final hoursLeft = _remainingTime.inHours;
     if (_isTimeUp) return Colors.red;
     if (hoursLeft <= 2) return Colors.red.shade600;
@@ -146,22 +153,14 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
           scale: _pulseAnimation.value,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: _getTimerColor().withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: _getTimerColor(),
-                width: 1.5,
-              ),
-            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (widget.showHourglass) ...[
                   // Kum saati animasyonu
                   SizedBox(
-                    width: 20,
-                    height: 20,
+                    width: 19,
+                    height: 19,
                     child: Transform.rotate(
                       angle: _hourglassAnimation.value * 2 * 3.14159,
                       child: Icon(
@@ -186,11 +185,8 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
                 
                 // Durum ikonu
                 const SizedBox(width: 6),
-                Icon(
-                  _isTimeUp ? Icons.warning : Icons.timer,
-                  color: _getTimerColor(),
-                  size: 16,
-                ),
+
+
               ],
             ),
           ),

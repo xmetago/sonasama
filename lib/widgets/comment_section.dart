@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/comment_utils.dart';
+import 'expandable_comment_text.dart';
 
 typedef CommentSubmitCallback = Future<void> Function(
   String yorumMetni, {
@@ -343,12 +344,13 @@ class _CommentCardState extends State<CommentCard> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            comment['yorum']?.toString() ?? '',
+          ExpandableCommentText(
+            text: comment['yorum']?.toString() ?? '',
             style: const TextStyle(
               fontSize: 14,
               color: Colors.black87,
             ),
+            maxLines: 4,
           ),
           const SizedBox(height: 8),
           Row(

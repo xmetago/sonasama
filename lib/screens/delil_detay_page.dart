@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:ui';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/evidence_model.dart';
 import '../widgets/common_header_widgets.dart';
@@ -7,6 +8,7 @@ import '../widgets/video_player_widget.dart';
 import '../widgets/pdf_viewer_widget.dart';
 import '../widgets/evidence_comment_widget.dart';
 import '../services/hive_database_service.dart';
+import '../services/evidence_service.dart';
 
 class DelilDetayPage extends StatefulWidget {
   final String? userEmail;
@@ -26,11 +28,25 @@ class DelilDetayPage extends StatefulWidget {
 
 class _DelilDetayPageState extends State<DelilDetayPage> {
   String? _currentUserRole;
+  static const int _qualityCircleCount = 19;
+  bool _delilBilgileriExpanded = true;
+  late EvidenceModel _evidence;
 
   @override
   void initState() {
     super.initState();
+    _evidence = widget.evidence;
     _loadUserRole();
+    _refreshEvidenceFromStore();
+  }
+
+  Future<void> _refreshEvidenceFromStore() async {
+    final svc = EvidenceService();
+    await svc.initialize();
+    final fresh = svc.getEvidenceById(widget.evidence.id);
+    if (fresh != null && mounted) {
+      setState(() => _evidence = fresh);
+    }
   }
 
   /// Kullanıcının rolünü yükle
@@ -48,7 +64,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
         (d) {
           final davaId = (d['davaId'] as String?) ?? (d['id'] as String?);
           return davaId?.trim().toLowerCase() == 
-                 widget.evidence.davaId.trim().toLowerCase();
+                 _evidence.davaId.trim().toLowerCase();
         },
         orElse: () => {},
       );
@@ -118,70 +134,160 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Delil Bilgileri Kartı
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Başlık ve Tip
-                            Row(
-                              children: [
-                                _getEvidenceIcon(widget.evidence.type),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        widget.evidence.title,
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withOpacity(0.72),
+                                Colors.white.withOpacity(0.38),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.55),
+                              width: 1.1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF1B2A23).withOpacity(0.10),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _delilBilgileriExpanded = !_delilBilgileriExpanded;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Center(
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Text(
+                                              '||  Delil Bilgileri  ||  ',
+                                              style: TextStyle(
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFF1B2A23),
+                                              ),
+                                            ),
+                                            _getEvidenceIcon(_evidence.type),
+                                          ],
                                         ),
                                       ),
-                                      Text(
-                                        _getEvidenceTypeText(widget.evidence.type),
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[600],
+                                    ),
+                                    AnimatedRotation(
+                                      turns: _delilBilgileriExpanded ? 0.5 : 0,
+                                      duration: const Duration(milliseconds: 220),
+                                      curve: Curves.easeOutCubic,
+                                      child: Icon(
+                                        Icons.expand_more,
+                                        color: Colors.grey.shade600,
+                                        size: 26,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          AnimatedCrossFade(
+                            firstCurve: Curves.easeOutCubic,
+                            secondCurve: Curves.easeInCubic,
+                            sizeCurve: Curves.easeInOutCubic,
+                            duration: const Duration(milliseconds: 280),
+                            crossFadeState: _delilBilgileriExpanded
+                                ? CrossFadeState.showFirst
+                                : CrossFadeState.showSecond,
+                            firstChild: const SizedBox.shrink(),
+                            secondChild: Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      InkWell(
+                                        onTap: _showEvidenceInfo,
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(4.0),
+                                          child: Icon(
+                                            Icons.info_outline_rounded,
+                                            size: 24,
+                                            color: Colors.lightBlue,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 19),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _evidence.title,
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
+                                            Align(
+                                              alignment: Alignment.topLeft,
+                                              child: _buildQualityCircles(),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Açıklama
-                            const Text(
-                              'Açıklama:',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                                  const SizedBox(height: 10),
+                                  _buildDashedLine(const Color(0xFFD8E5DE)),
+                                  const SizedBox(height: 10),
+                                  const Text(
+                                    'Açıklama:',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1B2A23),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _evidence.description,
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _buildDashedLine(const Color(0xFFD8E5DE)),
+                                  const SizedBox(height: 8),
+                                  if (_evidence.fileSize > 0)
+                                    _buildDetailInfo('Dosya Boyutu', _formatFileSize(_evidence.fileSize)),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              widget.evidence.description,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Detay Bilgileri
-                            _buildDetailInfo('Delil ID', widget.evidence.id),
-                            _buildDetailInfo('Dava ID', widget.evidence.davaId),
-                            _buildDetailInfo('Ekleyen', widget.evidence.userId),
-                            _buildDetailInfo('Eklenme Tarihi', _formatDate(widget.evidence.createdAt)),
-                            if (widget.evidence.fileSize > 0)
-                              _buildDetailInfo('Dosya Boyutu', _formatFileSize(widget.evidence.fileSize)),
-                            _buildDetailInfo('Doğrulandı', widget.evidence.isVerified ? 'Evet' : 'Hayır'),
-                          ],
+                          ),
+                        ],
+                          ),
                         ),
                       ),
                     ),
@@ -200,7 +306,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                           children: [
                             Row(
                               children: [
-                                _getEvidenceIcon(widget.evidence.type),
+                                _getEvidenceIcon(_evidence.type),
                                 const SizedBox(width: 8),
                                 const Text(
                                   'Delil İçeriği',
@@ -220,10 +326,13 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                     
                     // Rol Yorumları Bölümü
                     EvidenceCommentWidget(
-                      evidenceId: widget.evidence.id,
-                      davaId: widget.evidence.davaId,
+                      evidenceId: _evidence.id,
+                      davaId: _evidence.davaId,
                       userEmail: widget.userEmail,
                       currentUserRole: widget.userRole ?? _currentUserRole,
+                      isEvidenceValid: _evidence.isVerified,
+                      evidenceSnapshot: _evidence,
+                      onEvidenceVoteChanged: _refreshEvidenceFromStore,
                     ),
                   ],
                 ),
@@ -262,8 +371,58 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
     );
   }
 
+  Widget _buildQualityCircles() {
+    final bool isFirstCircleGreen =
+        _evidence.likeCount >= _evidence.dislikeCount;
+
+    return SizedBox(
+      width: 104,
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        spacing: 8,
+        runSpacing: 8,
+        children: List.generate(_qualityCircleCount, (index) {
+          final Color fillColor =
+              index == 0 && isFirstCircleGreen ? Colors.green : Colors.red;
+
+          return Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              color: fillColor,
+              shape: BoxShape.circle,
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildDashedLine(Color color) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const dashWidth = 6.0;
+        const dashSpace = 4.0;
+        final count = (constraints.maxWidth / (dashWidth + dashSpace)).floor();
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(count, (_) {
+            return SizedBox(
+              width: dashWidth,
+              height: 1,
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: color),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+
   Widget _buildEvidenceContent() {
-    switch (widget.evidence.type) {
+    switch (_evidence.type) {
       case 'image':
         return _buildImageContent();
       case 'video':
@@ -278,7 +437,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
   }
 
   Widget _buildImageContent() {
-    if (widget.evidence.filePath.isEmpty) {
+    if (_evidence.filePath.isEmpty) {
       return const Text('Resim dosyası bulunamadı');
     }
 
@@ -294,7 +453,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Image.file(
-              File(widget.evidence.filePath),
+              File(_evidence.filePath),
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
@@ -329,7 +488,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
   }
 
   Widget _buildVideoContent() {
-    if (widget.evidence.filePath.isEmpty) {
+    if (_evidence.filePath.isEmpty) {
       return const Text('Video dosyası bulunamadı');
     }
 
@@ -418,7 +577,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
   }
 
   Widget _buildPdfContent() {
-    if (widget.evidence.filePath.isEmpty) {
+    if (_evidence.filePath.isEmpty) {
       return const Text('PDF dosyası bulunamadı');
     }
 
@@ -511,7 +670,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
   }
 
   Widget _buildLinkContent() {
-    if (widget.evidence.url.isEmpty) {
+    if (_evidence.url.isEmpty) {
       return const Text('Link bulunamadı');
     }
 
@@ -534,7 +693,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                widget.evidence.url,
+                _evidence.url,
                 style: const TextStyle(
                   color: Colors.blue,
                   decoration: TextDecoration.underline,
@@ -597,13 +756,25 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
+  String _formatUserDisplayName(String userId) {
+    final trimmed = userId.trim();
+    if (trimmed.isEmpty) return '';
+
+    final atIndex = trimmed.indexOf('@');
+    if (atIndex > 0) {
+      return trimmed.substring(0, atIndex);
+    }
+
+    return trimmed;
+  }
+
   void _openImageFullScreen() {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => Scaffold(
           appBar: AppBar(
-            title: Text(widget.evidence.title),
+            title: Text(_evidence.title),
             backgroundColor: Colors.black,
             foregroundColor: Colors.white,
           ),
@@ -611,7 +782,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
             color: Colors.black,
             child: Center(
               child: InteractiveViewer(
-                child: Image.file(File(widget.evidence.filePath)),
+                child: Image.file(File(_evidence.filePath)),
               ),
             ),
           ),
@@ -622,9 +793,9 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
 
   void _openVideoPlayer() {
     try {
-      print('🎥 Video player açılıyor: ${widget.evidence.filePath}');
+      print('🎥 Video player açılıyor: ${_evidence.filePath}');
       
-      if (widget.evidence.filePath.isEmpty) {
+      if (_evidence.filePath.isEmpty) {
         print('❌ Video dosyası bulunamadı');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -636,9 +807,9 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       }
 
       // Video dosyasının var olup olmadığını kontrol et
-      final videoFile = File(widget.evidence.filePath);
+      final videoFile = File(_evidence.filePath);
       if (!videoFile.existsSync()) {
-        print('❌ Video dosyası mevcut değil: ${widget.evidence.filePath}');
+        print('❌ Video dosyası mevcut değil: ${_evidence.filePath}');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('❌ Video dosyası bulunamadı'),
@@ -652,8 +823,8 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
         context,
         MaterialPageRoute(
           builder: (context) => CustomVideoPlayer(
-            videoPath: widget.evidence.filePath,
-            title: widget.evidence.title,
+            videoPath: _evidence.filePath,
+            title: _evidence.title,
           ),
         ),
       );
@@ -679,10 +850,35 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow('Dosya Yolu:', widget.evidence.filePath),
-            _buildInfoRow('Dosya Boyutu:', _formatFileSize(widget.evidence.fileSize)),
-            _buildInfoRow('Eklenme Tarihi:', _formatDate(widget.evidence.createdAt)),
-            _buildInfoRow('Ekleyen:', widget.evidence.userId),
+            _buildInfoRow('Dosya Yolu:', _evidence.filePath),
+            _buildInfoRow('Dosya Boyutu:', _formatFileSize(_evidence.fileSize)),
+            _buildInfoRow('Eklenme Tarihi:', _formatDate(_evidence.createdAt)),
+            _buildInfoRow('Ekleyen:', _formatUserDisplayName(_evidence.userId)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Kapat'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEvidenceInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delil Bilgileri'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInfoRow('Delil ID:', _evidence.id),
+            _buildInfoRow('Dava ID:', _evidence.davaId),
+            _buildInfoRow('Ekleyen:', _formatUserDisplayName(_evidence.userId)),
+            _buildInfoRow('Eklenme Tarihi:', _formatDate(_evidence.createdAt)),
           ],
         ),
         actions: [
@@ -713,9 +909,9 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
 
   void _openPdfViewer() {
     try {
-      print('📄 PDF viewer açılıyor: ${widget.evidence.filePath}');
+      print('📄 PDF viewer açılıyor: ${_evidence.filePath}');
       
-      if (widget.evidence.filePath.isEmpty) {
+      if (_evidence.filePath.isEmpty) {
         print('❌ PDF dosyası bulunamadı');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -727,9 +923,9 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       }
 
       // PDF dosyasının var olup olmadığını kontrol et
-      final pdfFile = File(widget.evidence.filePath);
+      final pdfFile = File(_evidence.filePath);
       if (!pdfFile.existsSync()) {
-        print('❌ PDF dosyası mevcut değil: ${widget.evidence.filePath}');
+        print('❌ PDF dosyası mevcut değil: ${_evidence.filePath}');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('❌ PDF dosyası bulunamadı'),
@@ -743,8 +939,8 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
         context,
         MaterialPageRoute(
           builder: (context) => CustomPdfViewer(
-            pdfPath: widget.evidence.filePath,
-            title: widget.evidence.title,
+            pdfPath: _evidence.filePath,
+            title: _evidence.title,
           ),
         ),
       );
@@ -770,10 +966,10 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow('Dosya Yolu:', widget.evidence.filePath),
-            _buildInfoRow('Dosya Boyutu:', _formatFileSize(widget.evidence.fileSize)),
-            _buildInfoRow('Eklenme Tarihi:', _formatDate(widget.evidence.createdAt)),
-            _buildInfoRow('Ekleyen:', widget.evidence.userId),
+            _buildInfoRow('Dosya Yolu:', _evidence.filePath),
+            _buildInfoRow('Dosya Boyutu:', _formatFileSize(_evidence.fileSize)),
+            _buildInfoRow('Eklenme Tarihi:', _formatDate(_evidence.createdAt)),
+            _buildInfoRow('Ekleyen:', _formatUserDisplayName(_evidence.userId)),
           ],
         ),
         actions: [
@@ -788,10 +984,10 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
 
   void _openLink() async {
     try {
-      print('🔗 Link açma işlemi başlatılıyor: ${widget.evidence.url}');
+      print('🔗 Link açma işlemi başlatılıyor: ${_evidence.url}');
       
       // URL'nin boş olup olmadığını kontrol et
-      if (widget.evidence.url.isEmpty) {
+      if (_evidence.url.isEmpty) {
         print('❌ URL boş');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -803,7 +999,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       }
 
       // URL formatını kontrol et
-      String urlString = widget.evidence.url;
+      String urlString = _evidence.url;
       if (!urlString.startsWith('http://') && !urlString.startsWith('https://')) {
         urlString = 'https://$urlString';
         print('🔗 URL formatı düzeltildi: $urlString');
@@ -854,7 +1050,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
         print('❌ URL açılamaz');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Bu link açılamaz: ${widget.evidence.url}'),
+            content: Text('❌ Bu link açılamaz: ${_evidence.url}'),
             backgroundColor: Colors.red,
           ),
         );

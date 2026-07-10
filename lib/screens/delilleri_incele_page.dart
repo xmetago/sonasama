@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/countdown_timer_widget.dart';
 import '../widgets/evidence_viewer_widget.dart';
+import '../services/dava_hukum_eligibility_service.dart';
+import '../services/dava_timer_service.dart';
 import '../services/hive_database_service.dart';
 
 // Model class for Dava (delil için de kullanılabilir)
@@ -43,6 +46,10 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
   bool _isLoading = true;
   String? _selectedDavaId; // Deliller için kullanılan gerçek davaId
   String? _selectedDropdownValue; // Dropdown için benzersiz değer
+  /// Yargıla — Dava Künyesi ile aynı daraltılabilir üst panel (sayfa açılışında kapalı)
+  bool _delillerKunyeExpanded = false;
+  /// Künye içinde Dava Konusu metni — varsayılan kapalı
+  bool _davaKonusuExpanded = false;
 
   @override
   void initState() {
@@ -138,46 +145,7 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                   },
                 ),
               ),
-              // ROW 4: Başlık satırı
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        MdiIcons.menuOpen,
-                        size: 34,
-                        color: Colors.red,
-                      ),
-                      onPressed: () {},
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.content_paste_search,
-                              color: Colors.blue[700],
-                              size: 24,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              "DELİLLERİ İNCELE",
-                              style: TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // ROW 5: Dava seçici ve Delil görüntüleyici
+              // Dava Künyesi (Yargıla) ile uyumlu üst panel + delil görüntüleyici
               if (_isLoading)
                 const Center(
                   child: Padding(
@@ -219,96 +187,7 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                     ),
                 )
               else
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        children: [
-                      // Dava seçici dropdown (birden fazla dava varsa)
-                      if (_acceptedDavalar.length > 1)
-                        Container(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.blue[200]!,
-                            ),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _selectedDropdownValue,
-                              isExpanded: true,
-                              icon: Icon(
-                                Icons.arrow_drop_down,
-                                color: Colors.blue[700],
-                              ),
-                              items: _acceptedDavalar.asMap().entries.map((entry) {
-                                final index = entry.key;
-                                final dava = entry.value;
-                                // Her item için benzersiz bir value oluştur
-                                // Önce id alanını kullan (her zaman benzersizdir)
-                                // Eğer id yoksa davaId + index kombinasyonu kullan
-                                final uniqueValue = (dava['id'] as String?) ?? 
-                                                   '${dava['davaId'] as String? ?? 'dava'}_$index';
-                                return DropdownMenuItem<String>(
-                                  value: uniqueValue,
-                                  child: Text(
-                                    dava['adi'] as String? ?? 'İsimsiz Dava',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (String? newValue) {
-                                setState(() {
-                                  _selectedDropdownValue = newValue;
-                                  // Seçilen dava için gerçek davaId'yi bul
-                                  if (newValue != null) {
-                                    final selectedIndex = _acceptedDavalar.asMap().entries.firstWhere(
-                                      (entry) {
-                                        final index = entry.key;
-                                        final dava = entry.value;
-                                        final uniqueValue = (dava['id'] as String?) ?? 
-                                                           '${dava['davaId'] as String? ?? 'dava'}_$index';
-                                        return uniqueValue == newValue;
-                                      },
-                                      orElse: () => _acceptedDavalar.asMap().entries.first,
-                                    );
-                                    
-                                    final selectedDava = selectedIndex.value;
-                                    // Deliller için gerçek davaId'yi kullan
-                                    _selectedDavaId = (selectedDava['davaId'] as String?) ?? 
-                                                     (selectedDava['id'] as String?);
-                                    print('🔍 Dava seçildi - Dropdown: $newValue, DavaId: $_selectedDavaId');
-                                  }
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                      
-                      // Modern Delil Görüntüleyici Widget
-                      // Dava seçildiğinde delilleri göster
-                      if (_selectedDavaId != null)
-                        EvidenceViewerWidget(
-                          key: ValueKey(_selectedDavaId), // Dava değiştiğinde widget'ı yeniden oluştur
-                          davaId: _selectedDavaId!.trim(), // Trim yaparak eşleşmeyi garanti et
-                          userEmail: widget.userEmail,
-                          showCaseInfo: true,
-                          caseInfoCard: _buildDavaInfoCard(),
-                    ),
-                  ],
-                ),
-              ),
+                _buildDelillerMainPanel(context),
             ],
           ),
         ),
@@ -316,130 +195,355 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
     );
   }
 
-  /// Dava bilgi kartı oluştur
-  Widget _buildDavaInfoCard() {
-    if (_selectedDavaId == null) return const SizedBox.shrink();
-    
-    // Seçili davayı bul
-    final selectedDava = _acceptedDavalar.firstWhere(
-      (dava) => dava['id'] == _selectedDavaId,
-      orElse: () => {},
-    );
-    
-    if (selectedDava.isEmpty) return const SizedBox.shrink();
-    
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+  Map<String, dynamic>? _resolveSelectedDava() {
+    if (_selectedDavaId == null) return null;
+    final want = _selectedDavaId!.trim().toLowerCase();
+    for (final d in _acceptedDavalar) {
+      final id = ((d['davaId'] as String?) ?? (d['id'] as String?))?.trim().toLowerCase();
+      if (id != null && id == want) return d;
+    }
+    return null;
+  }
+
+  /// Yargıla `ModernYargilaCard` / Dava Künyesi ile aynı görsel dil
+  Widget _buildDelillerMainPanel(BuildContext context) {
+    const borderColor = Color(0xFFDDE9E2);
+    const innerBorder = Color(0xFFDCE7E1);
+    const dashColor = Color(0xFFD8E5DE);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.blue[50]!,
-              Colors.white,
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Başlık
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    MdiIcons.gavel,
-                    color: Colors.blue[700],
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        selectedDava['adi'] as String? ?? 'İsimsiz Dava',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (selectedDava['davaKonusu'] != null &&
-                          (selectedDava['davaKonusu'] as String).isNotEmpty)
-                        Text(
-                          selectedDava['davaKonusu'] as String,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-            const Divider(),
-            const SizedBox(height: 12),
-            
-            // Detaylar
-            Row(
-              children: [
-                Expanded(
-                  child: _buildInfoItem(
-                    'Davacı',
-                    selectedDava['davaci'] as String? ?? '-',
-                    Icons.person,
-                  ),
-                ),
-                Expanded(
-                  child: _buildInfoItem(
-                    'Davalı',
-                    selectedDava['davali'] as String? ?? '-',
-                    Icons.person_outline,
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-            
-            Row(
-              children: [
-                Expanded(
-                  child: _buildInfoItem(
-                    'Görev',
-                    selectedDava['userRole'] as String? ?? '-',
-                    Icons.badge,
-                  ),
-                ),
-                Expanded(
-                  child: _buildInfoItem(
-                    'Kalan Süre',
-                    selectedDava['kalanSure'] as String? ?? '-',
-                    MdiIcons.timerSand,
-                  ),
-                ),
-              ],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF101815).withValues(alpha: 0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
+        child: Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  icon: Icon(
+                    Icons.arrow_back,
+                    size: 26,
+                    color: Colors.green.shade700,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  tooltip: 'Geri',
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: innerBorder),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          setState(() => _delillerKunyeExpanded = !_delillerKunyeExpanded);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.content_paste_search,
+                                color: Colors.blue.shade700,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Center(
+                                  child: Text(
+                                    ' || Delilleri İncele ||',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.2,
+                                      color: Color(0xFF1B2A23),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              AnimatedRotation(
+                                turns: _delillerKunyeExpanded ? 0.5 : 0,
+                                duration: const Duration(milliseconds: 220),
+                                curve: Curves.easeOutCubic,
+                                child: Icon(
+                                  Icons.expand_more,
+                                  color: Colors.grey.shade600,
+                                  size: 26,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeInOutCubic,
+                      alignment: Alignment.topCenter,
+                      child: _delillerKunyeExpanded
+                          ? Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                              child: _buildKunyeExpandedBody(dashColor),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+              ),
+              if (_acceptedDavalar.length > 1) ...[
+                const SizedBox(height: 10),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6FBF8),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: innerBorder),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedDropdownValue,
+                      isExpanded: true,
+                      icon: Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.green.shade700,
+                      ),
+                      items: _acceptedDavalar.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final dava = entry.value;
+                        final uniqueValue = (dava['id'] as String?) ??
+                            '${dava['davaId'] as String? ?? 'dava'}_$index';
+                        return DropdownMenuItem<String>(
+                          value: uniqueValue,
+                          child: Text(
+                            dava['adi'] as String? ?? 'İsimsiz Dava',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _selectedDropdownValue = newValue;
+                          if (newValue != null) {
+                            final selectedIndex = _acceptedDavalar.asMap().entries.firstWhere(
+                              (entry) {
+                                final index = entry.key;
+                                final dava = entry.value;
+                                final uniqueValue = (dava['id'] as String?) ??
+                                    '${dava['davaId'] as String? ?? 'dava'}_$index';
+                                return uniqueValue == newValue;
+                              },
+                              orElse: () => _acceptedDavalar.asMap().entries.first,
+                            );
+
+                            final selectedDava = selectedIndex.value;
+                            _selectedDavaId = (selectedDava['davaId'] as String?) ??
+                                (selectedDava['id'] as String?);
+                            _davaKonusuExpanded = false;
+                            print('🔍 Dava seçildi - Dropdown: $newValue, DavaId: $_selectedDavaId');
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              if (_selectedDavaId != null)
+                EvidenceViewerWidget(
+                  key: ValueKey(_selectedDavaId),
+                  davaId: _selectedDavaId!.trim(),
+                  userEmail: widget.userEmail,
+                  userRole: (_acceptedDavalar.firstWhere(
+                    (dava) =>
+                        ((dava['davaId'] as String?) ?? (dava['id'] as String?))?.trim() ==
+                        _selectedDavaId?.trim(),
+                    orElse: () => <String, dynamic>{},
+                  )['userRole'] as String?),
+                  showCaseInfo: false,
+                ),
+            ],
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _buildKunyeExpandedBody(Color dashColor) {
+    final d = _resolveSelectedDava();
+    if (d == null) {
+      return Text(
+        'Dava bilgisi yüklenemedi veya henüz seçilmedi.',
+        style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildKunyeInfoRow(
+          'Göreviniz',
+          d['userRole'] as String? ?? '-',
+          Icons.gavel_outlined,
+        ),
+        const SizedBox(height: 3),
+        _buildKunyeDashedLine(dashColor),
+        const SizedBox(height: 3),
+        _buildKunyeInfoRow('Dava Adı', d['adi'] as String? ?? '-', Icons.description),
+        const SizedBox(height: 3),
+        _buildKunyeDashedLine(dashColor),
+        const SizedBox(height: 3),
+        _buildKunyeInfoRow('Davacı', d['davaci'] as String? ?? '-', Icons.person),
+        const SizedBox(height: 3),
+        _buildKunyeDashedLine(dashColor),
+        const SizedBox(height: 3),
+        _buildKunyeInfoRow('Davalı', d['davali'] as String? ?? '-', Icons.person_outline),
+        _buildKunyeDavaKonusuSection(d, dashColor),
+        const SizedBox(height: 3),
+        _buildKunyeDashedLine(dashColor),
+        const SizedBox(height: 3),
+        _buildKalanSureItem(d),
+      ],
+    );
+  }
+
+  /// Dava konusu: varsayılan kapalı, başlığa dokununca metin açılır
+  Widget _buildKunyeDavaKonusuSection(Map<String, dynamic> d, Color dashColor) {
+    final konusu = (d['davaKonusu'] as String?)?.trim() ?? '';
+    if (konusu.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 3),
+        _buildKunyeDashedLine(dashColor),
+        const SizedBox(height: 3),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _davaKonusuExpanded = !_davaKonusuExpanded),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+              child: Row(
+                children: [
+                  Icon(Icons.article_outlined, size: 20, color: Colors.green.shade700),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Dava Konusu',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _davaKonusuExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    child: Icon(Icons.expand_more, color: Colors.grey.shade600, size: 22),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeInOutCubic,
+          alignment: Alignment.topCenter,
+          child: _davaKonusuExpanded
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 0, 8, 4),
+                  child: SelectableText(
+                    konusu,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade900,
+                      height: 1.45,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKunyeDashedLine(Color color) {
+    return SizedBox(
+      height: 10,
+      child: CustomPaint(
+        size: const Size(double.infinity, 10),
+        painter: KunyeDashedLinePainter(color: color, strokeWidth: 1.6),
+      ),
+    );
+  }
+
+  Widget _buildKunyeInfoRow(String label, String value, IconData icon, {bool isHighlight = false}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: isHighlight ? Colors.red.shade600 : Colors.green.shade700,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isHighlight ? Colors.red.shade700 : Colors.grey.shade900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -479,6 +583,138 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
       ],
     );
   }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
+  }
+
+  DateTime? _extractOpenedAt(Map<String, dynamic> dava) {
+    return _parseDate(dava['openedAt']) ??
+        _parseDate(dava['acceptedAt']) ??
+        _parseDate(dava['createdAt']);
+  }
+
+  Widget _buildKalanSureItem(Map<String, dynamic> selectedDava) {
+    final davaId =
+        ((selectedDava['davaId'] as String?) ?? (selectedDava['id'] as String?))
+                ?.trim() ??
+            '';
+    final openedAt = _extractOpenedAt(selectedDava);
+    final fallbackText = selectedDava['kalanSure'] as String? ?? '-';
+
+    if (openedAt == null) {
+      return _buildInfoItem('Kalan Süre', fallbackText, MdiIcons.timerSand);
+    }
+
+    final openedFromDb =
+        davaId.isEmpty ? null : HiveDatabaseService.getOpenedDavaById(davaId);
+    final isAppealActive =
+        DavaHukumEligibilityService.isAppealJudgeWindowActive(openedFromDb);
+
+    if (isAppealActive) {
+      final appealRequestedAt = _parseDate(openedFromDb?['appealRequestedAt']);
+      if (appealRequestedAt != null) {
+        return _buildTimerInfoItem(
+          label: 'Kalan Süre',
+          subtitle: 'Temyiz',
+          icon: MdiIcons.timerSand,
+          startTime: appealRequestedAt,
+          totalDuration: DavaTimerService.appealJudgeDecisionWindow,
+          accentColor: Colors.deepPurple.shade700,
+        );
+      }
+    }
+
+    final segment = DavaTimerService.buildIncomingListCountdown(
+      openedAt: openedAt,
+    );
+    if (segment != null) {
+      return _buildTimerInfoItem(
+        label: 'Kalan Süre',
+        subtitle: segment.phaseLabel,
+        icon: MdiIcons.timerSand,
+        startTime: segment.segmentStart,
+        totalDuration: segment.totalDuration,
+        accentColor: segment.accentColor,
+      );
+    }
+
+    return _buildInfoItem('Kalan Süre', 'Süre doldu', MdiIcons.timerSandComplete);
+  }
+
+  Widget _buildTimerInfoItem({
+    required String label,
+    required String subtitle,
+    required IconData icon,
+    required DateTime startTime,
+    required Duration totalDuration,
+    required Color accentColor,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: Colors.blue[700],
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                ),
+              ),
+              CountdownTimerWidget(
+                startTime: startTime,
+                totalDuration: totalDuration,
+                accentColor: accentColor,
+                showHourglass: true,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Yargıla sayfasındaki `DashedLinePainter` ile aynı çizgi stili
+class KunyeDashedLinePainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+
+  KunyeDashedLinePainter({required this.color, required this.strokeWidth});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    const dashWidth = 5.0;
+    const dashSpace = 6.0;
+    final y = size.height / 2;
+    double startX = 0;
+
+    while (startX < size.width) {
+      canvas.drawLine(
+        Offset(startX, y),
+        Offset(startX + dashWidth, y),
+        paint,
+      );
+      startX += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // Reused Widgets from GelenDavalarPage

@@ -1,7 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'expandable_comment_text.dart';
 import '../models/evidence_comment_model.dart';
+import '../models/evidence_model.dart';
 import '../services/evidence_comment_service.dart';
+import '../services/evidence_service.dart';
+
+String _criticismFromEvidenceVote(String? vote) {
+  switch (vote) {
+    case 'like':
+      return 'positive';
+    case 'dislike':
+      return 'negative';
+    case 'neutral':
+      return 'neutral';
+    default:
+      return 'neutral';
+  }
+}
+
+String _evidenceVoteFromCriticism(String criticism) {
+  switch (criticism) {
+    case 'positive':
+      return 'like';
+    case 'negative':
+      return 'dislike';
+    default:
+      return 'neutral';
+  }
+}
 
 /// Delil yorumları widget'ı
 /// 8 farklı rol için yorum görüntüleme ve yazma
@@ -10,6 +37,12 @@ class EvidenceCommentWidget extends StatefulWidget {
   final String davaId;
   final String? userEmail;
   final String? currentUserRole; // Mevcut kullanıcının rolü
+  final bool isEvidenceValid; // Delil geçerliyse true
+  /// Oy çubuğu ve senkron için güncel delil (liste/detay ile aynı kaynak)
+  final EvidenceModel? evidenceSnapshot;
+  final VoidCallback? onEvidenceVoteChanged;
+  final bool isVoteLockedByFinalizedHukum;
+  final bool forcedValidVote;
 
   const EvidenceCommentWidget({
     super.key,
@@ -17,6 +50,11 @@ class EvidenceCommentWidget extends StatefulWidget {
     required this.davaId,
     this.userEmail,
     this.currentUserRole,
+    this.isEvidenceValid = true,
+    this.evidenceSnapshot,
+    this.onEvidenceVoteChanged,
+    this.isVoteLockedByFinalizedHukum = false,
+    this.forcedValidVote = false,
   });
 
   @override
@@ -76,7 +114,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                 ),
                 const SizedBox(width: 8),
                 const Text(
-                  'Rol Yorumları',
+                  'Delili Değerlendirdim : ',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -92,11 +130,192 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
               ],
             ),
             const SizedBox(height: 16),
+
+            if (widget.evidenceSnapshot != null &&
+                widget.userEmail != null &&
+                widget.userEmail!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: _buildEvidenceAssessmentBar(),
+              ),
             
             // 8 Rol için yorum kartları
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _buildRoleCommentsGrid(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onAssessmentVoteTap(Future<void> Function() action) async {
+    if (widget.isVoteLockedByFinalizedHukum) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.forcedValidVote
+                ? 'Hükmünüz kesinleşti: deliller geçerli kabul edildi.'
+                : 'Hükmünüz kesinleşti: deliller geçersiz kabul edildi.',
+          ),
+          backgroundColor: Colors.blueGrey,
+        ),
+      );
+      return;
+    }
+    await action();
+    widget.onEvidenceVoteChanged?.call();
+  }
+
+  Widget _buildEvidenceAssessmentBar() {
+    final e = widget.evidenceSnapshot!;
+    final email = widget.userEmail!.trim();
+    final vote = e.getUserVote(email);
+    final isLiked = vote == 'like';
+    final isNeutral = vote == 'neutral';
+    final isDisliked = vote == 'dislike';
+    final svc = EvidenceService();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          Row(
+            children: [
+              Expanded(
+                child: _buildVoteSegment(
+                  icon: Icons.thumb_up_rounded,
+                  label: 'Geçerli',
+                  count: e.likeCount,
+                  color: Colors.blue,
+                  active: isLiked,
+                  disabled: widget.isVoteLockedByFinalizedHukum,
+                  onTap: () => _onAssessmentVoteTap(() async {
+                    await svc.initialize();
+                    await svc.toggleLike(e.id, email);
+                  }),
+                ),
+              ),
+              Container(width: 10, height: 22, color: Colors.grey[300]),
+              Expanded(
+                child: _buildVoteSegment(
+                  icon: Icons.remove,
+                  label: 'Nötr',
+                  count: e.neutralCount,
+                  color: Colors.grey,
+                  active: isNeutral,
+                  disabled: widget.isVoteLockedByFinalizedHukum,
+                  onTap: () => _onAssessmentVoteTap(() async {
+                    await svc.initialize();
+                    await svc.toggleNeutral(e.id, email);
+                  }),
+                ),
+              ),
+              Container(width: 10, height: 22, color: Colors.grey[300]),
+              Expanded(
+                child: _buildVoteSegment(
+                  icon: Icons.thumb_down_rounded,
+                  label: 'Geçersiz',
+                  count: e.dislikeCount,
+                  color: Colors.red,
+                  active: isDisliked,
+                  disabled: widget.isVoteLockedByFinalizedHukum,
+                  onTap: () => _onAssessmentVoteTap(() async {
+                    await svc.initialize();
+                    await svc.toggleDislike(e.id, email);
+                  }),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVoteSegment({
+    required IconData icon,
+    required String label,
+    required int count,
+    required Color color,
+    required bool active,
+    required bool disabled,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: disabled ? null : onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        decoration: BoxDecoration(
+          color: disabled
+              ? Colors.grey[200]
+              : active
+                  ? color.withValues(alpha: 0.15)
+                  : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: disabled
+                ? Colors.grey[400]!
+                : active
+                    ? color
+                    : color.withValues(alpha: 0.25),
+            width: active ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: disabled
+                  ? Colors.grey[500]
+                  : active
+                      ? color
+                      : color.withValues(alpha: 0.65),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                      color: disabled
+                          ? Colors.grey[600]
+                          : active
+                              ? color
+                              : Colors.grey[700],
+                    ),
+                  ),
+                  Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: disabled ? Colors.grey[600] : color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -271,18 +490,11 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // Yorum metni (kısaltılmış)
-                  Text(
-                    comment.commentText,
+                  ExpandableCommentText(
+                    text: comment.commentText,
                     style: const TextStyle(fontSize: 14),
                     maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  if (comment.commentText.length > 100)
-                    TextButton(
-                      onPressed: () => _showCommentDialog(role, comment, true, canComment),
-                      child: const Text('Devamını oku'),
-                    ),
                 ],
               ),
             ),
@@ -356,17 +568,24 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
       return;
     }
 
+    final userVote = widget.evidenceSnapshot?.getUserVote(widget.userEmail ?? '');
+
     showDialog(
       context: context,
+      barrierDismissible: true,
+      useSafeArea: true,
       builder: (context) => _CommentDialog(
         role: role,
         evidenceId: widget.evidenceId,
         davaId: widget.davaId,
         userEmail: widget.userEmail ?? '',
         userRole: role.value,
-        existingComment: existingComment,
+        isEvidenceValid: widget.isEvidenceValid,
+        existingComment: hasComment ? existingComment : null,
         hasComment: hasComment,
         canComment: canComment,
+        userEvidenceVote: userVote,
+        onEvidenceVoteChanged: widget.onEvidenceVoteChanged,
         onCommentSaved: () {
           _loadComments();
           Navigator.pop(context);
@@ -399,9 +618,12 @@ class _CommentDialog extends StatefulWidget {
   final String davaId;
   final String userEmail;
   final String userRole;
+  final bool isEvidenceValid;
   final EvidenceCommentModel? existingComment;
   final bool hasComment;
   final bool canComment;
+  final String? userEvidenceVote;
+  final VoidCallback? onEvidenceVoteChanged;
   final VoidCallback onCommentSaved;
 
   const _CommentDialog({
@@ -410,9 +632,12 @@ class _CommentDialog extends StatefulWidget {
     required this.davaId,
     required this.userEmail,
     required this.userRole,
+    required this.isEvidenceValid,
     this.existingComment,
     required this.hasComment,
     required this.canComment,
+    this.userEvidenceVote,
+    this.onEvidenceVoteChanged,
     required this.onCommentSaved,
   });
 
@@ -432,6 +657,12 @@ class _CommentDialogState extends State<_CommentDialog> {
     if (widget.existingComment != null) {
       _commentController.text = widget.existingComment!.commentText;
       _selectedCriticism = widget.existingComment!.criticism;
+    } else if (widget.userEvidenceVote != null &&
+        widget.userEvidenceVote!.isNotEmpty) {
+      _selectedCriticism = _criticismFromEvidenceVote(widget.userEvidenceVote);
+    }
+    if (!widget.isEvidenceValid && _selectedCriticism == 'positive') {
+      _selectedCriticism = 'neutral';
     }
   }
 
@@ -443,145 +674,138 @@ class _CommentDialogState extends State<_CommentDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
+    return AlertDialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Başlık
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: widget.role.color.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    widget.role.icon,
-                    color: widget.role.color,
-                    size: 24,
-                  ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      titlePadding: const EdgeInsets.fromLTRB(20, 20, 12, 0),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: widget.role.color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              widget.role.icon,
+              color: widget.role.color,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '${widget.role.label} Yorumu',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 500),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Eleştiri Türü:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '${widget.role.label} Yorumu',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildCriticismOption(
+                      'positive',
+                      'Olumlu',
+                      Icons.thumb_up,
+                      Colors.green,
+                      widget.isEvidenceValid,
                     ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            
-            // Eleştiri seçimi
-            const Text(
-              'Eleştiri Türü:',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildCriticismOption(
+                      'neutral',
+                      'Nötr',
+                      Icons.remove,
+                      Colors.grey,
+                      true,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildCriticismOption(
+                      'negative',
+                      'Olumsuz',
+                      Icons.thumb_down,
+                      Colors.red,
+                      true,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildCriticismOption(
-                    'positive',
-                    'Olumlu',
-                    Icons.thumb_up,
-                    Colors.green,
-                  ),
+              const SizedBox(height: 20),
+              const Text(
+                'Yorumunuz:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildCriticismOption(
-                    'neutral',
-                    'Nötr',
-                    Icons.remove,
-                    Colors.grey,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildCriticismOption(
-                    'negative',
-                    'Olumsuz',
-                    Icons.thumb_down,
-                    Colors.red,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            
-            // Yorum metni
-            const Text(
-              'Yorumunuz:',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
               ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _commentController,
-              maxLines: 8,
-              decoration: InputDecoration(
-                hintText: 'Delil hakkındaki yorumunuzu yazın...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: true,
-                fillColor: Colors.grey[50],
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // Butonlar
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: _isSaving ? null : () => Navigator.pop(context),
-                  child: const Text('İptal'),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isSaving ? null : _saveComment,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.role.color,
-                    foregroundColor: Colors.white,
+              const SizedBox(height: 8),
+              TextField(
+                controller: _commentController,
+                maxLines: 8,
+                decoration: InputDecoration(
+                  hintText: 'Delil hakkındaki yorumunuzu yazın...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Text(widget.hasComment ? 'Güncelle' : 'Kaydet'),
+                  filled: true,
+                  fillColor: Colors.grey[50],
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context),
+          child: const Text('İptal'),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : _saveComment,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: widget.role.color,
+            foregroundColor: Colors.white,
+          ),
+          child: _isSaving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Text(widget.hasComment ? 'Güncelle' : 'Kaydet'),
+        ),
+      ],
     );
   }
 
@@ -591,34 +815,62 @@ class _CommentDialogState extends State<_CommentDialog> {
     String label,
     IconData icon,
     Color color,
+    bool enabled,
   ) {
     final isSelected = _selectedCriticism == value;
     return InkWell(
-      onTap: () => setState(() => _selectedCriticism = value),
+      onTap: !enabled
+          ? () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Geçersiz delilde olumlu yorum seçilemez'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+          : () => setState(() => _selectedCriticism = value),
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected
+          color: !enabled
+              ? Colors.grey[200]
+              : isSelected
               ? color.withValues(alpha: 0.2)
               : Colors.grey[100],
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? color : Colors.grey[300]!,
+            color: !enabled
+                ? Colors.grey[400]!
+                : isSelected
+                    ? color
+                    : Colors.grey[300]!,
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: isSelected ? color : Colors.grey, size: 20),
+            Icon(
+              icon,
+              color: !enabled
+                  ? Colors.grey[500]
+                  : isSelected
+                      ? color
+                      : Colors.grey,
+              size: 20,
+            ),
             const SizedBox(width: 4),
             Text(
-              label,
+              enabled ? label : '$label (pasif)',
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? color : Colors.grey[700],
+                fontWeight: isSelected && enabled ? FontWeight.bold : FontWeight.normal,
+                color: !enabled
+                    ? Colors.grey[600]
+                    : isSelected
+                        ? color
+                        : Colors.grey[700],
               ),
             ),
           ],
@@ -659,9 +911,21 @@ class _CommentDialogState extends State<_CommentDialog> {
         userEmail: widget.userEmail,
         commentText: _commentController.text.trim(),
         criticism: _selectedCriticism,
+        isEvidenceValid: widget.isEvidenceValid,
       );
 
       if (result['success'] == true) {
+        try {
+          final evSvc = EvidenceService();
+          await evSvc.initialize();
+          await evSvc.setUserVote(
+            widget.evidenceId,
+            widget.userEmail,
+            _evidenceVoteFromCriticism(_selectedCriticism),
+          );
+          widget.onEvidenceVoteChanged?.call();
+        } catch (_) {}
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Yorum kaydedildi'),

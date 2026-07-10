@@ -1,5 +1,6 @@
 import '../models/dava_model.dart';
 import '../models/dava.dart';
+import 'dava_map_utils.dart';
 
 /// Dava ve DavaModel'i Map<String, dynamic> formatına çeviren adapter fonksiyonları
 /// Bu sayede farklı veri tipleriyle çalışan widget'lar aynı formatta veri alabilir
@@ -45,7 +46,9 @@ class DavaAdapter {
       'isOpened': dava.isOpened,
       // Dava class'ında olmayan alanlar için varsayılan değerler
       'createdAt': DateTime.now().toIso8601String(),
-      'kategori': '',
+      'kategori': dava.kategori,
+      'davaKategorisi': dava.kategori,
+      'davaKategori': dava.kategori,
       'altKategori': '',
       'aciklama': '',
       'likeCount': 0,
@@ -62,7 +65,7 @@ class DavaAdapter {
     return Dava(
       id: map['id']?.toString() ?? '',
       davaAdi: map['davaAdi']?.toString() ?? map['adi']?.toString() ?? '',
-      kategori: map['kategori']?.toString() ?? '',
+      kategori: resolveDavaKategoriFromMap(map),
       davaci: map['davaci']?.toString() ?? '',
       davali: map['davali']?.toString() ?? '',
       mevkii: map['mevkii']?.toString() ?? '',

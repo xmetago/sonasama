@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../widgets/profile_icons_row.dart';
 import 'category_page.dart';
 
@@ -264,42 +265,25 @@ class _MyCheckboxWidgetState extends State<MyCheckboxWidget> {
       children: [ const SizedBox(width: 38),
 
         const Text(
-          'GELEN  DAVALAR KAÇ TANE ',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          '8-HÜKÜM || ',
+          style: TextStyle(
+            fontSize: 22,
+            fontStyle: FontStyle.normal,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+            color: Color(0xFF2F3E35),
+          ),
 
         ),
-        const SizedBox(width: 19),
+
         Stack(
           children: [
-            Image.asset(
-              'lib/icons/06_left_row_gelen_davalar_icon.png',
-              width: 30,
-              height: 30,
+            Icon(
+              MdiIcons.gavel,
+              size: 24,
+              color: Colors.black54,
             ),
-            Positioned(
-              right: 0,
-              top: 0,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                constraints: const BoxConstraints(
-                  minWidth: 18,
-                  minHeight: 18,
-                ),
-                child: Text(
-                  GelenDavalarKactanePage.iconCount.toString(), // Buradaki sayı dinamik (şimdi 13)
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
+
           ],
         ),
 

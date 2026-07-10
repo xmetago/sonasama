@@ -1,107 +1,109 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import '../models/dava.dart' as dava_model;
 import '../services/hive_database_service.dart';
-import '../screens/dava_ac_page.dart'; // DavaAcPage için import eklendi
+import '../screens/dava_ac_page.dart';
+
+// Uygulama yeşil tonu paleti (#169371 ana yeşil)
+const _kPrimaryDark = Color(0xFF169371);   // Ana yeşil
+const _kPrimaryLight = Color(0xFF059669);  // Gradient için açık yeşil
+const _kAccent = Color(0xFF0D7A5A);        // Vurgu (koyu yeşil)
+const _kCardBg = Color(0xFFE8F5F1);        // Açık yeşil zemin (E0F5EF benzeri)
+const _kTextPrimary = Color(0xFF1E293B);
+const _kTextSecondary = Color(0xFF64748B);
 
 /// Kaydedilen Davalar dialog'unu gösteren global utility fonksiyonu
-/// Bu fonksiyon tüm sayfalarda kullanılabilir
 Future<void> showSavedDavalarDialog(BuildContext context, String userEmail) async {
-  // Kaydedilen davaları veritabanından yükle
   final List<Map<String, dynamic>> savedDavalarMaps = HiveDatabaseService.getSavedDavalar();
   final List<dava_model.Dava> savedDavalar = savedDavalarMaps.map((map) => dava_model.Dava.fromMap(map)).toList();
 
   if (!context.mounted) return;
 
-  showDialog(
+  await showDialog<void>(
     context: context,
     barrierDismissible: true,
     builder: (BuildContext context) {
       return Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         elevation: 0,
         backgroundColor: Colors.transparent,
         child: Container(
-          width: MediaQuery.of(context).size.width * 0.85,
-          height: MediaQuery.of(context).size.height * 0.75,
+          width: MediaQuery.of(context).size.width * 0.88,
+          height: MediaQuery.of(context).size.height * 0.78,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+                color: _kPrimaryDark.withOpacity(0.15),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Column(
             children: [
-                             // Header Section
-               Container(
-                 padding: const EdgeInsets.all(24),
-                 decoration: BoxDecoration(
-                   borderRadius: const BorderRadius.only(
-                     topLeft: Radius.circular(20),
-                     topRight: Radius.circular(20),
-                   ),
-                   color: Colors.green.shade600,
-                 ),
-                 child: Row(
-                   children: [
-                     // Icon
-                     Container(
-                       padding: const EdgeInsets.all(12),
-                       decoration: BoxDecoration(
-                         color: Colors.white.withOpacity(0.2),
-                         borderRadius: BorderRadius.circular(12),
-                       ),
-                       child: const Icon(
-                         Icons.check_circle,
-                         color: Colors.white,
-                         size: 24,
-                       ),
-                     ),
-                     const SizedBox(width: 16),
-                     // Title
-                     Expanded(
-                       child: Column(
-                         crossAxisAlignment: CrossAxisAlignment.start,
-                         children: [
-                           const Text(
-                             'Kaydedilen Davalar',
-                             style: TextStyle(
-                               fontSize: 20,
-                               fontWeight: FontWeight.bold,
-                               color: Colors.white,
-                             ),
-                           ),
-                           const SizedBox(height: 4),
-                           Text(
-                             '${savedDavalar.length} dava kaydedildi',
-                             style: TextStyle(
-                               fontSize: 14,
-                               color: Colors.white.withOpacity(0.9),
-                             ),
-                           ),
-                         ],
-                       ),
-                     ),
-                     // Close Button
-                     IconButton(
-                       onPressed: () => Navigator.of(context).pop(),
-                       icon: const Icon(
-                         Icons.close,
-                         color: Colors.white,
-                         size: 20,
-                       ),
-                     ),
-                   ],
-                 ),
-               ),
-              
-              // Content Section
+              // Header — mahkeme teması
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [_kPrimaryDark, _kPrimaryLight],
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.gavel_rounded, color: Colors.white, size: 26),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Dava Düzenle',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${savedDavalar.length} dava ',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white.withOpacity(0.85),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.9), size: 22),
+                    ),
+                  ],
+                ),
+              ),
               Expanded(
                 child: savedDavalar.isEmpty
                     ? _buildEmptyState()
@@ -115,188 +117,248 @@ Future<void> showSavedDavalarDialog(BuildContext context, String userEmail) asyn
   );
 }
 
- Widget _buildEmptyState() {
-   return Container(
-     padding: const EdgeInsets.all(32),
-     child: Column(
-       mainAxisAlignment: MainAxisAlignment.center,
-       children: [
-         // Empty State Icon
-         Container(
-           padding: const EdgeInsets.all(20),
-           decoration: BoxDecoration(
-             color: Colors.grey.withOpacity(0.1),
-             shape: BoxShape.circle,
-           ),
-           child: Icon(
-             Icons.folder_open_outlined,
-             size: 48,
-             color: Colors.grey.shade400,
-           ),
-         ),
-         const SizedBox(height: 20),
-         
-         // Empty State Text
-         Text(
-           'Henüz dava kaydedilmedi',
-           style: TextStyle(
-             fontSize: 18,
-             fontWeight: FontWeight.bold,
-             color: Colors.grey.shade700,
-           ),
-           textAlign: TextAlign.center,
-         ),
-         const SizedBox(height: 8),
-         
-         Text(
-           'Dava açtığınızda burada görünecek',
-           style: TextStyle(
-             fontSize: 14,
-             color: Colors.grey.shade600,
-           ),
-           textAlign: TextAlign.center,
-         ),
-       ],
-     ),
-   );
- }
+Widget _buildEmptyState() {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: _kPrimaryDark.withOpacity(0.06),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.gavel_rounded,
+            size: 56,
+            color: _kTextSecondary.withOpacity(0.6),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Henüz dava kaydedilmedi',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: _kTextPrimary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Dava açtığınızda burada görünecek',
+          style: TextStyle(fontSize: 14, color: _kTextSecondary),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
+}
 
 Widget _buildSavedDavalarList(BuildContext context, List<dava_model.Dava> savedDavalar, String userEmail) {
   return Container(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
     child: ListView.builder(
       itemCount: savedDavalar.length,
       itemBuilder: (context, index) {
         final dava = savedDavalar[index];
-        return _buildDavaCard(context, dava, userEmail, index);
+        return Slidable(
+          key: ValueKey(dava.id),
+          groupTag: 'saved_davalar',
+          startActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: 0.35,
+            children: [
+              SlidableAction(
+                onPressed: (_) => _showDeleteConfirmation(context, dava, userEmail),
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+                icon: Icons.delete_rounded,
+                label: 'Sil',
+              ),
+            ],
+          ),
+          endActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: 0.35,
+            children: [
+              SlidableAction(
+                onPressed: (_) => _navigateToEdit(context, dava, userEmail),
+                backgroundColor: _kPrimaryDark,
+                foregroundColor: Colors.white,
+                icon: Icons.edit_rounded,
+                label: 'Düzenle',
+              ),
+            ],
+          ),
+          child: _buildDavaCard(context, dava, userEmail, index),
+        );
       },
     ),
   );
 }
 
- Widget _buildDavaCard(BuildContext context, dava_model.Dava dava, String userEmail, int index) {
-   return Container(
-     margin: const EdgeInsets.only(bottom: 12),
-     decoration: BoxDecoration(
-       borderRadius: BorderRadius.circular(12),
-       color: Colors.white,
-       border: Border.all(color: Colors.grey.withOpacity(0.2)),
-       boxShadow: [
-         BoxShadow(
-           color: Colors.black.withOpacity(0.03),
-           blurRadius: 8,
-           offset: const Offset(0, 2),
-         ),
-       ],
-     ),
-     child: Material(
-       color: Colors.transparent,
-       child: InkWell(
-         borderRadius: BorderRadius.circular(12),
-         onTap: () {
-           Navigator.of(context).pop();
-           Navigator.of(context).push(
-             MaterialPageRoute(
-               builder: (context) => DavaAcPage(
-                 userEmail: userEmail,
-                 editDava: dava,
-               ),
-             ),
-           );
-         },
-         child: Padding(
-           padding: const EdgeInsets.all(16),
-           child: Column(
-             crossAxisAlignment: CrossAxisAlignment.start,
-             children: [
-               // Header Row
-               Row(
-                 children: [
-                   // Dava Adı
-                   Expanded(
-                     child: Text(
-                       dava.davaAdi.isNotEmpty ? dava.davaAdi : 'Dava Adı Belirtilmemiş',
-                       style: const TextStyle(
-                         fontSize: 16,
-                         fontWeight: FontWeight.bold,
-                         color: Colors.black87,
-                       ),
-                       maxLines: 2,
-                       overflow: TextOverflow.ellipsis,
-                     ),
-                   ),
-                   
-                   // Action Buttons
-                   Row(
-                     mainAxisSize: MainAxisSize.min,
-                     children: [
-                       // Edit Button
-                       IconButton(
-                         icon: Icon(
-                           Icons.edit_outlined,
-                           color: Colors.grey.shade600,
-                           size: 20,
-                         ),
-                         onPressed: () {
-                           Navigator.of(context).pop();
-                           Navigator.of(context).push(
-                             MaterialPageRoute(
-                               builder: (context) => DavaAcPage(
-                                 userEmail: userEmail,
-                                 editDava: dava,
-                               ),
-                             ),
-                           );
-                         },
-                       ),
-                       
-                       // Delete Button
-                       IconButton(
-                         icon: Icon(
-                           Icons.delete_outline,
-                           color: Colors.red.shade600,
-                           size: 20,
-                         ),
-                         onPressed: () => _showDeleteConfirmation(context, dava, userEmail),
-                       ),
-                     ],
-                   ),
-                 ],
-               ),
-               
-               const SizedBox(height: 8),
-               
-               // Dava Details
-               if (dava.kategori.isNotEmpty || dava.davaci.isNotEmpty || dava.davali.isNotEmpty)
-                 Column(
-                   children: [
-                     if (dava.kategori.isNotEmpty) _buildDetailRow('Kategori', dava.kategori),
-                     if (dava.davaci.isNotEmpty) _buildDetailRow('Davacı', dava.davaci),
-                     if (dava.davali.isNotEmpty) _buildDetailRow('Davalı', dava.davali),
-                   ],
-                 ),
-             ],
-           ),
-         ),
-       ),
-     ),
-   );
- }
+void _navigateToEdit(BuildContext context, dava_model.Dava dava, String userEmail) {
+  Navigator.of(context).pop();
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (context) => DavaAcPage(
+        userEmail: userEmail,
+        editDava: dava,
+      ),
+    ),
+  );
+}
 
-Widget _buildDetailRow(String label, String value) {
+/// Sıra göstergesi: 1. dava = 1 tokmak, 2. dava = 2 tokmak ...
+Widget _buildGavelRow(int count) {
+  final int n = count.clamp(1, 10);
+  final double size = n > 5 ? 12 : 16;
+  final double spacing = n > 5 ? 2 : 4;
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: List.generate(
+      n,
+      (i) => Padding(
+        padding: EdgeInsets.only(right: i < n - 1 ? spacing : 0),
+        child: Icon(Icons.save_outlined, size: size, color: _kAccent),
+      ),
+    ),
+  );
+}
+
+Widget _buildDavaCard(BuildContext context, dava_model.Dava dava, String userEmail, int index) {
+  final int sira = index + 1;
+  return Container(
+    margin: const EdgeInsets.only(bottom: 14),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(16),
+      color: _kCardBg,
+      border: Border.all(color: _kPrimaryDark.withOpacity(0.08), width: 1),
+      boxShadow: [
+        BoxShadow(
+          color: _kPrimaryDark.withOpacity(0.06),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => DavaAcPage(
+                userEmail: userEmail,
+                editDava: dava,
+              ),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              // Sıra tokmağı + dava adı (sağa kaydır → Düzenle)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _kAccent.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: _buildGavelRow(sira),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          dava.davaAdi.isNotEmpty ? dava.davaAdi : 'Dava Adı Belirtilmemiş',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: _kTextPrimary,
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Sağa kaydır --> : Sil \n Sola kaydır: <--Düzenle',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _kTextSecondary.withOpacity(0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (dava.kategori.isNotEmpty || dava.davaci.isNotEmpty || dava.davali.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  height: 1,
+                  color: _kPrimaryDark.withOpacity(0.06),
+                ),
+                const SizedBox(height: 10),
+                if (dava.kategori.isNotEmpty) _buildDetailRow(Icons.category_outlined, 'Kategori', dava.kategori),
+                if (dava.davaci.isNotEmpty) _buildDetailRow(Icons.person_outline_rounded, 'Davacı', dava.davaci),
+                if (dava.davali.isNotEmpty) _buildDetailRow(Icons.person_outline_rounded, 'Davalı', dava.davali),
+              ],
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildCardIconButton({
+  required IconData icon,
+  required Color color,
+  required VoidCallback onPressed,
+}) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Icon(icon, color: color, size: 20),
+      ),
+    ),
+  );
+}
+
+Widget _buildDetailRow(IconData icon, String label, String value) {
   return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
+    padding: const EdgeInsets.symmetric(vertical: 5),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Icon(icon, size: 16, color: _kTextSecondary),
+        const SizedBox(width: 8),
         SizedBox(
-          width: 80,
+          width: 64,
           child: Text(
             label,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
+              color: _kTextSecondary,
             ),
           ),
         ),
@@ -306,7 +368,7 @@ Widget _buildDetailRow(String label, String value) {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Colors.black87,
+              color: _kTextPrimary,
             ),
           ),
         ),
@@ -320,68 +382,60 @@ Future<void> _showDeleteConfirmation(BuildContext context, dava_model.Dava dava,
     context: context,
     builder: (BuildContext context) {
       return Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: _kPrimaryDark.withOpacity(0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Warning Icon
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.shade50,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.warning_rounded,
-                  color: Colors.red.shade600,
-                  size: 24,
-                ),
+                child: Icon(Icons.warning_rounded, color: Colors.red.shade600, size: 28),
               ),
-              const SizedBox(height: 16),
-              
-              // Title
+              const SizedBox(height: 20),
               Text(
                 'Dava Silinecek',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                   color: Colors.red.shade700,
                 ),
               ),
-              const SizedBox(height: 12),
-              
-              // Message
+              const SizedBox(height: 10),
               Text(
                 'Bu davayı silmek istediğinizden emin misiniz?\nBu işlem geri alınamaz.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 14, color: _kTextSecondary, height: 1.4),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
-              
-              // Buttons
+              const SizedBox(height: 26),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: _kTextSecondary.withOpacity(0.4)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('İptal'),
+                      child: Text('İptal', style: TextStyle(color: _kTextSecondary, fontWeight: FontWeight.w600)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -389,18 +443,16 @@ Future<void> _showDeleteConfirmation(BuildContext context, dava_model.Dava dava,
                     child: ElevatedButton(
                       onPressed: () {
                         HiveDatabaseService.deleteSavedDava(dava.id);
-                        Navigator.of(context).pop(); // Delete dialog'u kapat
-                        Navigator.of(context).pop(); // Main dialog'u kapat
-                        // Dialog'u yeniden aç
+                        Navigator.of(context).pop();
+                        Navigator.of(context).pop();
                         showSavedDavalarDialog(context, userEmail);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red.shade600,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
                       ),
                       child: const Text('Sil'),
                     ),

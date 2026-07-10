@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../models/hukum_sentiment.dart';
+import 'dava_hukum_eligibility_service.dart';
 import 'hive_database_service.dart';
 
 /// Davalarda olumlu/olumsuz hüküm çoğunluğunu hesaplayan servis.
@@ -17,6 +18,8 @@ class DavaConsensusService {
     if (davaId.isEmpty) {
       return const DavaConsensusEvaluation.empty();
     }
+
+    await DavaHukumEligibilityService.ensureAppealJudgeFallback(davaId);
 
     final DateTime now = referenceTime ?? DateTime.now();
     final List<Map<String, dynamic>> hukumler =
@@ -44,17 +47,62 @@ class DavaConsensusService {
       hukumler: hukumler,
     );
 
+    final bool sixDone =
+        await DavaHukumEligibilityService.hasSixPanelFinalized(davaId);
+    final bool judgeDone =
+        await DavaHukumEligibilityService.hasYargicFinalized(davaId);
+    final bool sixAndJudgeEarlyFinal = sixDone && judgeDone;
+
     bool isFinal = false;
     Duration? remainingDuration;
     if (resolvedOpenedAt != null) {
       final Duration diff = now.difference(resolvedOpenedAt);
-      if (diff >= consensusWindow) {
+      if (diff >= consensusWindow || sixAndJudgeEarlyFinal) {
         isFinal = true;
       } else {
         remainingDuration = consensusWindow - diff;
       }
+    } else if (sixAndJudgeEarlyFinal) {
+      isFinal = true;
     }
 
+    final openedMap = HiveDatabaseService.getOpenedDavaById(davaId);
+    if (openedMap != null &&
+        openedMap['appealJudgeSentiment']?.toString() == 'positive') {
+      return DavaConsensusEvaluation(
+        positiveCount: positiveCount,
+        negativeCount: negativeCount,
+        verdict: DavaConsensusVerdict.hakli,
+        isFinal: true,
+        openedAt: resolvedOpenedAt,
+        evaluationTime: now,
+        remainingDuration: null,
+      );
+    }
+
+    final participants = await HiveDatabaseService.getDavaParticipants(
+      davaId,
+      normalizeExpired: false,
+    );
+    if (participants.isNotEmpty) {
+      const rej = {'manual_rejected', 'rejected', 'auto_rejected'};
+      final allRejected = participants.every(
+        (p) => rej.contains(p['status']?.toString() ?? ''),
+      );
+      if (allRejected) {
+        return DavaConsensusEvaluation(
+          positiveCount: positiveCount,
+          negativeCount: negativeCount,
+          verdict: DavaConsensusVerdict.hakli,
+          isFinal: true,
+          openedAt: resolvedOpenedAt,
+          evaluationTime: now,
+          remainingDuration: null,
+        );
+      }
+    }
+
+    // Eşitlikte davacı lehine: olumsuz sayısı fazlaysa haksız, aksi haklı.
     final DavaConsensusVerdict verdict =
         negativeCount > positiveCount ? DavaConsensusVerdict.haksiz : DavaConsensusVerdict.hakli;
 

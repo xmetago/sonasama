@@ -477,9 +477,9 @@ class _SavedHaykirTile extends StatelessWidget {
                         onRefresh();
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('❌ Kayıt kaldırıldı!'),
-                              duration: Duration(seconds: 2),
+                            SnackBar(
+                              content: const Text('❌ Kayıt kaldırıldı!'),
+                              duration: const Duration(seconds: 2),
                               backgroundColor: Colors.purple,
                             ),
                           );

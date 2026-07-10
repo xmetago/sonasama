@@ -43,8 +43,11 @@ class EvidenceModel extends HiveObject {
   @HiveField(12)
   int dislikeCount; // Beğenmeme sayısı
 
+  @HiveField(14, defaultValue: 0)
+  int neutralCount; // Nötr oy sayısı
+
   @HiveField(13)
-  Map<dynamic, dynamic> likedBy; // Kullanıcı email -> 'like' veya 'dislike'
+  Map<dynamic, dynamic> likedBy; // Kullanıcı email -> 'like', 'dislike' veya 'neutral'
 
   EvidenceModel({
     required this.id,
@@ -60,6 +63,7 @@ class EvidenceModel extends HiveObject {
     required this.userId,
     this.likeCount = 0,
     this.dislikeCount = 0,
+    this.neutralCount = 0,
     Map<String, String>? likedBy,
   }) : likedBy = likedBy ?? {};
 
@@ -84,6 +88,7 @@ class EvidenceModel extends HiveObject {
       userId: json['userId'] ?? '',
       likeCount: json['likeCount'] ?? 0,
       dislikeCount: json['dislikeCount'] ?? 0,
+      neutralCount: json['neutralCount'] ?? 0,
       likedBy: json['likedBy'] != null 
           ? Map<String, String>.from(json['likedBy'])
           : {},
@@ -106,6 +111,7 @@ class EvidenceModel extends HiveObject {
       'userId': userId,
       'likeCount': likeCount,
       'dislikeCount': dislikeCount,
+      'neutralCount': neutralCount,
       'likedBy': likedBy,
     };
   }
@@ -125,6 +131,7 @@ class EvidenceModel extends HiveObject {
     String? userId,
     int? likeCount,
     int? dislikeCount,
+    int? neutralCount,
     Map<String, String>? likedBy,
   }) {
     return EvidenceModel(
@@ -141,6 +148,7 @@ class EvidenceModel extends HiveObject {
       userId: userId ?? this.userId,
       likeCount: likeCount ?? this.likeCount,
       dislikeCount: dislikeCount ?? this.dislikeCount,
+      neutralCount: neutralCount ?? this.neutralCount,
       likedBy: likedBy ?? Map<String, String>.from(this.likedBy),
     );
   }
@@ -158,6 +166,11 @@ class EvidenceModel extends HiveObject {
   /// Kullanıcı beğenmedi mi?
   bool hasUserDisliked(String userEmail) {
     return likedBy[userEmail] == 'dislike';
+  }
+
+  /// Kullanıcı nötr mü oy kullandı?
+  bool hasUserNeutral(String userEmail) {
+    return likedBy[userEmail] == 'neutral';
   }
 }
 

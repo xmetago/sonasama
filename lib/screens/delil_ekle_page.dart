@@ -125,15 +125,37 @@ class _DelilEklePageState extends State<DelilEklePage> {
                     icon: const Icon(Icons.arrow_back, color: Colors.black),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 1),
                   Expanded(
-                    child: Text(
-                      "DELİL EKLE - ${widget.davaAdi}",
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
+                    child: Container(
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        "DELİL EKLE ", // Parametre varsa onu kullan, yoksa varsayılan
+                        style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 48), // Dengeleme için
+                  const SizedBox(width:1 ),
+                  Tooltip(
+                    message: 'Delil Ekle',
+                    child: IconButton(
+                      onPressed: !_isDavaOpened ? () => _openEvidenceAddSheet('image') : null,
+                      icon: Icon(
+                        Icons.add_circle_outline_outlined,
+                        size: 28,
+                        color: !_isDavaOpened ? Colors.blue[700] : Colors.grey[400],
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: !_isDavaOpened ? Colors.blue.withOpacity(0.1) : null,
+                        padding: const EdgeInsets.all(6),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -188,26 +210,6 @@ class _DelilEklePageState extends State<DelilEklePage> {
                               ],
                             ),
                           ),
-
-                        // Delil Başlığı
-                        _buildInputField(
-                          controller: _titleController,
-                          label: 'Delil Başlığı',
-                          hint: 'Delil için açıklayıcı başlık girin (min 1 karakter)',
-                          maxLines: 1,
-                          enabled: !_isDavaOpened,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Delil Açıklaması
-                        _buildInputField(
-                          controller: _descriptionController,
-                          label: 'Delil Açıklaması',
-                          hint: 'Delil hakkında detaylı açıklama yazın (min 6 karakter)',
-                          maxLines: 3,
-                          enabled: !_isDavaOpened,
-                        ),
-                        const SizedBox(height: 24),
 
                         // Delil Türleri
                         _buildEvidenceTypes(),
@@ -268,7 +270,11 @@ class _DelilEklePageState extends State<DelilEklePage> {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -303,9 +309,24 @@ class _DelilEklePageState extends State<DelilEklePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Delil Türü Seçin',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        Text.rich(
+          TextSpan(
+            text: "Dava Delilleri ||  ",
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black, // Ana metin rengi
+            ),
+            children: [
+              TextSpan(
+                text: widget.davaAdi ?? 'Bilinmeyen Dava',
+                style: const TextStyle(
+                  color: Colors.blue, // Vurgulanacak mavi tonu
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
 
@@ -316,7 +337,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
           subtitle: 'JPG, PNG, GIF formatları (Max: 5MB)',
           count: _evidenceCounts['image'] ?? 0,
           maxCount: EvidenceLimits.maxImages,
-          onTap: _isDavaOpened ? null : () => _showImageUploadDialog(),
+          onTap: _isDavaOpened ? null : () => _openEvidenceAddSheet('image'),
           color: Colors.blue,
         ),
 
@@ -329,7 +350,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
           subtitle: 'MP4, AVI, MOV formatları (Max: 40MB)',
           count: _evidenceCounts['video'] ?? 0,
           maxCount: EvidenceLimits.maxVideos,
-          onTap: _isDavaOpened ? null : () => _showVideoUploadDialog(),
+          onTap: _isDavaOpened ? null : () => _openEvidenceAddSheet('video'),
           color: Colors.red,
         ),
 
@@ -342,7 +363,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
           subtitle: 'PDF formatı (Max: 10MB)',
           count: _evidenceCounts['text'] ?? 0,
           maxCount: EvidenceLimits.maxPdfs,
-          onTap: _isDavaOpened ? null : () => _showPdfUploadDialog(),
+          onTap: _isDavaOpened ? null : () => _openEvidenceAddSheet('text'),
           color: Colors.orange,
         ),
 
@@ -355,7 +376,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
           subtitle: 'Güvenli web linkleri',
           count: _evidenceCounts['link'] ?? 0,
           maxCount: EvidenceLimits.maxLinks,
-          onTap: _isDavaOpened ? null : () => _showLinkDialog(),
+          onTap: _isDavaOpened ? null : () => _openEvidenceAddSheet('link'),
           color: Colors.green,
         ),
       ],
@@ -425,15 +446,135 @@ class _DelilEklePageState extends State<DelilEklePage> {
                   ],
                 ),
               ),
-              Icon(
-                isDisabled ? Icons.block : Icons.add_circle_outline,
-                color: isDisabled ? Colors.grey : color,
-                size: 24,
+              IconButton(
+                tooltip: isDisabled ? null : 'Delil ekle',
+                onPressed: isDisabled ? null : onTap,
+                icon: Icon(
+                  isDisabled ? Icons.block : Icons.add_circle_outline,
+                  color: isDisabled ? Colors.grey : color,
+                  size: 24,
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  void _openEvidenceAddSheet(String type) {
+    if (_isDavaOpened) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('❌ Dava açıldığı için delil eklenemez')),
+      );
+      return;
+    }
+
+    // Sheet her açıldığında temiz başlasın
+    _titleController.clear();
+    _descriptionController.clear();
+    _linkController.clear();
+
+    bool validateTitleDesc() {
+      if (_titleController.text.trim().isEmpty || _descriptionController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lütfen başlık ve açıklama alanlarını doldurun')),
+        );
+        return false;
+      }
+      if (_descriptionController.text.trim().length < 6) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Açıklama en az 6 karakter olmalı')),
+        );
+        return false;
+      }
+      return true;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+        return Padding(
+          padding: EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 16 + bottomInset),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Icon(
+                    _getSheetTypeIcon(type),
+                    size: 32,
+                    color: _getSheetTypeColor(type),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _buildInputField(
+                  controller: _titleController,
+                  label: 'Delil Başlığı',
+                  hint: 'Delil için açıklayıcı başlık girin (min 1 karakter)',
+                  maxLines: 1,
+                  enabled: true,
+                ),
+                const SizedBox(height: 10),
+                _buildInputField(
+                  controller: _descriptionController,
+                  label: 'Delil Açıklaması',
+                  hint: 'Delil hakkında detaylı açıklama yazın (min 6 karakter)',
+                  maxLines: 3,
+                  enabled: true,
+                ),
+                const SizedBox(height: 12),
+                if (type == 'link') ...[
+                  TextField(
+                    controller: _linkController,
+                    decoration: const InputDecoration(
+                      labelText: 'URL',
+                      hintText: 'https://example.com',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.url,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('İptal'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (!validateTitleDesc()) return;
+
+                          Navigator.pop(context);
+                          if (type == 'image') {
+                            _showImageUploadDialog();
+                          } else if (type == 'video') {
+                            _showVideoUploadDialog();
+                          } else if (type == 'text') {
+                            _showPdfUploadDialog();
+                          } else if (type == 'link') {
+                            _addLink();
+                          }
+                        },
+                        child: Text(type == 'link' ? 'Ekle' : 'Devam'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -505,41 +646,192 @@ class _DelilEklePageState extends State<DelilEklePage> {
     }
   }
 
+  IconData _getSheetTypeIcon(String type) {
+    switch (type) {
+      case 'image':
+        return Icons.image_search_outlined;
+      case 'video':
+        return Icons.video_library_outlined;
+      case 'text':
+        return Icons.picture_as_pdf_outlined;
+      case 'link':
+        return Icons.link_outlined;
+      default:
+        return Icons.add_circle_outline;
+    }
+  }
+
+  Color _getSheetTypeColor(String type) {
+    switch (type) {
+      case 'image':
+        return Colors.blue;
+      case 'video':
+        return Colors.red;
+      case 'text':
+        return Colors.orange;
+      case 'link':
+        return Colors.green;
+      default:
+        return Colors.black54;
+    }
+  }
+
   // Resim yükleme dialog'u
   void _showImageUploadDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Resim Ekle'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Resim seçme yöntemini seçin:'),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.camera);
-                  },
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text('Kamera'),
+      builder: (context) {
+        const Color accentColor = Color(0xFF27D6CE);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accentColor.withOpacity(0.35), width: 1.4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.gallery);
-                  },
-                  icon: const Icon(Icons.photo_library),
-                  label: const Text('Galeri'),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'RESIM YUKLE',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => Navigator.of(context).pop(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: Icon(Icons.close, size: 18, color: Colors.black54),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Resmi nereden eklemek istiyorsun?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _pickImage(ImageSource.camera);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: accentColor.withOpacity(0.85)),
+                              foregroundColor: accentColor.withOpacity(0.95),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                            child: const Text(
+                              'KAMERA',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _pickImage(ImageSource.gallery);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: accentColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'GALERI',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ],
-        ),
-      ),
+              ),
+              Positioned(
+                top: -32,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withOpacity(0.35),
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Container(
+                      margin: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            accentColor,
+                            accentColor.withOpacity(0.85),
+                          ],
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.image_outlined,
+                        size: 30,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -547,37 +839,158 @@ class _DelilEklePageState extends State<DelilEklePage> {
   void _showVideoUploadDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Video Ekle'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Video seçme yöntemini seçin:'),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _pickVideo(ImageSource.camera);
-                  },
-                  icon: const Icon(Icons.videocam),
-                  label: const Text('Kamera'),
+      builder: (context) {
+        const Color accentColor = Color(0xFFE53935);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accentColor.withOpacity(0.35), width: 1.4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _pickVideo(ImageSource.gallery);
-                  },
-                  icon: const Icon(Icons.video_library),
-                  label: const Text('Galeri'),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'VIDEO YUKLE',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => Navigator.of(context).pop(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: Icon(Icons.close, size: 18, color: Colors.black54),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Videoyu nereden eklemek istiyorsun?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _pickVideo(ImageSource.camera);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: accentColor.withOpacity(0.85)),
+                              foregroundColor: accentColor.withOpacity(0.95),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                            child: const Text(
+                              'KAMERA',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _pickVideo(ImageSource.gallery);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: accentColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'GALERI',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ],
-        ),
-      ),
+              ),
+              Positioned(
+                top: -32,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withOpacity(0.35),
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Container(
+                      margin: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            accentColor,
+                            accentColor.withOpacity(0.85),
+                          ],
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.videocam_outlined,
+                        size: 30,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -585,24 +998,134 @@ class _DelilEklePageState extends State<DelilEklePage> {
   void _showPdfUploadDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('PDF Ekle'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('PDF dosyası seçin:'),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                _pickPdf();
-              },
-              icon: const Icon(Icons.file_present),
-              label: const Text('Dosya Seç'),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) {
+        const Color accentColor = Color(0xFFFF9800);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accentColor.withOpacity(0.35), width: 1.4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'PDF YUKLE',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => Navigator.of(context).pop(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: Icon(Icons.close, size: 18, color: Colors.black54),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'PDF dosyasini cihazindan secip ekleyebilirsin.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _pickPdf();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'DOSYA SEC',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                top: -32,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withOpacity(0.35),
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Container(
+                      margin: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            accentColor,
+                            accentColor.withOpacity(0.85),
+                          ],
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.picture_as_pdf_outlined,
+                        size: 30,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -610,38 +1133,160 @@ class _DelilEklePageState extends State<DelilEklePage> {
   void _showLinkDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Link Ekle'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _linkController,
-              decoration: const InputDecoration(
-                labelText: 'URL',
-                hintText: 'https://example.com',
+      builder: (context) {
+        const Color accentColor = Color(0xFF2E7D32);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accentColor.withOpacity(0.35), width: 1.4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'LINK EKLE',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => Navigator.of(context).pop(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: Icon(Icons.close, size: 18, color: Colors.black54),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _linkController,
+                      decoration: InputDecoration(
+                        labelText: 'URL',
+                        hintText: 'https://example.com',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: accentColor, width: 1.6),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: accentColor.withOpacity(0.85)),
+                              foregroundColor: accentColor.withOpacity(0.95),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                            child: const Text(
+                              'IPTAL',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _addLink();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: accentColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'EKLE',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('İptal'),
+              Positioned(
+                top: -32,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withOpacity(0.35),
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Container(
+                      margin: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            accentColor,
+                            accentColor.withOpacity(0.85),
+                          ],
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.link_outlined,
+                        size: 30,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _addLink();
-                  },
-                  child: const Text('Ekle'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

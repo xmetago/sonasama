@@ -57,5 +57,17 @@ class VerifiedUsersService {
     if (_verifiedUsersBox == null) return;
     await _verifiedUsersBox!.clear();
   }
+
+  /// Mavi tik sahibi olmayan kullanıcılar, mavi tikli ünlülere dava açamaz.
+  static bool canOpenCaseAgainst({
+    required String openerJudgeName,
+    required String defendantJudgeName,
+  }) {
+    final defendant = defendantJudgeName.trim();
+    final opener = openerJudgeName.trim();
+    if (defendant.isEmpty) return true;
+    if (!isVerified(defendant)) return true;
+    return isVerified(opener);
+  }
 }
 

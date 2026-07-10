@@ -1,4 +1,5 @@
 import '../models/dava.dart' as dava_model;
+import '../utils/dava_map_utils.dart';
 
 /// Dava Aç ekranındaki geçici form durumunu temsil eder.
 class DavaDraftState {
@@ -58,9 +59,7 @@ class DavaDraftState {
       avatarPath:
           map['profilResmi']?.toString() ?? 'lib/icons/03_davala_ana_icon.png',
       description: map['davaKonusu']?.toString() ?? '',
-      categoryPath: map['davaKategorisi']?.toString() ??
-          map['kategori']?.toString() ??
-          '',
+      categoryPath: resolveDavaKategoriFromMap(map),
       plaintiff: map['davaci']?.toString() ?? '',
       isOpened: map['isOpened'] == true,
     );
@@ -82,7 +81,7 @@ class DavaDraftState {
   }
 
   Map<String, dynamic> toHiveMap() {
-    return {
+    return withDavaKategoriFields({
       'id': id,
       'adi': title,
       'davaAdi': title,
@@ -91,11 +90,9 @@ class DavaDraftState {
       'kalanSure': remainingTime,
       'profilResmi': avatarPath,
       'davaKonusu': description,
-      'davaKategorisi': categoryPath,
-      'kategori': categoryPath,
       'davaci': plaintiff,
       'isOpened': isOpened,
-    };
+    }, categoryPath);
   }
 
   dava_model.Dava toDavaModel() {

@@ -513,15 +513,7 @@ class CharacterCounterBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.edit, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            '$current / $max',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
+
         ],
       ),
     );

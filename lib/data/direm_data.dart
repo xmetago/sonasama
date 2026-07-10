@@ -23,9 +23,9 @@ class DiremCategory {
 class DiremData {
   static final List<DiremCategory> categories = [
     DiremCategory(
-      name: 'Komik Direnler',
-      icon: '😄',
-      color: const Color(0xFFFFD93D), // Sarı
+      name: 'Beğenilen',
+      icon: '',
+      color: Color(0xFFFFD93D), // Sarı
       diremler: [
         // Mevcut komik direnler
         'Simit, çay',
@@ -187,7 +187,7 @@ class DiremData {
     DiremCategory(
       name: 'Üyelerden',
       icon: '👥',
-      color: const Color(0xFF10B981), // Yeşil
+      color: Color(0xFF10B981), // Yeşil
       diremler: [
         // Savaşçı Direnleri
         'Ateşe Üfle',

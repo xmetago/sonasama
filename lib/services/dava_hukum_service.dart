@@ -2,14 +2,14 @@ import 'hive_database_service.dart';
 
 /// Dava hüküm servisi
 /// 
-/// 76 gün dolduğunda otomatik olarak hüküm hesaplar:
+/// 19 gün dolduğunda otomatik olarak hüküm hesaplar:
 /// - Destek >= Kına ise → Başarılı
 /// - Aksi halde → Başarısız
 class DavaHukumService {
-  /// 76 gün süresi (gün cinsinden)
-  static const int hukumSuresiGun = 76;
+  /// Halk kararı / hüküm süresi (gün cinsinden)
+  static const int hukumSuresiGun = 19;
 
-  /// Dava açıldığında (acceptedAt) tarihinden itibaren 76 gün geçti mi kontrol et
+  /// Dava açıldığında (acceptedAt) tarihinden itibaren hüküm süresi doldu mu kontrol et
   static bool isHukumSuresiDoldu(DateTime? acceptedAt) {
     if (acceptedAt == null) {
       return false;
@@ -79,9 +79,8 @@ class DavaHukumService {
         return null;
       }
 
-      // 76 gün doldu mu kontrol et
       if (!isHukumSuresiDoldu(acceptedAt)) {
-        print('ℹ️ Dava için henüz 76 gün dolmadı: $davaId');
+        print('ℹ️ Dava için henüz $hukumSuresiGun gün dolmadı: $davaId');
         return null;
       }
 
@@ -173,7 +172,6 @@ class DavaHukumService {
         final acceptedAt = DateTime.tryParse(acceptedAtStr);
         if (acceptedAt == null) continue;
 
-        // 76 gün dolduysa hüküm hesapla
         if (isHukumSuresiDoldu(acceptedAt)) {
           await calculateAndSaveHukum(davaId);
         }

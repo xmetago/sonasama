@@ -377,7 +377,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
     final yeniYorum = {
       'id': DateTime.now().millisecondsSinceEpoch.toString(),
       'userName': isGizliTanik
-          ? 'GizliTanık-${gizliTanikSayisi + 1}'
+          ? HiveDatabaseService.gizliTanikDisplayName
           : (widget.userEmail ?? 'Siz'),
       'userEmail': widget.userEmail,
       'yorum': yorumMetni,
@@ -1271,7 +1271,7 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
     final currentUserEmail =
         _currentUserEmail ?? widget.userEmail ?? 'demo@whoboom.com';
     final currentUserName = isGizliTanik
-        ? 'GizliTanık-${gizliTanikSayisi + 1}'
+        ? HiveDatabaseService.gizliTanikDisplayName
         : _currentUserDisplayName;
 
     final yeniYorum = {
@@ -1783,7 +1783,7 @@ class _ModernDavaCardState extends State<ModernDavaCard> {
                     if (isGizliTanik) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Yorumunuz "GizliTanık-X" adıyla görünecektir.',
+                        'Yorumunuz "${HiveDatabaseService.gizliTanikDisplayName}" adıyla görünecektir.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],

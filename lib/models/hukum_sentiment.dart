@@ -34,6 +34,22 @@ extension HukumSentimentX on HukumSentiment {
         HukumSentiment.negative =>
             'Dava hakkında olumsuz yönde fikir beyan ediyorsunuz.',
       };
+
+  /// [HukumSentimentSelector] seçili kartındaki gradient ile aynı tona yakın zemin.
+  Color get actionSurfaceColor =>
+      Color.alphaBlend(color.withOpacity(0.28), Colors.white);
+
+  /// [actionSurfaceColor] üzerinde okunaklı ikon/metin rengi.
+  Color get onActionSurfaceColor => switch (this) {
+        HukumSentiment.positive => Colors.orange.shade900,
+        HukumSentiment.negative => Colors.blue.shade900,
+      };
+
+  /// Hüküm Verildi kenarlığı için vurgu rengi.
+  Color get actionBorderColor => switch (this) {
+        HukumSentiment.positive => Colors.orange.shade600,
+        HukumSentiment.negative => Colors.blue.shade600,
+      };
 }
 
 /// Depolanan string değerden [HukumSentiment] üretir.

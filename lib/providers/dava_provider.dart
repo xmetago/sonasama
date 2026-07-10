@@ -1,5 +1,7 @@
 import 'dart:async';
+import '../services/dava_auto_assign_service.dart';
 import '../services/hive_database_service.dart';
+import '../services/offline_gift_queue.dart';
 import 'base_provider.dart';
 
 /// Dava yönetimi için provider
@@ -69,6 +71,10 @@ class DavaProvider extends BaseProvider {
 
   /// Kullanıcı için dava verilerini yükle
   Future<void> loadUserData(String userEmail) async {
+    await OfflineGiftQueue.processPending(
+      onAnyApplied: notifyMasrafDataChanged,
+    );
+
     if (_currentUserEmail == userEmail && _incomingDavalar.isNotEmpty) {
       return; // Zaten yüklenmiş
     }
@@ -86,6 +92,8 @@ class DavaProvider extends BaseProvider {
           _loadHomeFeedPosts(userEmail), // ✅ Düzeltme: userEmail parametresi eklendi
           _loadKatildigimDavalar(userEmail),
         ]);
+        await DavaAutoAssignService.processAllOpenedDavalar();
+        await _loadOpenedDavalar();
       },
       errorMessage: 'Dava verileri yüklenirken hata oluştu',
     );
@@ -111,12 +119,10 @@ class DavaProvider extends BaseProvider {
     _invitations = HiveDatabaseService.getInvitations(userEmail);
   }
 
-  /// Home feed postlarını yükle (bitirilen postları filtrele)
-  Future<void> _loadHomeFeedPosts(String userEmail) async {
-    // ✅ Düzeltme: Kullanıcı bazlı paylaşımları getir
+  /// Home feed postlarını Hive'dan çekip bitenleri filtreler
+  List<Map<String, dynamic>> _getFilteredHomeFeedPosts(String userEmail) {
     final allPosts = HiveDatabaseService.getHomeFeedPosts(userEmail: userEmail);
-    // Bitirilen postları filtrele
-    _homeFeedPosts = allPosts.where((post) {
+    return allPosts.where((post) {
       final payload = post['payload'];
       if (payload is Map) {
         return !(payload['isFinished'] ?? false);
@@ -125,8 +131,43 @@ class DavaProvider extends BaseProvider {
     }).toList();
   }
 
+  /// Home feed postlarını yükle (bitirilen postları filtrele)
+  Future<void> _loadHomeFeedPosts(String userEmail) async {
+    // ✅ Düzeltme: Kullanıcı bazlı paylaşımları getir
+    _homeFeedPosts = _getFilteredHomeFeedPosts(userEmail);
+  }
+
+  /// Hive ile senkron: loading/success snackbar zinciri olmadan ana akışı yeniler.
+  Future<void> refreshHomeFeedSilent(String userEmail) async {
+    if (userEmail.isEmpty) {
+      return;
+    }
+    await _loadHomeFeedPosts(userEmail);
+    notifyListeners();
+  }
+
+  /// Home feed için sayfalı veri çeker (Hive'dan skip/take mantığıyla)
+  ///
+  /// [pageKey]: ilk öğenin global index'i (0 tabanlı)
+  /// [pageSize]: sayfa başına öğe sayısı
+  List<Map<String, dynamic>> fetchHomeFeedPaged({
+    required String userEmail,
+    required int pageKey,
+    required int pageSize,
+  }) {
+    final posts = _getFilteredHomeFeedPosts(userEmail);
+    if (posts.isEmpty) return <Map<String, dynamic>>[];
+
+    final startIndex = pageKey;
+    if (startIndex >= posts.length) return <Map<String, dynamic>>[];
+
+    final endIndex = (startIndex + pageSize).clamp(0, posts.length);
+    return posts.sublist(startIndex, endIndex);
+  }
+
   /// Katıldığım davaları yükle
   Future<void> _loadKatildigimDavalar(String userEmail) async {
+    await HiveDatabaseService.purgeLegacyKatildigimTestRows(userEmail);
     _katildigimDavalar = HiveDatabaseService.getKatildigimDavalar(userEmail);
   }
 
@@ -488,9 +529,18 @@ class DavaProvider extends BaseProvider {
         
         // Veritabanına kaydet
         await HiveDatabaseService.saveAcceptedDava(acceptedDava);
-        await HiveDatabaseService.removeIncomingDava(davaIdToRemove);
         final String? davaId = acceptedDava['id']?.toString() ?? acceptedDava['davaId']?.toString();
         final String? participantEmail = acceptedDava['userEmail']?.toString();
+        if (acceptedDava['isAppealJudgeAssignment'] == true &&
+            participantEmail != null &&
+            participantEmail.isNotEmpty) {
+          await HiveDatabaseService.removeIncomingDavaForUser(
+            participantEmail,
+            davaIdToRemove,
+          );
+        } else {
+          await HiveDatabaseService.removeIncomingDava(davaIdToRemove);
+        }
         if (davaId != null && participantEmail != null && participantEmail.isNotEmpty) {
           await HiveDatabaseService.markDavaParticipantStatus(
             davaId: davaId,
@@ -648,6 +698,11 @@ class DavaProvider extends BaseProvider {
       errorMessage: 'Masraf kaydedilirken hata oluştu',
       successMessage: 'Masraf başarıyla kaydedildi',
     ) ?? false;
+  }
+
+  /// Kuyruk / doğrudan Hive güncellemelerinden sonra dinleyicileri bilgilendir.
+  void notifyMasrafDataChanged() {
+    notifyListeners();
   }
 
   @override

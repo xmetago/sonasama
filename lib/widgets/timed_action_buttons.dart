@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_feather_icons/flutter_feather_icons.dart';
 import '../services/hive_database_service.dart';
+import '../utils/app_local_date_format.dart';
 import '../screens/category_page.dart';
 import '../screens/haykir_page.dart';
 
-/// 19 saatlik süre kontrolü ile dava aç ve haykır butonları
+/// Dava için günlük kota; haykır serbest (çalışan proje ile uyumlu)
 /// Bu widget tüm sayfalarda kullanılabilir
 class TimedActionButtons extends StatefulWidget {
   final String? userEmail;
@@ -32,9 +33,7 @@ class TimedActionButtons extends StatefulWidget {
 
 class _TimedActionButtonsState extends State<TimedActionButtons> {
   bool _canOpenDava = true;
-  bool _canHaykir = true;
-  int _remainingDavaHours = 0;
-  int _remainingHaykirHours = 0;
+  int _remainingDavaQuota = 0;
 
   @override
   void initState() {
@@ -56,13 +55,9 @@ class _TimedActionButtonsState extends State<TimedActionButtons> {
 
     setState(() {
       _canOpenDava = HiveDatabaseService.canUserOpenDava(widget.userEmail!);
-      _canHaykir = HiveDatabaseService.canUserHaykir(widget.userEmail!);
-      
+
       if (!_canOpenDava) {
-        _remainingDavaHours = HiveDatabaseService.getRemainingDavaAcHours(widget.userEmail!);
-      }
-      if (!_canHaykir) {
-        _remainingHaykirHours = HiveDatabaseService.getRemainingHaykirHours(widget.userEmail!);
+        _remainingDavaQuota = HiveDatabaseService.getRemainingDavaAcHours(widget.userEmail!);
       }
     });
   }
@@ -183,8 +178,8 @@ class _TimedActionButtonsState extends State<TimedActionButtons> {
         widget.onShowSavedDavalar!();
       } else {
         _showModernAlert(
-          title: 'Bekleme Süresi ⏰',
-          message: 'Dava açabilmek için $_remainingDavaHours saat daha beklemeniz gerekiyor.\n\nKaydedilen davalarınızı görüntülemek için save ikonuna tıklayın.',
+          title: 'Günlük Dava Kotası ⏰',
+          message: 'Bugün için dava açma hakkınızı doldurdunuz (maksimum 19).\n\nYeni dava açmak için yarını bekleyin.\nKaydedilen davalarınızı görüntülemek için save ikonuna tıklayın.',
           icon: FeatherIcons.clock,
           color: const Color(0xFFF59E0B),
         );
@@ -192,9 +187,9 @@ class _TimedActionButtonsState extends State<TimedActionButtons> {
       return;
     }
 
-    // Günün tarihini al ve callback ile gönder
-    final now = DateTime.now();
-    final formattedDate = '${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${now.year}';
+    // Günün tarihini al ve callback ile gönder (locale + cihaz yerel saati)
+    final formattedDate =
+        AppLocalDateFormat.formatShortDate(context, DateTime.now());
     widget.onDateUpdate?.call(formattedDate);
 
     // Dava açma zamanını güncelle
@@ -215,21 +210,6 @@ class _TimedActionButtonsState extends State<TimedActionButtons> {
     if (widget.onHaykirPressed != null) {
       widget.onHaykirPressed!();
       return;
-    }
-
-    if (!_canHaykir) {
-      _showModernAlert(
-        title: 'Bekleme Süresi ⏰',
-        message: 'Haykırabilmek için $_remainingHaykirHours saat daha beklemeniz gerekiyor.',
-        icon: FeatherIcons.clock,
-        color: const Color(0xFFF59E0B),
-      );
-      return;
-    }
-
-    // Haykırma zamanını güncelle
-    if (widget.userEmail != null) {
-      HiveDatabaseService.updateUserHaykirTime(widget.userEmail!);
     }
 
     Navigator.push(
@@ -282,7 +262,7 @@ class _TimedActionButtonsState extends State<TimedActionButtons> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '$_remainingDavaHours',
+                        '$_remainingDavaQuota',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10,
@@ -304,43 +284,17 @@ class _TimedActionButtonsState extends State<TimedActionButtons> {
             width: widget.buttonSize,
             height: widget.buttonSize,
             decoration: BoxDecoration(
-              color: _canHaykir ? Colors.blue.shade100 : Colors.grey.shade200,
+              color: Colors.blue.shade100,
               shape: BoxShape.circle,
               border: Border.all(
-                color: _canHaykir ? Colors.blue : Colors.grey,
+                color: Colors.blue,
                 width: 2,
               ),
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Image.asset(
-                  'lib/icons/03_haykir_ana_icon.png',
-                  width: widget.iconSize,
-                  height: widget.iconSize,
-                  color: _canHaykir ? null : Colors.grey.shade400,
-                ),
-                if (!_canHaykir)
-                  Positioned(
-                    top: 2,
-                    right: 2,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.orange,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '$_remainingHaykirHours',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+            child: Image.asset(
+              'lib/icons/03_haykir_ana_icon.png',
+              width: widget.iconSize,
+              height: widget.iconSize,
             ),
           ),
         ),

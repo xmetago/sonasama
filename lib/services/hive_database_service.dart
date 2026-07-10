@@ -11,8 +11,8 @@ import '../models/evidence_model.dart';
 import '../models/evidence_comment_model.dart';
 import '../models/album_model.dart';
 import '../models/album_image_model.dart';
-import '../data/category_data.dart';
 import '../data/direm_data.dart';
+import '../utils/constants.dart';
 import 'verified_users_service.dart';
 import '../utils/comment_utils.dart';
 
@@ -37,6 +37,8 @@ class HiveDatabaseService {
   static const String _davaParticipantBoxName = 'dava_participant_box'; // key: davaId, value: List<Map<String,dynamic>> (participant status list)
   static const String _cezaBegeniBoxName = 'ceza_begeni_box'; // key: cezaName, value: Map<String, dynamic> (likeCount, likedBy: List<String>)
   static const String _cezaBoxName = 'ceza_box'; // key: davaId_userEmail, value: String (ceza metni)
+  static const String _cezaOyBoxName = 'ceza_oy_box'; // key: davaId, value: Map (votesByEmail)
+  static const String _hediyeOyBoxName = 'hediye_oy_box'; // key: davaId, value: Map (votesByEmail)
   static const String _masrafBoxName = 'masraf_box'; // key: davaId_userEmail, value: List<String> (masraf isimleri listesi)
   static const String _reklamBoxName = 'reklam_box'; // key: reklamId, value: Map<String, dynamic> (reklam verileri)
   static const String _tutulanReklamlarBoxName = 'tutulan_reklamlar_box'; // key: userEmail, value: List<String> (reklamId listesi)
@@ -50,6 +52,7 @@ class HiveDatabaseService {
   static const String _savedWidgetsBoxName = 'saved_widgets_box'; // ✅ Step-1: key: userEmail, value: List<Map<String, dynamic>> (kaydedilen widget'lar)
   static const String _albumBoxName = 'album_box'; // ✅ Step-3: key: userEmail, value: List<Map<String, dynamic>> (albümler)
   static const String _albumImageBoxName = 'album_image_box'; // ✅ Step-3: key: albumId, value: List<Map<String, dynamic>> (albüm resimleri)
+  static const String _dailyQuotaBoxName = 'daily_quota_box'; // key: action_email_yyyy-mm-dd, value: int
 
   static Box<DavaModel>? _davaBox;
   static Box<UserModel>? _userBox;
@@ -71,6 +74,8 @@ class HiveDatabaseService {
   static Box? _davaParticipantBox; // key: davaId, value: List<Map<String, dynamic>>
   static Box? _cezaBegeniBox; // key: cezaName, value: Map<String, dynamic> (likeCount, likedBy: List<String>)
   static Box? _cezaBox; // key: davaId_userEmail, value: String (ceza metni)
+  static Box? _cezaOyBox; // key: davaId, value: Map<String, dynamic> (votesByEmail)
+  static Box? _hediyeOyBox; // key: davaId, value: Map<String, dynamic> (votesByEmail)
   static Box? _masrafBox; // key: davaId_userEmail, value: List<String> (masraf isimleri listesi)
   static Box? _reklamBox; // key: reklamId, value: Map<String, dynamic> (reklam verileri)
   static Box? _tutulanReklamlarBox; // key: userEmail, value: List<String> (reklamId listesi)
@@ -84,6 +89,7 @@ class HiveDatabaseService {
   static Box? _savedWidgetsBox; // ✅ Step-1: key: userEmail, value: List<Map<String, dynamic>> (kaydedilen widget'lar)
   static Box? _albumBox; // ✅ Step-3: key: userEmail, value: List<Map<String, dynamic>> (albümler)
   static Box? _albumImageBox; // ✅ Step-3: key: albumId, value: List<Map<String, dynamic>> (albüm resimleri)
+  static Box? _dailyQuotaBox; // key: action_email_yyyy-mm-dd, value: int
   
   // Sabit grup üyelikleri (istenen kesin 7 kişi)
   static const List<String> _grup19Members = <String>[
@@ -131,6 +137,8 @@ class HiveDatabaseService {
     _homeFeedBox = await Hive.openBox(_homeFeedBoxName);
     _davaParticipantBox = await Hive.openBox(_davaParticipantBoxName);
     _cezaBox = await Hive.openBox(_cezaBoxName);
+    _cezaOyBox = await Hive.openBox(_cezaOyBoxName);
+    _hediyeOyBox = await Hive.openBox(_hediyeOyBoxName);
     _masrafBox = await Hive.openBox(_masrafBoxName);
     _reklamBox = await Hive.openBox(_reklamBoxName);
     _tutulanReklamlarBox = await Hive.openBox(_tutulanReklamlarBoxName);
@@ -143,6 +151,7 @@ class HiveDatabaseService {
     _savedWidgetsBox = await Hive.openBox(_savedWidgetsBoxName); // ✅ Step-1: Kaydedilen widget'lar box'ı
     _albumBox = await Hive.openBox(_albumBoxName); // ✅ Step-3: Albümler box'ı
     _albumImageBox = await Hive.openBox(_albumImageBoxName); // ✅ Step-3: Albüm resimleri box'ı
+    _dailyQuotaBox = await Hive.openBox(_dailyQuotaBoxName); // ✅ Günlük kota sayacı box'ı
 
     // Varsayılan kategorileri yükle (sadece ilk kez)
     await initializeDefaultCategories();
@@ -356,9 +365,12 @@ class HiveDatabaseService {
     await _friendGroupBox?.clear();
     await _davaParticipantBox?.clear();
     await _cezaBox?.clear();
+    await _cezaOyBox?.clear();
+    await _hediyeOyBox?.clear();
     await _masrafBox?.clear();
     await _reklamBox?.clear();
     await _tutulanReklamlarBox?.clear();
+    await _dailyQuotaBox?.clear();
   }
 
   // Veritabanı istatistikleri
@@ -565,6 +577,51 @@ class HiveDatabaseService {
         ..addAll(list);
       _openedDavaBox?.put('opened', list);
     }
+  }
+
+  /// Çekilme / red vicdan metnini açılan davaya ekle (Seyir Defteri senkronu).
+  static Future<void> appendWithdrawalNarrative(
+    String davaId,
+    String narrative,
+  ) async {
+    final existing = getOpenedDavaById(davaId);
+    if (existing == null) return;
+    final list = List<String>.from(existing['withdrawalNarratives'] ?? []);
+    list.add(narrative);
+    await updateOpenedDava(davaId, {
+      'withdrawalNarratives': list,
+      'caseParticipantOutcome': 'Reddedildi/Çekildi',
+    });
+  }
+
+  /// Dava tarihçesine olay ekle.
+  static Future<void> appendDavaHistoryEvent(
+    String davaId,
+    Map<String, dynamic> event,
+  ) async {
+    final existing = getOpenedDavaById(davaId);
+    if (existing == null) return;
+    final h = List<Map<String, dynamic>>.from(existing['davaHistory'] ?? []);
+    h.add({
+      ...event,
+      'recordedAt': DateTime.now().toIso8601String(),
+    });
+    await updateOpenedDava(davaId, {'davaHistory': h});
+  }
+
+  /// Temyiz talebi: davacı/davalı kapı ikonundan sonra işaretlenir.
+  static Future<void> setDavaAppealRequested({
+    required String davaId,
+    required String requestedByEmail,
+    required String party, // 'davaci' | 'davali'
+  }) async {
+    // Geriye dönük uyumluluk: doğrudan çağrılarda yalnızca bayrakları günceller.
+    await updateOpenedDava(davaId, {
+      'isAppealable': true,
+      'appealRequestedAt': DateTime.now().toIso8601String(),
+      'appealRequestedBy': requestedByEmail,
+      'appealRequestedParty': party,
+    });
   }
 
   /// Belirli bir açılan davayı sil
@@ -820,10 +877,41 @@ class HiveDatabaseService {
     return _registrationBox?.values.toList() ?? [];
   }
 
+  /// Sabit Grup19 listesindeki kullanıcılardan, uygulamada kaydı bulunanları döndürür.
+  static Set<String> getRegisteredGrup19MemberEmails() {
+    final registeredEmails = getAllRegistrations()
+        .map((r) => r.email.trim().toLowerCase())
+        .where((email) => email.isNotEmpty)
+        .toSet();
+
+    return _grup19Members
+        .map((email) => email.trim().toLowerCase())
+        .where(registeredEmails.contains)
+        .toSet();
+  }
+
   /// E-posta ile kayıt getir
   static RegistrationModel? getRegistrationByEmail(String email) {
     try {
       return _registrationBox?.values.firstWhere((r) => r.email == email);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  static String _normalizeJudgeName(String judgeName) {
+    return judgeName.trim().toLowerCase();
+  }
+
+  /// Yargıç adı ile kayıt getir (case-insensitive, trim)
+  static RegistrationModel? getRegistrationByJudgeName(String judgeName) {
+    final normalized = _normalizeJudgeName(judgeName);
+    if (normalized.isEmpty) return null;
+
+    try {
+      return _registrationBox?.values.firstWhere(
+        (r) => _normalizeJudgeName(r.judgeName) == normalized,
+      );
     } catch (e) {
       return null;
     }
@@ -854,23 +942,26 @@ class HiveDatabaseService {
 
   // ========== KATEGORİ İŞLEMLERİ ==========
   
-  /// Varsayılan kategorileri kurulumda yükle (sadece bir kez)
+  /// Varsayılan kategorileri kurulumda yükle (sadece Hive boşsa).
+  /// Sabit liste [initialCategories] lib/utils/constants.dart içindedir;
+  /// ileride Hive üzerinden isim/icon güncellenebilir.
   static Future<void> initializeDefaultCategories() async {
     if ((_categoryBox?.isEmpty ?? true)) {
       final now = DateTime.now();
-      final entries = CategoryData.categories.entries.toList();
-      for (int i = 0; i < entries.length; i++) {
-        final entry = entries[i];
+      for (int i = 0; i < initialCategories.length; i++) {
+        final entry = initialCategories[i];
+        final id = entry['id'].toString();
         final model = CategoryModel(
-          id: entry.key, // Basit benzersiz anahtar olarak isim
-          name: entry.key,
-          subCategories: entry.value,
+          id: id,
+          name: entry['name'] as String,
+          subCategories: [],
+          iconPath: entry['icon'] as String?,
           isActive: true,
           totalDavalar: 0,
           createdAt: now,
           orderIndex: i,
         );
-        await _categoryBox?.put(model.id, model);
+        await _categoryBox?.put(id, model);
       }
     }
   }
@@ -880,10 +971,12 @@ class HiveDatabaseService {
     return _categoryBox?.values.toList() ?? [];
   }
 
-  /// Aktif kategorileri getir
+  /// Aktif kategorileri getir (orderIndex'e göre sıralı)
   static List<CategoryModel> getActiveCategories() {
     final all = getAllCategories();
-    return all.where((c) => c.isActive).toList();
+    final active = all.where((c) => c.isActive).toList();
+    active.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    return active;
   }
 
   /// Arama metnine göre kategorileri filtrele
@@ -928,29 +1021,48 @@ class HiveDatabaseService {
     await _categoryBox?.delete(id);
   }
 
-  // ========== ZAMANLAMA (19 SAAT) İŞLEMLERİ ==========
-  static const int _limitHours = 19;
+  // ========== GÜNLÜK KOTA İŞLEMLERİ ==========
+  static const int _dailyDavaLimit = 19;
+
+  static String _dailyQuotaKey({
+    required String action,
+    required String email,
+    required DateTime date,
+  }) {
+    final day = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return '${action}_${email.toLowerCase()}_$day';
+  }
+
+  static int _getTodayQuotaCount({
+    required String action,
+    required String email,
+  }) {
+    final key = _dailyQuotaKey(action: action, email: email, date: DateTime.now());
+    final raw = _dailyQuotaBox?.get(key);
+    if (raw is int) return raw;
+    if (raw is String) return int.tryParse(raw) ?? 0;
+    return 0;
+  }
+
+  static Future<void> _incrementTodayQuotaCount({
+    required String action,
+    required String email,
+  }) async {
+    final key = _dailyQuotaKey(action: action, email: email, date: DateTime.now());
+    final current = _getTodayQuotaCount(action: action, email: email);
+    await _dailyQuotaBox?.put(key, current + 1);
+  }
 
   static bool canUserOpenDava(String email) {
     // Admin kullanıcı sınırsız dava açabilir
     if (isAdmin(email)) return true;
-    final user = getRegistrationByEmail(email);
-    if (user == null) return true;
-    final last = user.lastDavaAcTime;
-    if (last == null) return true;
-    final diff = DateTime.now().difference(last);
-    return diff.inHours >= _limitHours;
+    final todayCount = _getTodayQuotaCount(action: 'dava', email: email);
+    return todayCount < _dailyDavaLimit;
   }
 
   static bool canUserHaykir(String email) {
-    // Admin kullanıcı sınırsız haykırabilir
-    if (isAdmin(email)) return true;
-    final user = getRegistrationByEmail(email);
-    if (user == null) return true;
-    final last = user.lastHaykirTime;
-    if (last == null) return true;
-    final diff = DateTime.now().difference(last);
-    return diff.inHours >= _limitHours;
+    // Haykır bekleme süresi devre dışı (çalışan proje ile uyumlu)
+    return true;
   }
 
   /// Kullanıcının admin olup olmadığını kontrol et
@@ -961,26 +1073,19 @@ class HiveDatabaseService {
   }
 
   static int getRemainingDavaAcHours(String email) {
-    // Admin kullanıcı için bekleme yok
+    // Geriye uyumluluk: metod adı saat içeriyor ama artık "kalan günlük dava hakkı" döndürür.
     if (isAdmin(email)) return 0;
-    final user = getRegistrationByEmail(email);
-    if (user?.lastDavaAcTime == null) return 0;
-    final diff = DateTime.now().difference(user!.lastDavaAcTime!);
-    final remaining = _limitHours - diff.inHours;
+    final todayCount = _getTodayQuotaCount(action: 'dava', email: email);
+    final remaining = _dailyDavaLimit - todayCount;
     return remaining > 0 ? remaining : 0;
   }
 
   static int getRemainingHaykirHours(String email) {
-    // Admin kullanıcı için bekleme yok
-    if (isAdmin(email)) return 0;
-    final user = getRegistrationByEmail(email);
-    if (user?.lastHaykirTime == null) return 0;
-    final diff = DateTime.now().difference(user!.lastHaykirTime!);
-    final remaining = _limitHours - diff.inHours;
-    return remaining > 0 ? remaining : 0;
+    return 0;
   }
 
   static Future<void> updateUserDavaAcTime(String email) async {
+    await _incrementTodayQuotaCount(action: 'dava', email: email);
     final user = getRegistrationByEmail(email);
     if (user == null) return;
     final updated = user.copyWith(lastDavaAcTime: DateTime.now());
@@ -999,6 +1104,12 @@ class HiveDatabaseService {
     return _davaBox?.get(id);
   }
 
+  /// Benzersiz dava/taslak kimliği üretir
+  static String generateUniqueDavaId(String userEmail) {
+    final safeEmail = userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+    return 'dava_${safeEmail}_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
   // ========== GELEN DAVALAR (KULLANICIYA ATANAN) ==========
   /// Kullanıcıya atanan davaları bellekte saklarız (UX'e dokunmadan hızlı kullanım için)
   static final Map<String, List<Map<String, dynamic>>> _incomingDavalarByUser = {};
@@ -1014,6 +1125,7 @@ class HiveDatabaseService {
         : List<Map<String, dynamic>>.from(_incomingDavalarByUser[userEmail] ?? []);
     // Aynı ID varsa güncelle, yoksa ekle
     final existingIndex = list.indexWhere((d) => d['id'] == dava['id']);
+    final wasNew = existingIndex == -1;
     if (existingIndex != -1) {
       list[existingIndex] = dava;
     } else {
@@ -1022,6 +1134,10 @@ class HiveDatabaseService {
     _incomingDavalarByUser[userEmail] = list;
     // Kalıcıya yaz
     _incomingDavaBox?.put(userEmail, list);
+
+    if (wasNew) {
+      Future.microtask(() => appendGelenDavaBildirimi(userEmail, dava));
+    }
 
     final String? davaId = (dava['id'] ?? dava['davaId'])?.toString();
     if (davaId != null && davaId.isNotEmpty) {
@@ -1186,6 +1302,7 @@ class HiveDatabaseService {
     String groupName, {
     int count = 7,
     String? defendantEmail,
+    bool sameCountryOnly = false,
   }) async {
     // Grup adı normalizasyonu ("Grup-19" ve "Grup19" desteklenir)
     final normalized = groupName.toLowerCase().replaceAll('-', '').trim();
@@ -1195,41 +1312,113 @@ class HiveDatabaseService {
     final openerJudgeName = opener?.judgeName ?? '';
     final isOpenerVerified = VerifiedUsersService.isVerified(openerJudgeName);
 
-    // Eğer Grup19 ise sabit 7 kişiyi döndür (opener hariç)
+    // Eğer Grup19 ise eksikleri zincirli fallback ile 7'ye tamamla
     if (normalized == 'grup19') {
-      final setEmails = _grup19Members.toSet();
-      final allRegs = getAllRegistrations()
-          .where((r) => setEmails.contains(r.email) && r.email != openerEmail)
-          .toList();
-      
-      // ✅ ADIM-2: Eğer dava açan mavi tik sahibi ise, önce mavi tik sahiplerini seç, 7'den azsa mavi tik sahibi olmayanlarla tamamla
-      if (isOpenerVerified) {
-        final verifiedRegs = allRegs.where((r) {
-          return VerifiedUsersService.isVerified(r.judgeName);
-        }).toList();
-        
-        final nonVerifiedRegs = allRegs.where((r) {
-          return !VerifiedUsersService.isVerified(r.judgeName);
-        }).toList();
-        
-        // Mavi tik sahiplerini karıştır
-        verifiedRegs.shuffle();
-        
-        // Eğer 7'den az mavi tik sahibi varsa, mavi tik sahibi olmayanlarla tamamla
-        if (verifiedRegs.length < count) {
-          final remaining = count - verifiedRegs.length;
-          nonVerifiedRegs.shuffle();
-          final selectedNonVerified = nonVerifiedRegs.take(remaining).toList();
-          return [...verifiedRegs, ...selectedNonVerified];
-        } else {
-          // 7 veya daha fazla mavi tik sahibi varsa, sadece onları kullan
-          return verifiedRegs.take(count).toList();
+      final openerId = opener?.id;
+      final openerCountry = opener?.country.trim().toLowerCase() ?? '';
+      final allUsers = getAllRegistrations();
+      final selected = <RegistrationModel>[];
+      final selectedEmails = <String>{};
+      final privacyCache = <String, bool>{};
+
+      Future<bool> canReceive(RegistrationModel r) async {
+        if (r.email == openerEmail) return false;
+        if (defendantEmail != null && r.email == defendantEmail) return false;
+        if (selectedEmails.contains(r.email)) return false;
+
+        final cached = privacyCache[r.email];
+        if (cached != null) return cached;
+        try {
+          final s = await getOrCreateSettings(r.email);
+          // 7 kişilik hüküm listesine girebilmek için iki şart:
+          // 1) Bana Dava Açılsın açık olmalı
+          // 2) Davetler > 7-Yargıç açık olmalı
+          final allowsDava = s.privacySettings['genel_davaacilsin'] ?? true;
+          final allowsSevenJudge = s.privacySettings['davet_7yargic'] ?? true;
+          final ok = allowsDava && allowsSevenJudge;
+          privacyCache[r.email] = ok;
+          return ok;
+        } catch (_) {
+          privacyCache[r.email] = true;
+          return true;
         }
       }
-      
-      // Normal kullanıcı için mevcut mantık
-      if (allRegs.length <= count) return allRegs;
-      return allRegs.take(count).toList();
+
+      Future<void> addFromPool(List<RegistrationModel> pool) async {
+        for (final r in pool) {
+          if (selected.length >= count) break;
+          if (await canReceive(r)) {
+            selected.add(r);
+            selectedEmails.add(r.email);
+          }
+        }
+      }
+
+      // 1) Grup19 havuzu
+      final grup19Pool = allUsers
+          .where((r) => _grup19Members.contains(r.email))
+          .toList()
+        ..shuffle();
+      await addFromPool(grup19Pool);
+
+      // 2) Arkadaşlar havuzu
+      if (selected.length < count) {
+        final friendIds = getAcceptedFriendships(openerId ?? '')
+            .map((f) => f.requesterId == openerId ? f.recipientId : f.requesterId)
+            .toSet();
+        final friendsPool = allUsers
+            .where((r) => friendIds.contains(r.id))
+            .toList()
+          ..shuffle();
+        await addFromPool(friendsPool);
+      }
+
+      // 3) Takipçiler havuzu
+      if (selected.length < count) {
+        final followerIds = getFollowers(openerId ?? '').map((f) => f.requesterId).toSet();
+        final followersPool = allUsers
+            .where((r) => followerIds.contains(r.id))
+            .toList()
+          ..shuffle();
+        await addFromPool(followersPool);
+      }
+
+      // 4) Herkes havuzu (tanımadıklar / ilişkisiz kullanıcılar)
+      if (selected.length < count) {
+        final friendIds = getAcceptedFriendships(openerId ?? '')
+            .expand((f) => [f.requesterId, f.recipientId])
+            .toSet();
+        final followerIds = getFollowers(openerId ?? '').map((f) => f.requesterId).toSet();
+        final followingIds = getFollowingUsers(openerId ?? '').map((f) => f.recipientId).toSet();
+        final excludeIds = <String>{}
+          ..addAll(friendIds)
+          ..addAll(followerIds)
+          ..addAll(followingIds)
+          ..add(openerId ?? '');
+        final everyonePool = allUsers
+            .where((r) => !excludeIds.contains(r.id))
+            .toList()
+          ..shuffle();
+        await addFromPool(everyonePool);
+      }
+
+      // 5) Hala eksikse: aynı ülkeden herhangi kullanıcı
+      if (selected.length < count && openerCountry.isNotEmpty) {
+        final sameCountryPool = allUsers
+            .where((r) => r.country.trim().toLowerCase() == openerCountry)
+            .toList()
+          ..shuffle();
+        await addFromPool(sameCountryPool);
+      }
+
+      // 6) Hala eksikse: ülke şartı aranmaksızın herhangi kullanıcı
+      if (selected.length < count) {
+        final anyPool = List<RegistrationModel>.from(allUsers)..shuffle();
+        await addFromPool(anyPool);
+      }
+
+      if (selected.length <= count) return selected;
+      return selected.take(count).toList();
     }
 
     // Opener bilgisi (yukarıda zaten tanımlanmış, tekrar tanımlamaya gerek yok)
@@ -1385,9 +1574,16 @@ class HiveDatabaseService {
     }
 
     // Diğer gruplar (Grup-19/Arkadaş/Takipçi): ülke şartı aranmaz, grup havuzundan rastgele seç
-    finalPool.shuffle();
-    if (finalPool.length <= count) return finalPool;
-    return finalPool.take(count).toList();
+    var resultPool = finalPool;
+    if (sameCountryOnly && openerCountry.isNotEmpty) {
+      resultPool = resultPool
+          .where((r) => r.country.trim().toLowerCase() == openerCountry)
+          .toList();
+    }
+
+    resultPool.shuffle();
+    if (resultPool.length <= count) return resultPool;
+    return resultPool.take(count).toList();
   }
 
   /// Davet alıcıları seç (dava gönderilmeyen kişilerden)
@@ -1529,12 +1725,12 @@ class HiveDatabaseService {
       }
     }
 
-    // Gizlilik ayarlarını kontrol et
+    // Davet gizliliğini kontrol et: sadece "Dava Davetleri" açık olanlara gönder
     final filteredPool = <RegistrationModel>[];
     for (final r in pool) {
       try {
         final s = await getOrCreateSettings(r.email);
-        if (s.privacySettings['genel_davaacilsin'] ?? true) {
+        if (s.privacySettings['davet_dava'] ?? true) {
           filteredPool.add(r);
         }
       } catch (_) {
@@ -1560,7 +1756,7 @@ class HiveDatabaseService {
       for (final r in globalPool) {
         try {
           final s = await getOrCreateSettings(r.email);
-          if (s.privacySettings['genel_davaacilsin'] ?? true) {
+          if (s.privacySettings['davet_dava'] ?? true) {
             finalPool.add(r);
           }
         } catch (_) {
@@ -1982,11 +2178,6 @@ class HiveDatabaseService {
         .toList();
   }
 
-  /// Belirli bir dava için gönderilen tüm kullanıcı e-postalarını getir
-  static Future<List<String>> _getDavaRecipientsInternal(String davaId) async {
-    return _computeDavaRecipients(davaId);
-  }
-
   /// Gelen davadan kaldır
   static Future<void> removeIncomingDava(String davaId) async {
     await _ensureIncomingDavaBoxOpen();
@@ -2024,6 +2215,30 @@ class HiveDatabaseService {
     } else {
       print('⚠️ [HiveDatabaseService] removeIncomingDava: Hiç dava kaldırılamadı (ID: $davaId)');
     }
+  }
+
+  /// Yalnızca belirtilen kullanıcının gelen davasından kaldırır.
+  static Future<bool> removeIncomingDavaForUser(
+    String userEmail,
+    String davaId,
+  ) async {
+    await _ensureIncomingDavaBoxOpen();
+    final persisted = _incomingDavaBox?.get(userEmail);
+    if (persisted == null) return false;
+
+    final List<Map<String, dynamic>> list = (persisted as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    final before = list.length;
+    list.removeWhere((dava) {
+      final itemId = dava['id']?.toString() ?? '';
+      final itemDavaId = dava['davaId']?.toString() ?? '';
+      return itemId == davaId || itemDavaId == davaId;
+    });
+    if (list.length == before) return false;
+    _incomingDavaBox?.put(userEmail, list);
+    _incomingDavalarByUser[userEmail] = List<Map<String, dynamic>>.from(list);
+    return true;
   }
 
   /// Gelen dava box'ını aç
@@ -2155,8 +2370,21 @@ class HiveDatabaseService {
     
     final key = '${davaId}_$userRole';
     final existingData = _hukumBox?.get(key) as Map<dynamic, dynamic>?;
+    final dynamic existingFinalizedValue = existingData?['isFinalized'];
+    final bool persistedFinalized = existingFinalizedValue is bool
+        ? existingFinalizedValue
+        : (existingFinalizedValue is int
+            ? existingFinalizedValue != 0
+            : (existingFinalizedValue?.toString().toLowerCase().trim() ==
+                'true'));
+    if (persistedFinalized) {
+      final String? existingText = existingData?['hukumText']?.toString();
+      if (existingText != null && existingText != hukumText) {
+        print('⚠️ [HiveDatabaseService] Finalize edilmiş hüküm değiştirilemez: $key');
+        return;
+      }
+    }
     final createdAt = existingData?['createdAt']?.toString() ?? DateTime.now().toIso8601String();
-    final bool persistedFinalized = (existingData?['isFinalized'] as bool?) ?? false;
     final bool finalizationState = isFinalized || persistedFinalized;
     final hukumData = {
       'davaId': davaId,
@@ -2402,6 +2630,29 @@ class HiveDatabaseService {
     print('✅ Katıldığım dava eklendi: ${dava['adi']}');
   }
 
+  static bool _isLegacyKatildigimTestRow(Map<String, dynamic> d) {
+    final src = d['source']?.toString();
+    final id = (d['id'] ?? d['davaId'] ?? '').toString();
+    return src == 'test_data' ||
+        id == 'test_dava_1' ||
+        id == 'test_dava_2';
+  }
+
+  /// Eski örnek/test katılım satırlarını siler (`test_data`, test_dava_*).
+  static Future<void> purgeLegacyKatildigimTestRows(String userEmail) async {
+    final key = userEmail.trim();
+    if (key.isEmpty) return;
+    await _ensureKatildigimDavaBoxOpen();
+    final list = getKatildigimDavalar(key);
+    final filtered =
+        list.where((d) => !_isLegacyKatildigimTestRow(d)).toList();
+    if (filtered.length == list.length) return;
+    _katildigimDavaBox!.put(key, filtered);
+    print(
+      '🧹 Eski test katıldığım dava kayıtları silindi: ${list.length - filtered.length}',
+    );
+  }
+
   /// Katıldığım davaları getir
   static List<Map<String, dynamic>> getKatildigimDavalar(String userEmail) {
     if (_katildigimDavaBox == null || !_katildigimDavaBox!.isOpen) {
@@ -2421,6 +2672,165 @@ class HiveDatabaseService {
     }).toList();
   }
 
+  static const List<String> _sekizStandartRoller = <String>[
+    'Temyiz hakimi',
+    'Yargıç',
+    'Davacı avukatı',
+    'Davalı avukatı',
+    '1.Jüri',
+    '2.Jüri',
+    'Davacı Şahidi',
+    'Davalı Şahidi',
+  ];
+
+  static bool _isSekizStandartRol(String? mevkii) {
+    final role = (mevkii ?? '').trim();
+    if (role.isEmpty) return false;
+    final compact = _compactMevkii(role);
+    for (final standard in _sekizStandartRoller) {
+      if (_compactMevkii(standard) == compact) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static String _compactMevkii(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), '')
+        .replaceAll('ı', 'i')
+        .replaceAll('ş', 's')
+        .replaceAll('ç', 'c')
+        .replaceAll('ğ', 'g')
+        .replaceAll('ö', 'o')
+        .replaceAll('ü', 'u');
+  }
+
+  /// Kullanıcının 8 standart rolden biriyle kabul ettiği dava kayıtları (davaId başına tek).
+  static Future<List<Map<String, dynamic>>> getSekizRolKatilimKayitlari(
+    String userEmail,
+  ) async {
+    final normalizedEmail = userEmail.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) {
+      return <Map<String, dynamic>>[];
+    }
+
+    final Map<String, Map<String, dynamic>> byDavaId =
+        <String, Map<String, dynamic>>{};
+
+    void mergeKayit(String davaId, Map<String, dynamic> meta) {
+      if (davaId.isEmpty) return;
+      byDavaId[davaId] = <String, dynamic>{
+        ...?byDavaId[davaId],
+        ...meta,
+        'davaId': davaId,
+        'id': davaId,
+      };
+    }
+
+    for (final dava in getKatildigimDavalar(userEmail)) {
+      final davaId =
+          (dava['id'] ?? dava['davaId'] ?? '').toString().trim();
+      final mevkii =
+          (dava['mevkii'] ?? dava['userRole'] ?? '').toString();
+      if (_isSekizStandartRol(mevkii)) {
+        mergeKayit(davaId, dava);
+      }
+    }
+
+    await _ensureDavaParticipantBoxOpen();
+    final keys = _davaParticipantBox?.keys.toList() ?? <dynamic>[];
+    for (final key in keys) {
+      final davaId = key.toString().trim();
+      if (davaId.isEmpty) continue;
+      final participants =
+          await getDavaParticipants(davaId, normalizeExpired: false);
+      for (final participant in participants) {
+        final pEmail =
+            (participant['userEmail'] ?? '').toString().trim().toLowerCase();
+        if (pEmail != normalizedEmail) continue;
+        final status = (participant['status'] ?? '').toString();
+        if (status != 'accepted') continue;
+        final mevkii =
+            (participant['mevkii'] ?? participant['userRole'] ?? '')
+                .toString();
+        if (!_isSekizStandartRol(mevkii)) {
+          continue;
+        }
+        final opened = getOpenedDavaById(davaId);
+        mergeKayit(
+          davaId,
+          <String, dynamic>{
+            if (opened != null) ...opened,
+            ...participant,
+            'mevkii': mevkii,
+          },
+        );
+      }
+    }
+
+    return byDavaId.values.toList();
+  }
+
+  /// Kullanıcının davalı olduğu (bana açılan) benzersiz dava sayısı.
+  static int countBanaAcilanDavalar(String userEmail) {
+    final normalizedEmail = userEmail.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) return 0;
+
+    final Set<String> davaIds = <String>{};
+
+    void tryAdd(Map<String, dynamic> dava) {
+      final id = (dava['id'] ?? dava['davaId'] ?? '').toString().trim();
+      if (id.isEmpty) return;
+      if (_isUserDefendantInDava(dava, normalizedEmail)) {
+        davaIds.add(id);
+      }
+    }
+
+    for (final dava in getOpenedDavalar()) {
+      tryAdd(dava);
+    }
+
+    for (final dava in getIncomingDavalar(userEmail)) {
+      tryAdd(dava);
+    }
+
+    for (final dava in getKatildigimDavalar(userEmail)) {
+      tryAdd(dava);
+    }
+
+    return davaIds.length;
+  }
+
+  static bool _isUserDefendantInDava(
+    Map<String, dynamic> dava,
+    String normalizedEmail,
+  ) {
+    final davaliEmail =
+        (dava['davaliEmail'] ?? '').toString().trim().toLowerCase();
+    if (davaliEmail.isNotEmpty && davaliEmail == normalizedEmail) {
+      return true;
+    }
+
+    final davaliRaw = (dava['davali'] ?? '').toString().trim();
+    if (davaliRaw.isEmpty) return false;
+
+    final davaliLower = davaliRaw.toLowerCase();
+    if (davaliLower == normalizedEmail) return true;
+    if (davaliRaw.contains('@') && davaliLower == normalizedEmail) {
+      return true;
+    }
+
+    final user = getRegistrationByEmail(normalizedEmail);
+    if (user != null &&
+        user.judgeName.trim().toLowerCase() == davaliLower) {
+      return true;
+    }
+
+    return false;
+  }
+
   /// Katıldığım dava sil
   static Future<void> removeKatildigimDava(String userEmail, String davaId) async {
     await _ensureKatildigimDavaBoxOpen();
@@ -2437,8 +2847,12 @@ class HiveDatabaseService {
       return <String, dynamic>{};
     }).toList();
 
-    // Belirtilen dava ID'sine sahip dava'yı kaldır
-    davaList.removeWhere((dava) => dava['id']?.toString() == davaId);
+    // Belirtilen dava ID'sine sahip dava'yı kaldır (id veya davaId)
+    davaList.removeWhere((dava) {
+      final id = dava['id']?.toString() ?? '';
+      final did = dava['davaId']?.toString() ?? '';
+      return id == davaId || did == davaId;
+    });
     
     // Güncellenmiş listeyi kaydet
     _katildigimDavaBox!.put(userEmail, davaList);
@@ -2706,7 +3120,7 @@ class HiveDatabaseService {
   }
 
   static Future<List<String>> _getDavaRecipientsInternalAlias(String davaId) async {
-    return _getDavaRecipientsInternal(davaId);
+    return _computeDavaRecipients(davaId);
   }
 
   /// Kullanıcının admin durumunu güncelle
@@ -2835,6 +3249,45 @@ class HiveDatabaseService {
     }
   }
 
+  /// Bir dava için ceza kutusunda kayıtlı tüm cezalar.
+  /// Anahtarlar e-posta adresinin küçük harf biçimidir (`davaId_userEmail`).
+  static Future<Map<String, String>> getCezaMapForDavaId(String davaId) async {
+    final Map<String, String> out = <String, String>{};
+    if (davaId.trim().isEmpty) {
+      return out;
+    }
+    try {
+      await _ensureCezaBoxOpen();
+      final box = _cezaBox;
+      if (box == null) {
+        return out;
+      }
+      final String prefix = '${davaId}_';
+      for (final Object? key in box.keys) {
+        final String ks = key.toString();
+        if (!ks.startsWith(prefix)) {
+          continue;
+        }
+        final String email = ks.substring(prefix.length).trim();
+        if (email.isEmpty) {
+          continue;
+        }
+        final Object? raw = box.get(key);
+        if (raw == null) {
+          continue;
+        }
+        final String text = raw.toString().trim();
+        if (text.isEmpty) {
+          continue;
+        }
+        out[email.toLowerCase()] = text;
+      }
+    } catch (e) {
+      print('❌ Ceza haritası okunurken hata: $e');
+    }
+    return out;
+  }
+
   /// Cezayı getir
   /// key: davaId_userEmail, value: String (ceza metni)
   static Future<String?> getCeza({
@@ -2859,6 +3312,154 @@ class HiveDatabaseService {
       print('❌ Ceza getirilirken hata: $e');
       return null;
     }
+  }
+
+  // ========== CEZA OYLARI (HALK) ==========
+
+  static Future<void> _ensureCezaOyBoxOpen() async {
+    if (_cezaOyBox == null || !_cezaOyBox!.isOpen) {
+      _cezaOyBox = await Hive.openBox(_cezaOyBoxName);
+    }
+  }
+
+  /// Dava için tüm ceza oylarını döndürür (anahtar: seçen email, değer: rol value).
+  static Future<Map<String, String>> getCezaOyMapForDavaId(String davaId) async {
+    final Map<String, String> out = <String, String>{};
+    if (davaId.trim().isEmpty) {
+      return out;
+    }
+    try {
+      await _ensureCezaOyBoxOpen();
+      final Object? raw = _cezaOyBox!.get(davaId);
+      if (raw is Map) {
+        final Object? votes = raw['votesByEmail'];
+        if (votes is Map) {
+          for (final MapEntry<dynamic, dynamic> e in votes.entries) {
+            final String email = e.key.toString().trim().toLowerCase();
+            final String role = e.value.toString().trim();
+            if (email.isNotEmpty && role.isNotEmpty) {
+              out[email] = role;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ Ceza oy haritası okunurken hata: $e');
+    }
+    return out;
+  }
+
+  /// Kullanıcının ceza oyunu kaydeder; aynı role tıklanırsa oy kaldırılır.
+  static Future<String?> toggleCezaOy({
+    required String davaId,
+    required String voterEmail,
+    required String roleValue,
+  }) async {
+    try {
+      await _ensureCezaOyBoxOpen();
+      final String email = voterEmail.trim().toLowerCase();
+      final String role = roleValue.trim();
+      if (davaId.trim().isEmpty || email.isEmpty || role.isEmpty) {
+        return null;
+      }
+      final Map<String, String> votes =
+          await getCezaOyMapForDavaId(davaId);
+      if (votes[email] == role) {
+        votes.remove(email);
+      } else {
+        votes[email] = role;
+      }
+      await _cezaOyBox!.put(davaId, <String, dynamic>{
+        'votesByEmail': Map<String, String>.from(votes),
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      return votes[email];
+    } catch (e) {
+      print('❌ Ceza oyu kaydedilirken hata: $e');
+      rethrow;
+    }
+  }
+
+  // ========== HEDİYE OYLARI (HALK) ==========
+
+  static Future<void> _ensureHediyeOyBoxOpen() async {
+    if (_hediyeOyBox == null || !_hediyeOyBox!.isOpen) {
+      _hediyeOyBox = await Hive.openBox(_hediyeOyBoxName);
+    }
+  }
+
+  static Future<Map<String, String>> getHediyeOyMapForDavaId(String davaId) async {
+    final Map<String, String> out = <String, String>{};
+    if (davaId.trim().isEmpty) {
+      return out;
+    }
+    try {
+      await _ensureHediyeOyBoxOpen();
+      final Object? raw = _hediyeOyBox!.get(davaId);
+      if (raw is Map) {
+        final Object? votes = raw['votesByEmail'];
+        if (votes is Map) {
+          for (final MapEntry<dynamic, dynamic> e in votes.entries) {
+            final String email = e.key.toString().trim().toLowerCase();
+            final String role = e.value.toString().trim();
+            if (email.isNotEmpty && role.isNotEmpty) {
+              out[email] = role;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ Hediye oy haritası okunurken hata: $e');
+    }
+    return out;
+  }
+
+  static Future<String?> toggleHediyeOy({
+    required String davaId,
+    required String voterEmail,
+    required String roleValue,
+  }) async {
+    try {
+      await _ensureHediyeOyBoxOpen();
+      final String email = voterEmail.trim().toLowerCase();
+      final String role = roleValue.trim();
+      if (davaId.trim().isEmpty || email.isEmpty || role.isEmpty) {
+        return null;
+      }
+      final Map<String, String> votes =
+          await getHediyeOyMapForDavaId(davaId);
+      if (votes[email] == role) {
+        votes.remove(email);
+      } else {
+        votes[email] = role;
+      }
+      await _hediyeOyBox!.put(davaId, <String, dynamic>{
+        'votesByEmail': Map<String, String>.from(votes),
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      return votes[email];
+    } catch (e) {
+      print('❌ Hediye oyu kaydedilirken hata: $e');
+      rethrow;
+    }
+  }
+
+  /// Dava kabul tarihi (opened / accepted kayıtlarından).
+  static Future<DateTime?> getDavaAcceptedAt(String davaId) async {
+    DateTime? acceptedAt;
+    final opened = getOpenedDavaById(davaId);
+    final openedAcceptedAt = opened?['acceptedAt']?.toString();
+    if (openedAcceptedAt != null && openedAcceptedAt.isNotEmpty) {
+      acceptedAt = DateTime.tryParse(openedAcceptedAt);
+    }
+    if (acceptedAt == null) {
+      final accepted = await getAcceptedDavaById(davaId);
+      final acceptedAcceptedAt = accepted?['acceptedAt']?.toString();
+      if (acceptedAcceptedAt != null && acceptedAcceptedAt.isNotEmpty) {
+        acceptedAt = DateTime.tryParse(acceptedAcceptedAt);
+      }
+    }
+    return acceptedAt;
   }
 
   /// Belirli bir dava için cezayı sil
@@ -2908,6 +3509,65 @@ class HiveDatabaseService {
       print('❌ Masraflar kaydedilirken hata: $e');
       rethrow;
     }
+  }
+
+  /// [HukumGiftSelectionPage] satır biçimi: emoji, isim, `· ⭐`, kategori `›` alt başlık.
+  static String? _pickGiftMasrafLine(List<dynamic> raw) {
+    final List<String> lines = raw
+        .map((e) => e.toString().trim())
+        .where((String s) => s.isNotEmpty)
+        .toList();
+    if (lines.isEmpty) {
+      return null;
+    }
+    for (final String s in lines) {
+      if (s.contains('⭐') && s.contains('›')) {
+        return s;
+      }
+    }
+    return lines.first;
+  }
+
+  /// Bir dava için masraf kutusundan kullanıcı başına tek hediye satırı (ilk uygun satır).
+  /// Anahtarlar e-postanın küçük harf biçimidir (`davaId_userEmail`).
+  static Future<Map<String, String>> getMasrafGiftLineMapForDavaId(String davaId) async {
+    final Map<String, String> out = <String, String>{};
+    if (davaId.trim().isEmpty) {
+      return out;
+    }
+    try {
+      await _ensureMasrafBoxOpen();
+      final box = _masrafBox;
+      if (box == null) {
+        return out;
+      }
+      final String prefix = '${davaId}_';
+      for (final Object? key in box.keys) {
+        final String ks = key.toString();
+        if (!ks.startsWith(prefix)) {
+          continue;
+        }
+        final String email = ks.substring(prefix.length).trim();
+        if (email.isEmpty) {
+          continue;
+        }
+        final Object? raw = box.get(key);
+        if (raw == null) {
+          continue;
+        }
+        if (raw is! List) {
+          continue;
+        }
+        final String? line = _pickGiftMasrafLine(raw);
+        if (line == null || line.isEmpty) {
+          continue;
+        }
+        out[email.toLowerCase()] = line;
+      }
+    } catch (e) {
+      print('❌ Hediye (masraf) haritası okunurken hata: $e');
+    }
+    return out;
   }
 
   /// Masrafları getir
@@ -3432,6 +4092,42 @@ class HiveDatabaseService {
     }
   }
 
+  /// Yeni gelen dava için [UyarilarPage] bildirimi (Hive).
+  static Future<void> appendGelenDavaBildirimi(
+    String userEmail,
+    Map<String, dynamic> dava,
+  ) async {
+    try {
+      if (_hediyeUyariBox == null || !_hediyeUyariBox!.isOpen) {
+        _hediyeUyariBox = await Hive.openBox(_hediyeUyariBoxName);
+      }
+      final bildirimKey = 'bildirimler_$userEmail';
+      final existingBildirimler = _hediyeUyariBox?.get(bildirimKey);
+      final List<Map<String, dynamic>> bildirimler = existingBildirimler != null
+          ? (existingBildirimler as List).map((item) {
+              if (item is Map) {
+                return Map<String, dynamic>.from(item);
+              }
+              return item as Map<String, dynamic>;
+            }).toList()
+          : <Map<String, dynamic>>[];
+
+      final davaId = (dava['id'] ?? dava['davaId'])?.toString() ?? '';
+      final adi = (dava['davaAdi'] ?? dava['adi'] ?? 'Dava').toString();
+      bildirimler.add({
+        'id': 'gelen_${davaId}_${userEmail}_${DateTime.now().millisecondsSinceEpoch}',
+        'type': 'gelen_dava',
+        'davaId': davaId,
+        'davaAdi': adi,
+        'uyariMesaji': 'Dikkat! Gelen DAVA var.',
+        'olusturmaTarihi': DateTime.now().toIso8601String(),
+      });
+      await _hediyeUyariBox?.put(bildirimKey, bildirimler);
+    } catch (e) {
+      print('❌ Gelen dava bildirimi eklenemedi: $e');
+    }
+  }
+
   /// Kullanıcının bildirimlerini al
   static List<Map<String, dynamic>> getBildirimler(String userEmail) {
     try {
@@ -3526,6 +4222,13 @@ class HiveDatabaseService {
   /// Dava beğenme/beğenmeme toggle (birbirini dışlar)
   static Future<void> toggleDavaLike(String davaId, String userEmail, bool isLike) async {
     try {
+      // Hüküm süresi sonrası destek/kına kilidi:
+      // Dava tarihi geçmişse sayaçların değişmesini servis katmanında da engelle.
+      if (await _isLikeDislikeLockedAfter76Days(davaId)) {
+        print('⚠️ $_hukumFreezeDays gün doldu: destek/kına güncellenemez. davaId=$davaId');
+        return;
+      }
+
       final key = '${davaId}_$userEmail';
       final userAction = getUserDavaAction(davaId, userEmail);
       final stats = getDavaActionStats(davaId);
@@ -3605,6 +4308,30 @@ class HiveDatabaseService {
     }
   }
 
+  static const int _hukumFreezeDays = 19;
+
+  static Future<bool> _isLikeDislikeLockedAfter76Days(String davaId) async {
+    DateTime? acceptedAt;
+
+    final opened = getOpenedDavaById(davaId);
+    final openedAcceptedAt = opened?['acceptedAt']?.toString();
+    if (openedAcceptedAt != null && openedAcceptedAt.isNotEmpty) {
+      acceptedAt = DateTime.tryParse(openedAcceptedAt);
+    }
+
+    if (acceptedAt == null) {
+      final accepted = await getAcceptedDavaById(davaId);
+      final acceptedAcceptedAt = accepted?['acceptedAt']?.toString();
+      if (acceptedAcceptedAt != null && acceptedAcceptedAt.isNotEmpty) {
+        acceptedAt = DateTime.tryParse(acceptedAcceptedAt);
+      }
+    }
+
+    if (acceptedAt == null) return false;
+    final passedDays = DateTime.now().difference(acceptedAt).inDays;
+    return passedDays >= _hukumFreezeDays;
+  }
+
   /// Dava için gizli tanık sayacını getir
   static int getGizliTanikCounter(String davaId) {
     try {
@@ -3636,10 +4363,13 @@ class HiveDatabaseService {
     }
   }
 
-  /// Gizli tanık ID oluştur
+  /// Gizli tanık yorumlarında görünen sabit takma ad.
+  static const String gizliTanikDisplayName = 'GizliTanık-19';
+
+  /// Gizli tanık ID oluştur (görünen ad her zaman [gizliTanikDisplayName]).
   static String generateGizliTanikId(String davaId) {
-    final counter = incrementGizliTanikCounter(davaId);
-    return 'GizliTanık-$counter';
+    incrementGizliTanikCounter(davaId);
+    return gizliTanikDisplayName;
   }
 
   /// Dava yorum ekle (max 19 kontrolü)
@@ -3767,7 +4497,7 @@ class HiveDatabaseService {
       await _davaActionStatsBox?.put(davaId, updatedStats);
       
       // Seyir defterine ekle
-      final davaData = _getDavaDataForShare(davaId);
+      final davaData = _getDavaDataForShare(davaId, viewerEmail: userEmail);
       if (davaData != null) {
         // ✅ Düzeltme: davaci bilgisini normalize et ve displayName ekle
         String davaciDisplayName = '';
@@ -3815,6 +4545,137 @@ class HiveDatabaseService {
     }
   }
 
+  /// Kullanıcı bu davayı seyir defterinde retweet etmiş mi?
+  static bool hasUserRetweetedDava(String davaId, String userEmail) {
+    final posts = getHomeFeedPosts(userEmail: userEmail);
+    return posts.any((post) => _isDavaRetweetPostFor(post, davaId, userEmail));
+  }
+
+  static bool _isDavaRetweetPostFor(
+    Map<String, dynamic> post,
+    String davaId,
+    String userEmail,
+  ) {
+    if (post['type']?.toString() != 'dava_share') return false;
+    if (post['authorEmail']?.toString() != userEmail) return false;
+    final payload = post['payload'];
+    if (payload is! Map) return false;
+    if (payload['isRetweet'] != true) return false;
+    final pid = (payload['davaId'] ?? payload['id'])?.toString() ?? '';
+    return pid == davaId;
+  }
+
+  /// Retweet: basan kişinin seyir defterine `dava_share` (isRetweet) ekler.
+  static Future<bool> retweetDavaToSeyirDefteri({
+    required String davaId,
+    required String userEmail,
+    String? sourcePostId,
+    String? sourceAuthorEmail,
+    Map<String, dynamic>? payloadOverride,
+  }) async {
+    try {
+      if (hasUserRetweetedDava(davaId, userEmail)) {
+        print('⚠️ Dava zaten retweet edilmiş: $davaId, $userEmail');
+        return false;
+      }
+
+      Map<String, dynamic>? raw = payloadOverride != null
+          ? Map<String, dynamic>.from(payloadOverride)
+          : _getDavaDataForShare(davaId, viewerEmail: userEmail);
+      if (raw == null || raw.isEmpty) {
+        print('⚠️ Retweet için dava verisi bulunamadı: $davaId');
+        return false;
+      }
+
+      final Map<String, dynamic> davaData = Map<String, dynamic>.from(raw);
+      davaData['id'] = davaId;
+      davaData['davaId'] = davaId;
+
+      String davaciDisplayName = '';
+      final davaciRaw = (davaData['davaci'] ?? '').toString().trim();
+      if (davaciRaw.isNotEmpty) {
+        if (davaciRaw.contains('@')) {
+          try {
+            final user = getRegistrationByEmail(davaciRaw);
+            davaciDisplayName = user?.judgeName ?? davaciRaw.split('@').first;
+          } catch (_) {
+            davaciDisplayName = davaciRaw.split('@').first;
+          }
+        } else {
+          davaciDisplayName = davaciRaw;
+        }
+      }
+      if (davaciDisplayName.isNotEmpty) {
+        davaData['displayName'] = davaciDisplayName;
+        davaData['davaci'] = davaciDisplayName;
+      }
+
+      final String nowIso = DateTime.now().toIso8601String();
+      final postData = <String, dynamic>{
+        'id':
+            'dava_retweet_${davaId}_${userEmail}_${DateTime.now().millisecondsSinceEpoch}',
+        'type': 'dava_share',
+        'createdAt': nowIso,
+        'authorEmail': userEmail,
+        'payload': <String, dynamic>{
+          ...davaData,
+          'isRetweet': true,
+          'retweetedAt': nowIso,
+          'retweetedBy': userEmail,
+          'sourcePostId': sourcePostId,
+          'sourceAuthorEmail': sourceAuthorEmail,
+          'userRetweeted': true,
+        },
+      };
+      addHomeFeedPost(postData, userEmail: userEmail);
+
+      final key = '${davaId}_$userEmail';
+      final userAction = Map<String, dynamic>.from(getUserDavaAction(davaId, userEmail));
+      userAction['retweetedAt'] = nowIso;
+      await _davaActionsBox?.put(key, userAction);
+
+      print('✅ Dava retweet seyir defterine eklendi: $davaId, $userEmail');
+      return true;
+    } catch (e) {
+      print('❌ Dava retweet eklenirken hata: $e');
+      return false;
+    }
+  }
+
+  /// Retweet'i basan kullanıcının seyir defterinden kaldırır.
+  static Future<bool> undoRetweetDavaFromSeyirDefteri(
+    String davaId,
+    String userEmail,
+  ) async {
+    try {
+      final posts = getHomeFeedPosts(userEmail: userEmail);
+      final retweetPost = posts.cast<Map<String, dynamic>>().firstWhere(
+            (p) => _isDavaRetweetPostFor(p, davaId, userEmail),
+            orElse: () => <String, dynamic>{},
+          );
+
+      if (retweetPost.isEmpty) {
+        return false;
+      }
+
+      final postId = retweetPost['id']?.toString() ?? '';
+      if (postId.isNotEmpty) {
+        removeHomeFeedPost(postId, userEmail: userEmail);
+      }
+
+      final key = '${davaId}_$userEmail';
+      final userAction = Map<String, dynamic>.from(getUserDavaAction(davaId, userEmail));
+      userAction.remove('retweetedAt');
+      await _davaActionsBox?.put(key, userAction);
+
+      print('✅ Dava retweet kaldırıldı: $davaId, $userEmail');
+      return true;
+    } catch (e) {
+      print('❌ Dava retweet kaldırılırken hata: $e');
+      return false;
+    }
+  }
+
   /// Belirli bir dava için tüm kullanıcı yorumlarını birleştirir.
   static List<Map<String, dynamic>> getAllDavaComments(String davaId) {
     try {
@@ -3846,7 +4707,10 @@ class HiveDatabaseService {
   }
 
   /// Paylaşım için dava verilerini getir
-  static Map<String, dynamic>? _getDavaDataForShare(String davaId) {
+  static Map<String, dynamic>? _getDavaDataForShare(
+    String davaId, {
+    String? viewerEmail,
+  }) {
     try {
       // Önce açılmış davalarda ara
       final openedDavalar = getOpenedDavalar();
@@ -3869,12 +4733,98 @@ class HiveDatabaseService {
       if (savedDava.isNotEmpty) {
         return Map<String, dynamic>.from(savedDava);
       }
+
+      // Gelen dava (8-Hüküm vb.): yalnızca bu kullanıcının gelen kutusu
+      final String? inbox = viewerEmail?.trim();
+      if (inbox != null && inbox.isNotEmpty) {
+        final incoming = getIncomingDavalar(inbox);
+        final incomingDava = incoming.firstWhere(
+          (d) => (d['id'] ?? d['davaId'] ?? '').toString() == davaId,
+          orElse: () => <String, dynamic>{},
+        );
+        if (incomingDava.isNotEmpty) {
+          return Map<String, dynamic>.from(incomingDava);
+        }
+      }
       
       return null;
     } catch (e) {
       print('❌ Dava verileri alınırken hata: $e');
       return null;
     }
+  }
+
+  /// 8-Hüküm: Ceza mühürü + masraf sonrası hüküm kesinleşince, kullanıcının kendi
+  /// seyir defterine [IlgililerinSeyirDefteriWidgeti] ile uyumlu `dava_share` postu.
+  /// Aynı dava + kullanıcı için yalnızca bir kez eklenir.
+  static Map<String, dynamic>? composeHomeFeedDavaSharePostAfterHukumFinalized({
+    required String davaId,
+    required String userEmail,
+    Map<String, dynamic>? fallbackSnapshot,
+  }) {
+    final String id = davaId.trim();
+    final String email = userEmail.trim();
+    if (id.isEmpty || email.isEmpty) {
+      return null;
+    }
+    final String postId = 'dava_share_hukum_${id}_$email';
+    final List<Map<String, dynamic>> existing =
+        getHomeFeedPosts(userEmail: email);
+    if (existing.any((Map<String, dynamic> p) =>
+        p['id']?.toString() == postId)) {
+      return null;
+    }
+
+    Map<String, dynamic>? raw =
+        _getDavaDataForShare(id, viewerEmail: email);
+    if ((raw == null || raw.isEmpty) && fallbackSnapshot != null) {
+      raw = Map<String, dynamic>.from(fallbackSnapshot);
+    }
+    if (raw == null || raw.isEmpty) {
+      print(
+          '⚠️ composeHomeFeedDavaSharePostAfterHukumFinalized: dava bulunamadı: $id');
+      return null;
+    }
+
+    final Map<String, dynamic> davaData = Map<String, dynamic>.from(raw);
+    final String davaAdiForShare =
+        (davaData['davaAdi'] ?? davaData['adi'] ?? 'Dava').toString().trim();
+    davaData['davaAdi'] = davaAdiForShare;
+    davaData['id'] = id;
+    davaData['davaId'] = id;
+
+    String davaciDisplayName = '';
+    final String davaciRaw = (davaData['davaci'] ?? '').toString().trim();
+    if (davaciRaw.isNotEmpty) {
+      if (davaciRaw.contains('@')) {
+        try {
+          final RegistrationModel? u = getRegistrationByEmail(davaciRaw);
+          davaciDisplayName = u?.judgeName ?? davaciRaw.split('@').first;
+        } catch (_) {
+          davaciDisplayName = davaciRaw.split('@').first;
+        }
+      } else {
+        davaciDisplayName = davaciRaw;
+      }
+    }
+    if (davaciDisplayName.isNotEmpty) {
+      davaData['displayName'] = davaciDisplayName;
+      davaData['davaci'] = davaciDisplayName;
+    }
+
+    final String nowIso = DateTime.now().toIso8601String();
+    return <String, dynamic>{
+      'id': postId,
+      'type': 'dava_share',
+      'createdAt': nowIso,
+      'authorEmail': email,
+      'payload': <String, dynamic>{
+        ...davaData,
+        'sharedBy': email,
+        'sharedAt': nowIso,
+        'hukumFinalizeAutoShare': true,
+      },
+    };
   }
 
   // ==================== DAVA HÜKÜM VERİSİ İŞLEMLERİ ====================
@@ -3999,12 +4949,49 @@ class HiveDatabaseService {
     }
   }
 
-  /// Haykırışı sil
-  /// ✅ Veritabanından kalıcı olarak siliniyor
+  /// Haykır ile ilişkili tüm seyir defteri postlarını kaldırır (tüm kullanıcılar)
+  static void removeHaykirPostsFromAllHomeFeeds(String haykirId) {
+    if (_homeFeedBox == null || haykirId.isEmpty) return;
+
+    final targetPostId = 'haykir_$haykirId';
+    final retweetPrefix = 'haykir_retweet_${haykirId}_';
+
+    for (final key in _homeFeedBox!.keys) {
+      final persisted = _homeFeedBox!.get(key);
+      if (persisted == null) continue;
+
+      final list = (persisted as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      final originalLength = list.length;
+
+      list.removeWhere((post) {
+        if (post['type']?.toString() != 'haykir') return false;
+
+        final postId = post['id']?.toString() ?? '';
+        if (postId == targetPostId || postId.startsWith(retweetPrefix)) {
+          return true;
+        }
+
+        return post['payload']?['haykirId']?.toString() == haykirId;
+      });
+
+      if (list.length != originalLength) {
+        _homeFeedBox!.put(key, list);
+        print('✅ Haykır postları seyir defterinden kaldırıldı: $haykirId, $key');
+      }
+    }
+  }
+
+  /// Haykırışı ve ilişkili verileri kalıcı olarak sil
   static Future<void> deleteHaykir(String haykirId) async {
     try {
+      removeHaykirPostsFromAllHomeFeeds(haykirId);
+
       final box = getHaykirBox();
       await box.delete(haykirId);
+      await box.delete('haykir_stats_$haykirId');
+      await box.delete('haykir_comments_$haykirId');
       print('✅ Haykırış silindi: $haykirId');
     } catch (e) {
       print('❌ Haykırış silinirken hata: $e');
@@ -4349,13 +5336,16 @@ class HiveDatabaseService {
             }
             break;
           case 'retweet':
-            stats['retweetCount'] = (stats['retweetCount'] as int? ?? 0) + 1;
-            // ✅ Kullanıcı retweet yaptıysa listeye ekle
             final userRetweets = List<String>.from(stats['userRetweets'] ?? []);
-            if (!userRetweets.contains(userEmail)) {
+            if (userRetweets.contains(userEmail)) {
+              userRetweets.remove(userEmail);
+              final current = stats['retweetCount'] as int? ?? 1;
+              stats['retweetCount'] = current > 0 ? current - 1 : 0;
+            } else {
               userRetweets.add(userEmail);
-              stats['userRetweets'] = userRetweets;
+              stats['retweetCount'] = (stats['retweetCount'] as int? ?? 0) + 1;
             }
+            stats['userRetweets'] = userRetweets;
             break;
           case 'like':
             final userLikes = List<String>.from(stats['userLikes'] ?? []);
