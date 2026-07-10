@@ -29,6 +29,8 @@ import '../providers/auth_provider.dart';
 import '../providers/dava_provider.dart';
 import '../widgets/ilgililerin_seyir_defteri_widgeti.dart';
 import '../widgets/expandable_comment_text.dart';
+import '../widgets/haykir_card_shell.dart';
+import '../utils/haykir_duration.dart';
 import '../utils/comment_utils.dart';
 import '../utils/app_theme.dart';
 import 'tutorial_case_page.dart';
@@ -2723,6 +2725,7 @@ class HaykirCardWidget extends StatefulWidget {
   final DavaProvider davaProvider;
   final String? userEmail;
   final bool showCloseButton; // ✅ X close ikonunu göster/gizle
+  final bool interactionsOnly; // ✅ Yalnızca etkileşim paneli (katıldığım kartı için)
   final VoidCallback? onPostUpdated;
 
   const HaykirCardWidget({
@@ -2732,6 +2735,7 @@ class HaykirCardWidget extends StatefulWidget {
     required this.davaProvider,
     this.userEmail,
     this.showCloseButton = true, // ✅ Varsayılan olarak göster
+    this.interactionsOnly = false,
     this.onPostUpdated,
   });
 
@@ -2854,6 +2858,488 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
     return grup19Retweets.contains(widget.userEmail!);
   }
 
+  String _resolveAuthorDisplayName(String? email) {
+    if (email == null || email.isEmpty) return 'Bilinmeyen';
+    try {
+      final user = HiveDatabaseService.getRegistrationByEmail(email);
+      return user?.judgeName ?? email.split('@').first;
+    } catch (_) {
+      return email.split('@').first;
+    }
+  }
+
+  Widget _buildGroupJoinButton(String haykirId, bool isDisabled) {
+    Widget iconChild(Widget child) => Padding(
+          padding: const EdgeInsets.all(6),
+          child: child,
+        );
+
+    if (isDisabled) {
+      return iconChild(Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(MdiIcons.accountGroup, size: 26, color: Colors.grey.shade600),
+      ));
+    }
+
+    if (_groupIconController == null) {
+      return GestureDetector(
+        onTap: () => _onGroupIconTap(haykirId),
+        child: iconChild(Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.purple.shade100,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(MdiIcons.accountGroup, size: 26, color: Colors.purple.shade700),
+        )),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => _onGroupIconTap(haykirId),
+      child: AnimatedBuilder(
+        animation: _groupIconController!,
+        builder: (context, child) {
+          final animationValue = _groupIconController!.value;
+          final opacity = 0.25 +
+              (0.75 *
+                  (0.5 + 0.5 * (math.sin(animationValue * 2 * math.pi))));
+          final scale = 1.0 + (animationValue * 0.12);
+          return Opacity(
+            opacity: opacity,
+            child: Transform.scale(
+              scale: scale,
+              child: iconChild(Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade100,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.purple.withValues(
+                        alpha: 0.2 + (animationValue * 0.35),
+                      ),
+                      blurRadius: 6 + (animationValue * 4),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  MdiIcons.accountGroup,
+                  size: 26,
+                  color: Colors.purple.shade700,
+                ),
+              )),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHaykirCommentsPanel(String haykirId) {
+    if (!showComments) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    decoration: InputDecoration(
+                      hintText: 'Yorumunuzu yazın...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                    ),
+                    maxLines: 2,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.send, color: Colors.green),
+                  onPressed: () async {
+                    if (_commentController.text.trim().isEmpty) return;
+                    if (haykirId.isEmpty ||
+                        widget.userEmail == null ||
+                        widget.userEmail!.isEmpty) {
+                      return;
+                    }
+
+                    final result = await HiveDatabaseService.addHaykirComment(
+                      haykirId: haykirId,
+                      userEmail: widget.userEmail!,
+                      commentText: _commentController.text.trim(),
+                    );
+
+                    if (!mounted) return;
+
+                    if (result['success'] == true) {
+                      _commentController.clear();
+                      final stats = HiveDatabaseService.getHaykirInteractionStats(
+                        haykirId,
+                        userEmail: widget.userEmail,
+                      );
+                      await _persistPostPayload({
+                        'commentCount': stats['commentCount'] ?? 0,
+                      });
+                      _refreshInteractionUi(haykirId: haykirId);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Yorum eklendi!'),
+                          duration: Duration(seconds: 1),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            result['error']?.toString() ?? 'Yorum eklenemedi',
+                          ),
+                          duration: const Duration(seconds: 3),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_comments.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Center(
+                  child: Text(
+                    'Henüz yorum yok. İlk yorumu siz yapın!',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ),
+              )
+            else
+              ..._comments.map((comment) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Colors.green.shade100,
+                            child: Text(
+                              (comment['userName']?.toString() ?? 'U')
+                                  .substring(0, 1)
+                                  .toUpperCase(),
+                              style: TextStyle(
+                                color: Colors.green.shade700,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              comment['userName']?.toString() ?? 'Bilinmeyen',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            _formatCommentTime(comment['createdAt']?.toString()),
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      ExpandableCommentText(
+                        text: comment['commentText']?.toString() ?? '',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 4,
+                      ),
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHaykirInteractionsColumn({
+    required String haykirId,
+    required bool isExpired,
+    required bool showSuccessBadge,
+    required bool isSuccess,
+    required int commentCount,
+    required int retweetCount,
+    required int likeCount,
+    required int kinaCount,
+    required bool isCommented,
+    required bool isRetweeted,
+    required bool isLiked,
+    required bool isKina,
+    required bool isSaved,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showSuccessBadge)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isSuccess ? Icons.thumb_up : Icons.thumb_down,
+                  size: 16,
+                  color: isSuccess ? Colors.amber.shade800 : Colors.red.shade700,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isSuccess ? 'Etkileşim başarılı' : 'Etkileşim başarısız',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isSuccess ? Colors.amber.shade900 : Colors.red.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        HaykirCompactSocialBar(
+          actions: [
+            HaykirSocialAction(
+              icon: MdiIcons.commentOutline,
+              tooltip: 'Yorum',
+              count: commentCount,
+              color: Colors.green,
+              isActive: isCommented || showComments,
+              onTap: () {
+                setState(() {
+                  showComments = !showComments;
+                  if (showComments && haykirId.isNotEmpty) {
+                    _comments = HiveDatabaseService.getHaykirComments(haykirId);
+                  }
+                });
+              },
+            ),
+            HaykirSocialAction(
+              icon: MdiIcons.repeat,
+              tooltip: 'Retweet',
+              count: retweetCount,
+              color: Colors.orange,
+              isActive: isRetweeted,
+              isDisabled: _isRetweetDisabled(haykirId) ||
+                  _isRetweetPermanent(haykirId),
+              onTap: (_isRetweetDisabled(haykirId) ||
+                      _isRetweetPermanent(haykirId))
+                  ? null
+                  : () {
+                      if (isRetweeted) {
+                        if (_isRetweetPermanent(haykirId)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  '⚠️ Grup-19 ile yapılan retweet geri alınamaz!'),
+                              duration: Duration(seconds: 3),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
+                        _undoRetweet(haykirId);
+                      } else {
+                        _showRetweetDialog(haykirId);
+                      }
+                    },
+            ),
+            HaykirSocialAction(
+              icon: isLiked ? MdiIcons.heart : MdiIcons.heartOutline,
+              tooltip: 'Beğen',
+              count: likeCount,
+              color: Colors.red,
+              isActive: isLiked,
+              isDisabled: isExpired,
+              onTap: isExpired
+                  ? null
+                  : () async {
+                      if (haykirId.isEmpty ||
+                          widget.userEmail == null ||
+                          widget.userEmail!.isEmpty) {
+                        return;
+                      }
+                      final newIsLiked = !isLiked;
+                      if (newIsLiked && isKina) {
+                        await HiveDatabaseService.updateHaykirInteractionStats(
+                          haykirId: haykirId,
+                          userEmail: widget.userEmail!,
+                          action: 'kina',
+                        );
+                      }
+                      await HiveDatabaseService.updateHaykirInteractionStats(
+                        haykirId: haykirId,
+                        userEmail: widget.userEmail!,
+                        isLiked: newIsLiked,
+                      );
+                      final updatedLikeCount = newIsLiked
+                          ? likeCount + 1
+                          : (likeCount > 0 ? likeCount - 1 : 0);
+                      await _persistPostPayload({
+                        'isLiked': newIsLiked,
+                        'likeCount': updatedLikeCount,
+                        'isKina': newIsLiked ? false : isKina,
+                        if (newIsLiked && isKina)
+                          'kinaCount': kinaCount > 0 ? kinaCount - 1 : 0,
+                      });
+                      _refreshInteractionUi(haykirId: haykirId);
+                    },
+            ),
+            HaykirSocialAction(
+              icon: MdiIcons.handWaveOutline,
+              tooltip: 'Kına',
+              count: kinaCount,
+              color: Colors.grey,
+              isActive: isKina,
+              isDisabled: isExpired,
+              onTap: isExpired
+                  ? null
+                  : () async {
+                      if (haykirId.isEmpty ||
+                          widget.userEmail == null ||
+                          widget.userEmail!.isEmpty) {
+                        return;
+                      }
+                      final newIsKina = !isKina;
+                      if (newIsKina && isLiked) {
+                        await HiveDatabaseService.updateHaykirInteractionStats(
+                          haykirId: haykirId,
+                          userEmail: widget.userEmail!,
+                          isLiked: false,
+                        );
+                      }
+                      await HiveDatabaseService.updateHaykirInteractionStats(
+                        haykirId: haykirId,
+                        userEmail: widget.userEmail!,
+                        action: 'kina',
+                      );
+                      final updatedKinaCount = newIsKina
+                          ? kinaCount + 1
+                          : (kinaCount > 0 ? kinaCount - 1 : 0);
+                      final updatedLikeCount = newIsKina && isLiked
+                          ? (likeCount > 0 ? likeCount - 1 : 0)
+                          : likeCount;
+                      await _persistPostPayload({
+                        'isKina': newIsKina,
+                        'kinaCount': updatedKinaCount,
+                        'isLiked': newIsKina ? false : isLiked,
+                        'likeCount': updatedLikeCount,
+                      });
+                      _refreshInteractionUi(haykirId: haykirId);
+                    },
+            ),
+            HaykirSocialAction(
+              icon: isSaved ? MdiIcons.bookmark : MdiIcons.bookmarkOutline,
+              tooltip: 'Kaydet',
+              count: isSaved ? 1 : 0,
+              color: Colors.purple,
+              isActive: isSaved,
+              onTap: () async {
+                if (haykirId.isEmpty ||
+                    widget.userEmail == null ||
+                    widget.userEmail!.isEmpty) {
+                  return;
+                }
+                final newIsSaved = !isSaved;
+                await HiveDatabaseService.updateHaykirInteractionStats(
+                  haykirId: haykirId,
+                  userEmail: widget.userEmail!,
+                  isSaved: newIsSaved,
+                );
+                const widgetId = 'home_page_Kaydet_bookmark';
+                if (newIsSaved) {
+                  HiveDatabaseService.saveWidget(
+                    userEmail: widget.userEmail!,
+                    widgetId: widgetId,
+                    label: 'Kaydet',
+                    iconCodePoint: MdiIcons.bookmark.codePoint.toString(),
+                    colorValue: Colors.purple.value,
+                    count: 0,
+                    isActive: newIsSaved,
+                    isDisabled: false,
+                    sourcePage: 'home_page',
+                    additionalData: {
+                      'postId': widget.post['id']?.toString() ?? '',
+                      'haykirId': haykirId,
+                    },
+                  );
+                } else {
+                  HiveDatabaseService.deleteSavedWidget(
+                    userEmail: widget.userEmail!,
+                    widgetId: widgetId,
+                  );
+                }
+                await _persistPostPayload({'isSaved': newIsSaved});
+                _refreshInteractionUi(haykirId: haykirId);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(newIsSaved
+                          ? '✅ Kaydedildi!'
+                          : '❌ Kayıt kaldırıldı!'),
+                      duration: const Duration(seconds: 2),
+                      backgroundColor: Colors.purple,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        _buildHaykirCommentsPanel(haykirId),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final haykirId = widget.payload['haykirId']?.toString() ?? '';
@@ -2894,42 +3380,16 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
     final isCommented =
         stats['isCommented'] as bool? ?? false; // ✅ Yorum durumu
 
-    // ✅ Haykır süresi: 19 saat
-    const int totalHours = 19;
-    String kalanSure = '$totalHours saat 0 dakika';
-    bool isExpired = false;
+    // ✅ Haykır süresi: 19 gün
+    final kalanSure = HaykirDuration.formatRemaining(createdAt);
+    final isExpired = HaykirDuration.isExpired(createdAt);
 
-    if (createdAt.isNotEmpty) {
-      try {
-        final created = DateTime.parse(createdAt);
-        final now = DateTime.now();
-        final difference = now.difference(created);
-        final totalMinutes = (totalHours * 60) - difference.inMinutes;
-
-        if (totalMinutes <= 0) {
-          kalanSure = 'Süre doldu';
-          isExpired = true;
-
-          // ✅ 19 saat sonunda puanlama kontrolü (sadece bir kez)
-          if (!_scoringChecked) {
-            _scoringChecked = true;
-            _checkAndApplyHaykirScoring(
-                    haykirId, likeCount, kinaCount, createdAt)
-                .then((_) {
-              if (mounted) {
-                setState(
-                    () {}); // ✅ Widget'ı yeniden build et ki badge görünsün
-              }
-            });
-          }
-        } else {
-          final remainingHours = totalMinutes ~/ 60;
-          final remainingMinutes = totalMinutes % 60;
-          kalanSure = '$remainingHours saat $remainingMinutes dakika';
-        }
-      } catch (e) {
-        kalanSure = '$totalHours saat 0 dakika';
-      }
+    if (isExpired && !_scoringChecked) {
+      _scoringChecked = true;
+      _checkAndApplyHaykirScoring(haykirId, likeCount, kinaCount, createdAt)
+          .then((_) {
+        if (mounted) setState(() {});
+      });
     }
 
     // ✅ Kullanıcının bu haykıra katılıp katılmadığını kontrol et
@@ -2941,53 +3401,9 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
           (h['haykirId']?.toString() ?? h['id']?.toString() ?? '') == haykirId);
     }
 
-    // ✅ Grup ikonu pasif mi? (19 saat geçmişse veya kullanıcı zaten katılmışsa)
+    // ✅ Grup ikonu pasif mi? (19 gün geçmişse veya kullanıcı zaten katılmışsa)
     final bool isGroupIconDisabled = isExpired || isParticipated;
 
-    // ✅ Seyir defterinde collapsed durum (sadece Haykır adı)
-    if (widget.showCloseButton && !isExpanded) {
-      return Card(
-        elevation: 2,
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: InkWell(
-          onTap: () {
-            setState(() {
-              isExpanded = true;
-              _expandController.forward();
-            });
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                Icon(Icons.campaign, size: 24, color: Colors.orange.shade600),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    adi,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.expand_more,
-                  color: Colors.grey[600],
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // ✅ Haykır başarı durumunu kontrol et
     final haykirData = HiveDatabaseService.getHaykir(haykirId);
     final scoringApplied = haykirData?['scoringApplied'] == 'true' ||
         haykirData?['scoringApplied'] == true;
@@ -2996,847 +3412,114 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
     final showSuccessBadge =
         isExpired && scoringApplied && isSuccessStr != null;
 
-    return Stack(
-      children: [
-        Card(
-          elevation: isExpanded ? 4 : 2,
-          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final authorEmail = widget.post['authorEmail']?.toString() ??
+        widget.payload['userEmail']?.toString() ??
+        haykirData?['userEmail']?.toString();
+    final authorName = _resolveAuthorDisplayName(authorEmail);
+    final shellExpanded = !widget.showCloseButton || isExpanded;
+
+    final interactions = _buildHaykirInteractionsColumn(
+      haykirId: haykirId,
+      isExpired: isExpired,
+      showSuccessBadge: showSuccessBadge,
+      isSuccess: isSuccess,
+      commentCount: commentCount,
+      retweetCount: retweetCount,
+      likeCount: likeCount,
+      kinaCount: kinaCount,
+      isCommented: isCommented,
+      isRetweeted: isRetweeted,
+      isLiked: isLiked,
+      isKina: isKina,
+      isSaved: isSaved,
+    );
+
+    if (widget.interactionsOnly) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: interactions,
+      );
+    }
+
+    Widget buildShell({required bool expanded}) {
+      return HaykirCardShell(
+        variant: HaykirCardShellVariant.feed,
+        isExpanded: expanded,
+        isExpired: isExpired,
+        adi: adi,
+        slogan: slogan,
+        direme: direme,
+        createdAt: createdAt,
+        authorDisplayName: authorName,
+        authorSubtitle: formatHaykirPublishedAgo(createdAt),
+        showSuccessBadge: showSuccessBadge,
+        isSuccess: isSuccess,
+        trailingAction: _buildGroupJoinButton(haykirId, isGroupIconDisabled),
+        onHeaderTap: widget.showCloseButton
+            ? () {
+                setState(() {
+                  if (expanded) {
+                    isExpanded = false;
+                    _expandController.reverse();
+                  } else {
+                    isExpanded = true;
+                    _expandController.forward();
+                  }
+                });
+              }
+            : null,
+        expandedChildren: expanded ? [interactions] : null,
+      );
+    }
+
+    if (widget.showCloseButton && !isExpanded) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+        child: buildShell(expanded: false),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.showCloseButton && isExpanded)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // ✅ Collapse butonu (seyir defterinde)
-                if (widget.showCloseButton && isExpanded)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.expand_less, color: Colors.grey[600]),
-                        onPressed: () {
-                          setState(() {
-                            isExpanded = false;
-                            _expandController.reverse();
-                          });
-                        },
-                        tooltip: 'Kapat',
-                      ),
-                      if (widget.showCloseButton)
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.red),
-                          onPressed: () async {
-                            await widget.davaProvider
-                                .removeHomeFeedPost(widget.post['id']);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      '✅ Haykır seyir defterinden kaldırıldı'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            }
-                          },
-                          tooltip: 'Seyir defterinden kaldır',
-                        ),
-                    ],
-                  ),
-
-                // Haykırış Bilgileri (Mavi arka plan)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.campaign,
-                              size: 30, color: Colors.orange),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              adi,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      // ✅ Modern Slogan Alanı (Gradient ve Shadow)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.blue.shade50,
-                              Colors.purple.shade50,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.blue.shade200,
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.blue.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(MdiIcons.formatQuoteOpen,
-                                size: 30, color: Colors.blue.shade600),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                slogan,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w500,
-                                  fontStyle: FontStyle.italic,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // ✅ Direme Alanı
-                      Row(
-                        children: [
-                          const SizedBox(width: 36),
-                          Icon(MdiIcons.flag, size: 28, color: Colors.red),
-                          const SizedBox(width: 38),
-                          Expanded(
-                            child: Text(
-                              direme,
-                              style: const TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 38),
-                          // ✅ Belirgin ve hareketli grup ikonu (belirgin yanıp sönme efekti ile) - Tıklanabilir (pasif durumda değilse)
-                          GestureDetector(
-                            onTap: isGroupIconDisabled
-                                ? null
-                                : () async {
-                                    // ✅ Grup ikonuna tıklandığında haykıra katıl
-                                    await _onGroupIconTap(haykirId);
-                                  },
-                            child: isGroupIconDisabled
-                                ? // ✅ Pasif durum: Gri, animasyonsuz, tıklanamaz
-                                Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade200,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      MdiIcons.accountGroup,
-                                      size: 32,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  )
-                                : _groupIconController != null
-                                    ? AnimatedBuilder(
-                                        animation: _groupIconController!,
-                                        builder: (context, child) {
-                                          // ✅ Belirgin yanıp sönme efekti için opacity hesaplama (0.2 - 1.0 arası)
-                                          // Sinüs dalgası kullanarak daha yumuşak geçiş
-                                          final animationValue =
-                                              _groupIconController!.value;
-                                          final opacity = 0.2 +
-                                              (0.8 *
-                                                  (0.5 +
-                                                      0.5 *
-                                                          (math.sin(
-                                                              animationValue *
-                                                                  2 *
-                                                                  math.pi))));
-                                          // ✅ Pulse efekti için scale (1.0 - 1.2 arası)
-                                          final scale =
-                                              1.0 + (animationValue * 0.2);
-
-                                          return Opacity(
-                                            opacity: opacity,
-                                            child: Transform.scale(
-                                              scale: scale,
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.all(8),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.purple.shade100,
-                                                  shape: BoxShape.circle,
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: Colors.purple
-                                                          .withOpacity(0.2 +
-                                                              (animationValue *
-                                                                  0.4)),
-                                                      blurRadius: 6 +
-                                                          (animationValue * 6),
-                                                      spreadRadius: 1 +
-                                                          (animationValue * 3),
-                                                    ),
-                                                  ],
-                                                ),
-                                                child: Icon(
-                                                  MdiIcons.accountGroup,
-                                                  size: 32,
-                                                  color: Colors.purple.shade700,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      )
-                                    : Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.purple.shade100,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Icon(
-                                          MdiIcons.accountGroup,
-                                          size: 32,
-                                          color: Colors.purple.shade700,
-                                        ),
-                                      ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                IconButton(
+                  icon: Icon(Icons.expand_less, color: Colors.grey[600]),
+                  onPressed: () {
+                    setState(() {
+                      isExpanded = false;
+                      _expandController.reverse();
+                    });
+                  },
+                  tooltip: 'Daralt',
                 ),
-
-                // ETKİLEŞİM İSTATİSTİKLERİ (Mor gradient)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.purple.shade50, Colors.blue.shade50],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.purple.shade200, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.purple.withOpacity(0.2),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Başlık
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // ✅ Dinamik icon: Başarılı için thumb up, Başarısız için thumb down, Henüz süre dolmadıysa chartLine
-                          Icon(
-                            showSuccessBadge
-                                ? (isSuccess
-                                    ? MdiIcons.thumbUp
-                                    : Icons.thumb_down)
-                                : MdiIcons.chartLine,
-                            color: showSuccessBadge
-                                ? (isSuccess
-                                    ? Colors.yellow[800]
-                                    : Colors.red[700])
-                                : Colors.purple.shade700,
-                            size: showSuccessBadge ? 40 : 20,
-                          ),
-                          const SizedBox(width: 19),
-                          Flexible(
-                            child: Text(
-                              showSuccessBadge
-                                  ? (isSuccess
-                                      ? 'ETKİLEŞİM BAŞARILI'
-                                      : 'ETKİLEŞİM BAŞARISIZ')
-                                  : 'ETKİLEŞİM',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.purple.shade700,
-                                letterSpacing: 1,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          const SizedBox(width: 19),
-                          // ✅ Süre doldu badge'i
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isExpired
-                                  ? (showSuccessBadge
-                                      ? (isSuccess
-                                          ? Colors.yellow[800]
-                                          : Colors.grey
-                                              .shade600) // ✅ Başarılı: beğen rengi (kırmızı), Başarısız: kına rengi (gri)
-                                      : Colors.grey
-                                          .shade600) // ✅ Henüz puanlama yapılmadıysa gri
-                                  : Colors.orange
-                                      .shade500, // ✅ Aktif durum: turuncu
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isExpired
-                                      ? (showSuccessBadge
-                                          ? (isSuccess
-                                                  ? Colors.red
-                                                  : Colors.grey)
-                                              .withOpacity(
-                                                  0.3) // ✅ Başarılı: kırmızı shadow, Başarısız: gri shadow
-                                          : Colors.grey.withOpacity(0.3))
-                                      : Colors.orange.withOpacity(
-                                          0.3), // ✅ Aktif durum: turuncu shadow
-                                  blurRadius: 6,
-                                  spreadRadius: 0.5,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (!isExpired)
-                                  AnimatedBuilder(
-                                    animation: _hourglassController,
-                                    builder: (context, child) {
-                                      return Transform.rotate(
-                                        angle: _hourglassController.value *
-                                            2 *
-                                            3.14159,
-                                        child: const Icon(
-                                          Icons.hourglass_empty,
-                                          size: 14,
-                                          color: Colors.white,
-                                        ),
-                                      );
-                                    },
-                                  )
-                                else
-                                  // ✅ Kum saati üzerinde çarpı işareti
-                                  Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.hourglass_empty,
-                                        size: 14,
-                                        color: Colors.white70,
-                                      ),
-                                      Positioned(
-                                        top: -2,
-                                        right: -2,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(1),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.red,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.close,
-                                            size: 8,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  kalanSure,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // ✅ Sağda başarılı/başarısız ikonu
-                          if (showSuccessBadge) ...[
-                            const SizedBox(width: 8),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // İkonlar
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildSocialIconButton(
-                            icon: MdiIcons.commentOutline,
-                            label: 'Yorum',
-                            count: commentCount,
-                            color: Colors.green,
-                            isActive: isCommented ||
-                                showComments, // ✅ Kullanıcı yorum yazdıysa veya yorumlar açıksa aktif
-                            onTap: () {
-                              setState(() {
-                                showComments = !showComments;
-                                if (showComments && haykirId.isNotEmpty) {
-                                  _comments =
-                                      HiveDatabaseService.getHaykirComments(
-                                          haykirId);
-                                }
-                              });
-                            },
-                          ),
-                          _buildSocialIconButton(
-                            icon: MdiIcons.repeat,
-                            label: 'Retw...',
-                            count: retweetCount,
-                            color: Colors.orange,
-                            isActive:
-                                isRetweeted, // ✅ Kullanıcı retweet yaptıysa aktif
-                            isDisabled: _isRetweetDisabled(haykirId) ||
-                                _isRetweetPermanent(haykirId),
-                            onTap: (_isRetweetDisabled(haykirId) ||
-                                    _isRetweetPermanent(haykirId))
-                                ? null
-                                : () {
-                                    // ✅ Eğer daha önce retweet yapılmışsa
-                                    if (isRetweeted) {
-                                      // Grup-19 ile yapılmışsa geri alınamaz
-                                      if (_isRetweetPermanent(haykirId)) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                '⚠️ Grup-19 ile yapılan retweet geri alınamaz!'),
-                                            duration: Duration(seconds: 3),
-                                            backgroundColor: Colors.orange,
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      // Sadece ben ile yapılmışsa geri al
-                                      _undoRetweet(haykirId);
-                                    } else {
-                                      // İlk retweet: Dialog aç
-                                      _showRetweetDialog(haykirId);
-                                    }
-                                  },
-                          ),
-                          _buildSocialIconButton(
-                            icon: isLiked
-                                ? MdiIcons.heart
-                                : MdiIcons.heartOutline,
-                            label: 'Beğen',
-                            count: likeCount,
-                            color: Colors.red,
-                            isActive: isLiked,
-                            isDisabled:
-                                isExpired, // ✅ Süre dolduğunda devre dışı
-                            onTap: isExpired
-                                ? null
-                                : () async {
-                                    if (haykirId.isEmpty ||
-                                        widget.userEmail == null ||
-                                        widget.userEmail!.isEmpty) {
-                                      return;
-                                    }
-
-                                    final newIsLiked = !isLiked;
-
-                                    if (newIsLiked && isKina) {
-                                      await HiveDatabaseService
-                                          .updateHaykirInteractionStats(
-                                        haykirId: haykirId,
-                                        userEmail: widget.userEmail!,
-                                        action: 'kina',
-                                      );
-                                    }
-
-                                    await HiveDatabaseService
-                                        .updateHaykirInteractionStats(
-                                      haykirId: haykirId,
-                                      userEmail: widget.userEmail!,
-                                      isLiked: newIsLiked,
-                                    );
-
-                                    final updatedLikeCount = newIsLiked
-                                        ? likeCount + 1
-                                        : (likeCount > 0 ? likeCount - 1 : 0);
-
-                                    await _persistPostPayload({
-                                      'isLiked': newIsLiked,
-                                      'likeCount': updatedLikeCount,
-                                      'isKina': newIsLiked ? false : isKina,
-                                      if (newIsLiked && isKina)
-                                        'kinaCount': kinaCount > 0
-                                            ? kinaCount - 1
-                                            : 0,
-                                    });
-                                    _refreshInteractionUi(haykirId: haykirId);
-                                  },
-                          ),
-                          _buildSocialIconButton(
-                            icon: MdiIcons.handWaveOutline,
-                            label: 'Kına',
-                            count: kinaCount,
-                            color: Colors.grey, // ✅ Gri renk
-                            isActive: isKina, // ✅ Aktif durumu
-                            isDisabled:
-                                isExpired, // ✅ Süre dolduğunda devre dışı
-                            onTap: isExpired
-                                ? null
-                                : () async {
-                                    if (haykirId.isEmpty ||
-                                        widget.userEmail == null ||
-                                        widget.userEmail!.isEmpty) {
-                                      return;
-                                    }
-
-                                    final newIsKina = !isKina;
-
-                                    if (newIsKina && isLiked) {
-                                      await HiveDatabaseService
-                                          .updateHaykirInteractionStats(
-                                        haykirId: haykirId,
-                                        userEmail: widget.userEmail!,
-                                        isLiked: false,
-                                      );
-                                    }
-
-                                    await HiveDatabaseService
-                                        .updateHaykirInteractionStats(
-                                      haykirId: haykirId,
-                                      userEmail: widget.userEmail!,
-                                      action: 'kina',
-                                    );
-
-                                    final updatedKinaCount = newIsKina
-                                        ? kinaCount + 1
-                                        : (kinaCount > 0 ? kinaCount - 1 : 0);
-                                    final updatedLikeCount = newIsKina && isLiked
-                                        ? (likeCount > 0 ? likeCount - 1 : 0)
-                                        : likeCount;
-
-                                    await _persistPostPayload({
-                                      'isKina': newIsKina,
-                                      'kinaCount': updatedKinaCount,
-                                      'isLiked': newIsKina ? false : isLiked,
-                                      'likeCount': updatedLikeCount,
-                                    });
-                                    _refreshInteractionUi(haykirId: haykirId);
-                                  },
-                          ),
-                          // Kaydet - ✅ En sağa taşındı
-                          _buildSocialIconButton(
-                            icon: isSaved
-                                ? MdiIcons.bookmark
-                                : MdiIcons.bookmarkOutline,
-                            label: 'Kaydet',
-                            count: 0,
-                            color: Colors.purple,
-                            isActive: isSaved,
-                            onTap: () async {
-                              if (haykirId.isEmpty ||
-                                  widget.userEmail == null ||
-                                  widget.userEmail!.isEmpty) {
-                                return;
-                              }
-
-                              final newIsSaved = !isSaved;
-                              await HiveDatabaseService
-                                  .updateHaykirInteractionStats(
-                                haykirId: haykirId,
-                                userEmail: widget.userEmail!,
-                                isSaved: newIsSaved,
-                              );
-
-                              if (newIsSaved) {
-                                try {
-                                  final haykirData =
-                                      HiveDatabaseService.getHaykir(haykirId);
-                                  if (haykirData != null) {
-                                    print(
-                                        '✅ Haykır kaydedildi (haykirislarim_page için): $haykirId');
-                                  }
-                                } catch (e) {
-                                  print('⚠️ Haykır kaydedilirken hata: $e');
-                                }
-                              }
-
-                              const widgetId = 'home_page_Kaydet_bookmark';
-                              final currentIcon = newIsSaved
-                                  ? MdiIcons.bookmark
-                                  : MdiIcons.bookmarkOutline;
-
-                              if (newIsSaved) {
-                                HiveDatabaseService.saveWidget(
-                                  userEmail: widget.userEmail!,
-                                  widgetId: widgetId,
-                                  label: 'Kaydet',
-                                  iconCodePoint:
-                                      currentIcon.codePoint.toString(),
-                                  colorValue: Colors.purple.value,
-                                  count: 0,
-                                  isActive: newIsSaved,
-                                  isDisabled: false,
-                                  sourcePage: 'home_page',
-                                  additionalData: {
-                                    'postId':
-                                        widget.post['id']?.toString() ?? '',
-                                    'haykirId': haykirId,
-                                  },
-                                );
-                              } else {
-                                HiveDatabaseService.deleteSavedWidget(
-                                  userEmail: widget.userEmail!,
-                                  widgetId: widgetId,
-                                );
-                              }
-
-                              await _persistPostPayload({'isSaved': newIsSaved});
-                              _refreshInteractionUi(haykirId: haykirId);
-
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(newIsSaved
-                                        ? '✅ Kaydedildi! Kaydedilenler arşivine eklendi.'
-                                        : '❌ Kayıt kaldırıldı!'),
-                                    duration: const Duration(seconds: 2),
-                                    backgroundColor: Colors.purple,
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-
-                      // ✅ Yorumlar bölümü
-                      if (showComments) ...[
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.green.shade200),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _commentController,
-                                      decoration: InputDecoration(
-                                        hintText: 'Yorumunuzu yazın...',
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        filled: true,
-                                        fillColor: Colors.grey[50],
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 12, vertical: 8),
-                                      ),
-                                      maxLines: 2,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.send,
-                                        color: Colors.green),
-                                    onPressed: () async {
-                                      if (_commentController.text
-                                          .trim()
-                                          .isEmpty) {
-                                        return;
-                                      }
-                                      if (haykirId.isEmpty ||
-                                          widget.userEmail == null ||
-                                          widget.userEmail!.isEmpty) {
-                                        return;
-                                      }
-
-                                      final result =
-                                          await HiveDatabaseService
-                                              .addHaykirComment(
-                                        haykirId: haykirId,
-                                        userEmail: widget.userEmail!,
-                                        commentText:
-                                            _commentController.text.trim(),
-                                      );
-
-                                      if (!mounted) return;
-
-                                      if (result['success'] == true) {
-                                        _commentController.clear();
-                                        final stats = HiveDatabaseService
-                                            .getHaykirInteractionStats(
-                                          haykirId,
-                                          userEmail: widget.userEmail,
-                                        );
-                                        await _persistPostPayload({
-                                          'commentCount':
-                                              stats['commentCount'] ?? 0,
-                                        });
-                                        _refreshInteractionUi(
-                                            haykirId: haykirId);
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content:
-                                                Text('✅ Yorum eklendi!'),
-                                            duration: Duration(seconds: 1),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
-                                      } else {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              result['error']?.toString() ??
-                                                  'Yorum eklenemedi',
-                                            ),
-                                            duration:
-                                                const Duration(seconds: 3),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              if (_comments.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Center(
-                                    child: Text(
-                                      'Henüz yorum yok. İlk yorumu siz yapın!',
-                                      style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12),
-                                    ),
-                                  ),
-                                )
-                              else
-                                ..._comments.map((comment) {
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[50],
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                          color: Colors.grey[200]!),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 12,
-                                              backgroundColor:
-                                                  Colors.green.shade100,
-                                              child: Text(
-                                                (comment['userName']
-                                                            ?.toString() ??
-                                                        'U')
-                                                    .substring(0, 1)
-                                                    .toUpperCase(),
-                                                style: TextStyle(
-                                                  color: Colors.green.shade700,
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                comment['userName']
-                                                        ?.toString() ??
-                                                    'Bilinmeyen',
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.black87,
-                                                ),
-                                              ),
-                                            ),
-                                            Text(
-                                              _formatCommentTime(
-                                                  comment['createdAt']
-                                                      ?.toString()),
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                color: Colors.grey[600],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        ExpandableCommentText(
-                                          text: comment['commentText']
-                                                  ?.toString() ??
-                                              '',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.black87,
-                                          ),
-                                          maxLines: 4,
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }),
-                            ],
-                          ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.red),
+                  onPressed: () async {
+                    await widget.davaProvider
+                        .removeHomeFeedPost(widget.post['id']);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              '✅ Haykır seyir defterinden kaldırıldı'),
+                          duration: Duration(seconds: 2),
                         ),
-                      ],
-                    ],
-                  ),
+                      );
+                    }
+                  },
+                  tooltip: 'Seyir defterinden kaldır',
                 ),
               ],
             ),
-          ),
-        ), // Card kapanıyor
-      ],
+          buildShell(expanded: shellExpanded),
+        ],
+      ),
     );
   }
 
@@ -3882,7 +3565,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
         'participatedAt': DateTime.now().toIso8601String(),
         'userEmail': widget.userEmail,
         'displayName': widget.userEmail,
-        'kalanSure': '19 saat 0 dakika', // Varsayılan süre
+        'kalanSure': '${HaykirDuration.totalDays} gün 0 saat',
         'profilResmi': 'lib/icons/03_haykir_ana_icon.png',
       };
 
@@ -4542,7 +4225,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
     }
   }
 
-  /// ✅ 19 saat sonunda Haykır puanlama kontrolü
+  /// ✅ 19 gün sonunda Haykır puanlama kontrolü
   Future<void> _checkAndApplyHaykirScoring(
     String haykirId,
     int destek, // likeCount

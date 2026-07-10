@@ -7,7 +7,98 @@ import '../utils/dialog_utils.dart';
 import '../data/direm_data.dart';
 import '../providers/dava_provider.dart';
 import 'saved_widgets_page.dart';
+import '../utils/haykir_duration.dart';
 import '../widgets/expandable_comment_text.dart';
+
+/// Kart üzerindeki HAYKIR butonu: haykırışı seyir defterine yayınlar.
+Future<bool> publishHaykirToHomeFeed({
+  required BuildContext context,
+  required String userEmail,
+  required Map<String, dynamic> haykirData,
+}) async {
+  final haykirId = haykirData['id']?.toString() ?? '';
+  if (haykirId.isEmpty || userEmail.isEmpty) return false;
+
+  try {
+    final davaProvider = Provider.of<DavaProvider>(context, listen: false);
+    final postId = 'haykir_$haykirId';
+    final nowIso = DateTime.now().toIso8601String();
+
+    final haykirPostData = {
+      'id': postId,
+      'type': 'haykir',
+      'createdAt': nowIso,
+      'authorEmail': userEmail,
+      'payload': {
+        'haykirId': haykirId,
+        'adi': haykirData['adi']?.toString() ?? '',
+        'slogan': haykirData['slogan']?.toString() ?? '',
+        'direme': haykirData['direme']?.toString() ?? '',
+        'detaylar': haykirData['detaylar']?.toString() ?? '',
+        'createdAt': haykirData['createdAt']?.toString() ?? nowIso,
+        'commentCount': 0,
+        'retweetCount': 0,
+        'likeCount': 0,
+        'kinaCount': 0,
+        'isSaved': false,
+        'isLiked': false,
+      },
+    };
+
+    var published = await davaProvider.addHomeFeedPost(haykirPostData);
+    if (!published) {
+      HiveDatabaseService.addHomeFeedPost(haykirPostData, userEmail: userEmail);
+      published = true;
+    }
+
+    if (published) {
+      await HiveDatabaseService.updateHaykir(
+        haykirId,
+        {'isPublishedOnCard': 'true'},
+      );
+    }
+
+    return published;
+  } catch (e, stackTrace) {
+    print('❌ Haykırış seyir defterine eklenirken hata: $e');
+    print('Stack trace: $stackTrace');
+
+    try {
+      final postId = 'haykir_$haykirId';
+      final nowIso = DateTime.now().toIso8601String();
+      final haykirPostData = {
+        'id': postId,
+        'type': 'haykir',
+        'createdAt': nowIso,
+        'authorEmail': userEmail,
+        'payload': {
+          'haykirId': haykirId,
+          'adi': haykirData['adi']?.toString() ?? '',
+          'slogan': haykirData['slogan']?.toString() ?? '',
+          'direme': haykirData['direme']?.toString() ?? '',
+          'detaylar': haykirData['detaylar']?.toString() ?? '',
+          'createdAt': haykirData['createdAt']?.toString() ?? nowIso,
+          'shareCount': 0,
+          'commentCount': 0,
+          'retweetCount': 0,
+          'likeCount': 0,
+          'kinaCount': 0,
+          'isSaved': false,
+          'isLiked': false,
+        },
+      };
+      HiveDatabaseService.addHomeFeedPost(haykirPostData, userEmail: userEmail);
+      await HiveDatabaseService.updateHaykir(
+        haykirId,
+        {'isPublishedOnCard': 'true'},
+      );
+      return true;
+    } catch (e2) {
+      print('❌ Fallback yayınlama başarısız: $e2');
+      return false;
+    }
+  }
+}
 
 // Model class for Haykir
 class Haykir {
@@ -88,49 +179,26 @@ class _HaykirPageState extends State<HaykirPage> {
   
   // Kalan süreyi hesapla
   String _calculateRemainingTime(String? createdAt) {
-    if (createdAt == null) return '76 saat 0 dakika';
-    try {
-      final created = DateTime.parse(createdAt);
-      final now = DateTime.now();
-      final difference = now.difference(created);
-      final totalMinutes = (76 * 60) - difference.inMinutes;
-      
-      if (totalMinutes <= 0) {
-        return 'Süre doldu';
-      }
-      
-      final remainingHours = totalMinutes ~/ 60;
-      final remainingMinutes = totalMinutes % 60;
-      
-      return '$remainingHours saat $remainingMinutes dakika';
-    } catch (e) {
-      return '76 saat 0 dakika';
-    }
+    return HaykirDuration.formatRemaining(createdAt);
   }
   
-  // Haykırışı yayınla
-  Future<void> _publishHaykir(Map<String, dynamic> haykirData) async {
+  // Formdan ön hazırlık kartı oluştur (henüz yayınlanmaz)
+  Future<void> _createHaykirDraft(Map<String, dynamic> haykirData) async {
     try {
-      // Kullanıcı email'i ekle
       if (widget.userEmail != null) {
         haykirData['userEmail'] = widget.userEmail;
       }
-      
-      // Özel diren varsa ekle
+
       if (_ozelDiremController.text.trim().isNotEmpty) {
         final ozelDiremText = _ozelDiremController.text.trim();
         haykirData['direme'] = ozelDiremText;
-        // ✅ Boolean değeri String'e dönüştür
         haykirData['isOzelDirem'] = 'true';
-        
-        // ✅ Özel direni "Başka bir diren" kategorisine ekle
         await HiveDatabaseService.addOzelDirem(ozelDiremText);
       }
-      
-      // Aktif durumu ekle - ✅ Boolean değeri String'e dönüştür
+
       haykirData['isActive'] = 'true';
-      
-      // ✅ Tüm değerleri String formatına dönüştür (güvenlik için)
+      haykirData['isPublishedOnCard'] = 'false';
+
       final cleanHaykirData = <String, dynamic>{};
       haykirData.forEach((key, value) {
         if (value == null) {
@@ -141,131 +209,33 @@ class _HaykirPageState extends State<HaykirPage> {
           cleanHaykirData[key] = value.toString();
         }
       });
-      
-      // ✅ Haykır ID'sini önceden oluştur (seyir defterine eklemek için gerekli)
-      final haykirId = cleanHaykirData['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString();
+
+      final haykirId =
+          cleanHaykirData['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString();
       cleanHaykirData['id'] = haykirId;
-      
-      // ✅ Veritabanına kaydet
+
       await HiveDatabaseService.addHaykir(cleanHaykirData);
-      
-      // ✅ Adım 1: Haykır yayınlandığında seyir defterine ekle
-      if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-        try {
-          print('🔵 Haykır seyir defterine ekleniyor... userEmail: ${widget.userEmail}, haykirId: $haykirId');
-          
-          final davaProvider = Provider.of<DavaProvider>(context, listen: false);
-          final postId = 'haykir_$haykirId';
-          final nowIso = DateTime.now().toIso8601String();
-          
-          // Etkileşim istatistikleri için başlangıç değerleri
-          final haykirPostData = {
-            'id': postId,
-            'type': 'haykir',
-            'createdAt': nowIso,
-            'authorEmail': widget.userEmail,
-            'payload': {
-              'haykirId': haykirId,
-              'adi': cleanHaykirData['adi'] ?? '',
-              'slogan': cleanHaykirData['slogan'] ?? '',
-              'direme': cleanHaykirData['direme'] ?? '',
-              'detaylar': cleanHaykirData['detaylar'] ?? '',
-              'createdAt': cleanHaykirData['createdAt'] ?? nowIso,
-              // Etkileşim istatistikleri
-              'commentCount': 0,
-              'retweetCount': 0,
-              'likeCount': 0,
-              'kinaCount': 0,
-              'isSaved': false,
-              'isLiked': false,
-            },
-          };
-          
-          print('🔵 Haykır post data hazırlandı: $postId');
-          final result = await davaProvider.addHomeFeedPost(haykirPostData);
-          
-          if (result) {
-            print('✅ Haykırış seyir defterine başarıyla eklendi: $postId');
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('✅ Haykırış seyir defterine eklendi!'),
-                  backgroundColor: Colors.green,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            }
-          } else {
-            print('⚠️ Haykırış seyir defterine eklenemedi (result: false)');
-            // Direkt HiveDatabaseService'e eklemeyi dene
-            try {
-              HiveDatabaseService.addHomeFeedPost(haykirPostData, userEmail: widget.userEmail);
-              print('✅ Haykırış direkt HiveDatabaseService ile seyir defterine eklendi');
-            } catch (e2) {
-              print('❌ Direkt ekleme de başarısız: $e2');
-            }
-          }
-        } catch (e, stackTrace) {
-          print('❌ Haykırış seyir defterine eklenirken hata: $e');
-          print('Stack trace: $stackTrace');
-          
-          // Hata durumunda direkt HiveDatabaseService'e eklemeyi dene
-          try {
-            final postId = 'haykir_$haykirId';
-            final nowIso = DateTime.now().toIso8601String();
-            final haykirPostData = {
-              'id': postId,
-              'type': 'haykir',
-              'createdAt': nowIso,
-              'authorEmail': widget.userEmail,
-              'payload': {
-                'haykirId': haykirId,
-                'adi': cleanHaykirData['adi'] ?? '',
-                'slogan': cleanHaykirData['slogan'] ?? '',
-                'direme': cleanHaykirData['direme'] ?? '',
-                'detaylar': cleanHaykirData['detaylar'] ?? '',
-                'createdAt': cleanHaykirData['createdAt'] ?? nowIso,
-                'shareCount': 0,
-                'commentCount': 0,
-                'retweetCount': 0,
-                'likeCount': 0,
-                'kinaCount': 0,
-                'isSaved': false,
-                'isLiked': false,
-              },
-            };
-            HiveDatabaseService.addHomeFeedPost(haykirPostData, userEmail: widget.userEmail);
-            print('✅ Haykırış direkt HiveDatabaseService ile seyir defterine eklendi (fallback)');
-          } catch (e2) {
-            print('❌ Fallback ekleme de başarısız: $e2');
-          }
-        }
-      } else {
-        print('⚠️ userEmail boş, seyir defterine eklenemedi');
-      }
-      
-      // Formu temizle
+
       _adiController.clear();
       _sloganController.clear();
       _detayController.clear();
       _ozelDiremController.clear();
       _selectedDireme = null;
-      
+
       setState(() {
         showCreateForm = false;
       });
-      
-      // Başarı mesajı göster
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Haykırış başarıyla oluşturuldu!'),
-            backgroundColor: Colors.green,
+            content: Text('✅ Ön hazırlık kartı oluşturuldu. Yayınlamak için karttaki HAYKIR\'a basın.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
           ),
         );
       }
-      
-      // Listeyi yenile
+
       setState(() {});
     } catch (e) {
       if (mounted) {
@@ -335,8 +305,21 @@ class _HaykirPageState extends State<HaykirPage> {
     // Dinamik kategorileri yükle
     final allCategories = _getAllCategories();
 
-    // Veritabanından haykırışları çek
-    final haykirDataList = HiveDatabaseService.getAllActiveHaykirislar();
+    // Veritabanından haykırışları çek (taslaklar yalnızca sahibine görünür)
+    final haykirDataList = HiveDatabaseService.getAllActiveHaykirislar()
+        .where((data) {
+          final publishedFlag = data['isPublishedOnCard'];
+          final isPublished = publishedFlag is bool
+              ? publishedFlag
+              : publishedFlag?.toString().toLowerCase() == 'true';
+          // Eski kayıtlar: flag yoksa zaten yayınlanmış kabul et
+          final isLegacyPublished =
+              publishedFlag == null || publishedFlag.toString().isEmpty;
+          final isOwner = widget.userEmail != null &&
+              data['userEmail']?.toString() == widget.userEmail;
+          return isPublished || isLegacyPublished || isOwner;
+        })
+        .toList();
     final List<Haykir> haykirList = haykirDataList.map((data) {
       return Haykir(
         adi: data['adi']?.toString() ?? 'Haykırış',
@@ -889,7 +872,7 @@ class _HaykirPageState extends State<HaykirPage> {
                                                         'direme': (_selectedDireme ?? _ozelDiremController.text.trim()).toString(),
                                                         'detaylar': _detayController.text.trim(),
                                                       };
-                                                      _publishHaykir(haykirData);
+                                                      _createHaykirDraft(haykirData);
                                                     }
                                                   : null,
                                               icon: const Icon(Icons.campaign, size: 20),
@@ -936,7 +919,8 @@ class _HaykirPageState extends State<HaykirPage> {
                                   onClose: haykirData != null &&
                                           haykirData['id'] != null &&
                                           widget.userEmail != null &&
-                                          haykirData['userEmail']?.toString() == widget.userEmail
+                                          haykirData['userEmail']?.toString() == widget.userEmail &&
+                                          haykirData['isPublishedOnCard']?.toString().toLowerCase() == 'false'
                                       ? () async {
                                           final haykirId = haykirData['id'].toString();
                                           try {
@@ -1075,12 +1059,21 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
     _loadInteractionStats();
   }
 
+  bool get _isHaykirOwner {
+    if (widget.userEmail == null || widget.userEmail!.isEmpty) return false;
+    final author = widget.haykirData?['userEmail']?.toString() ?? '';
+    return author == widget.userEmail;
+  }
+
   void _initPublishedState() {
     final publishedFlag = widget.haykirData?['isPublishedOnCard'];
     final isPublished = publishedFlag is bool
         ? publishedFlag
         : publishedFlag?.toString().toLowerCase() == 'true';
-    if (isPublished) {
+    // Eski kayıtlar: flag yoksa zaten yayınlanmış kabul et
+    final isLegacyPublished =
+        publishedFlag == null || publishedFlag.toString().isEmpty;
+    if (isPublished || isLegacyPublished) {
       isHaykirPressed = true;
       showSocialIcons = true;
       showSuccessAnimation = true;
@@ -1202,13 +1195,40 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                   else
                     const SizedBox.shrink(),
                   const Spacer(),
-                  // HAYKIR butonu
+                  // HAYKIR butonu — yalnızca sahibi yayınlayabilir
+                  if (_isHaykirOwner || isHaykirPressed)
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     child: ElevatedButton.icon(
-                      onPressed: isHaykirPressed
-                          ? null // ✅ Basıldıktan sonra inaktif
+                      onPressed: isHaykirPressed || !_isHaykirOwner
+                          ? null
                           : () async {
+                              if (widget.haykirData == null ||
+                                  widget.userEmail == null ||
+                                  widget.userEmail!.isEmpty) {
+                                return;
+                              }
+
+                              final published = await publishHaykirToHomeFeed(
+                                context: context,
+                                userEmail: widget.userEmail!,
+                                haykirData: widget.haykirData!,
+                              );
+
+                              if (!published) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('❌ Haykırış yayınlanamadı. Lütfen tekrar deneyin.'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+
+                              if (!mounted) return;
+
                               setState(() {
                                 showSocialIcons = true;
                                 isHaykirPressed = true;
@@ -1216,18 +1236,6 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                               });
                               _animationController?.forward();
 
-                              if (widget.haykirData?['id'] != null) {
-                                try {
-                                  await HiveDatabaseService.updateHaykir(
-                                    widget.haykirData!['id'].toString(),
-                                    {'isPublishedOnCard': 'true'},
-                                  );
-                                } catch (e) {
-                                  print('⚠️ Haykır yayın durumu kaydedilemedi: $e');
-                                }
-                              }
-
-                              // Başarı mesajı göster
                               Future.delayed(const Duration(milliseconds: 500), () {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
