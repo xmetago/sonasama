@@ -1,6 +1,6 @@
 # WhoBoom
 
-A new Flutter project.
+A new Flutter project. Hükmünü ver; adaleti sağla. 
 
 ## Getting Started
 
