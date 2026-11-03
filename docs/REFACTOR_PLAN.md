@@ -10,8 +10,8 @@ Denetim `lib/` altındaki elle yazılmış Dart dosyaları üzerinde yapıldı. 
 
 | Dosya | Satır | `setState` | Not |
 | --- | ---: | ---: | --- |
-| `lib/screens/actigim_davalar_page.dart` | 4857 | 35 | Kart `build` içindeki Hive taraması Tur 2'de önbelleğe alındı. `Consumer` duruyor |
-| `lib/screens/home_page.dart` | 4674 | 16 | Akış `PagedListView` (tembel). Başlık ve gövde aynı `setState` |
+| `lib/screens/actigim_davalar_page.dart` | ~580 | | Kart, başlık ve iskelet ayrı dosyada. `Consumer2` ve microtask duruyor |
+| `lib/screens/home_page.dart` | ~2730 | | Akış tembel. `HaykirCardWidget` ayrıldı. Başlık ve gövde aynı `setState` |
 | `lib/widgets/ilgililerin_seyir_defteri_widgeti.dart` | 4510 | 31 | Ekran kadar büyük widget |
 | `lib/screens/katildigim_davalar_page.dart` | 3824 | 30 | Kart `build` içinde `Consumer<DavaProvider>` |
 | `lib/screens/dava_ac_page.dart` | 3086 | 34 | Form, menü ve diyalog aynı dosyada |
@@ -311,33 +311,30 @@ Sıra: `trend_insights_page.dart` (düz `ListView` ve `_StatChip` yerinde kalır
 
 Sekmeler veya bölümler ayrı widget. Üç `ListView.builder` korunur. Diyaloglar `AppDialogFrame` ancak gradient ve başlık metni aynıysa.
 
-### Tur 11 — `haykir_page.dart`
+### Tur 11 — `haykir_page.dart` (kart ayrıldı)
 
-`FiveCardCaseInformation` bu dosyadan `lib/widgets/haykir_case_card.dart` olur. Sosyal sayaç state'i kartta kalır, sayfa state'i küçülür. 44 snack ayrı bir alt turda `AppSnack` olur.
+`FiveCardCaseInformation` ve `publishHaykirToHomeFeed` `lib/widgets/haykir_case_card.dart`. Sayfa bu adları yeniden dışa aktarır. 44 snack ayrı bir alt turda kalır. Renk ve süre farkları `showAppSnack` varsayılanına ezilmez.
 
-### Tur 12 — `dava_ac_page.dart`
+### Tur 12 — `dava_ac_page.dart` (kart, diyalog, başlık ayrıldı)
 
-Sıra: `GroupSelectionDialog`, `TreeMenuPageheadlines`, form alanları (`ModernTextField` zaten `modern_dava_form_widgets.dart` içinde; sayfa onu kullanmıyorsa önce kullanım haritası). `FiveCardCaseInformation` en son, çünkü 778 satırlık sınıf formu etkiliyor.
+`GroupSelectionDialog` `lib/widgets/group_selection_dialog.dart`. `FiveCardCaseInformation` `lib/widgets/dava_ac_case_card.dart`. Bu dosyadaki `TreeMenuPageheadlines` açtığım davalar başlığından farklıdır: yalnız `title`, `isCollapsed`, `onToggleCollapse`, `onMenuPressed`. `lib/widgets/dava_ac_page_headline.dart` olarak durur; sayfa aynı adı dışa aktarır. `home_page` `dava_ac.TreeMenuPageheadlines` kullanır. Form alanları yerinde. `ModernTextField` sayfada kullanılmıyorsa taşınmaz.
 
-### Tur 13 — `katildigim_davalar_page.dart`
+### Tur 13 — `katildigim_davalar_page.dart` (kart ayrıldı)
 
-1. Kart dosyaya ayrılır.
-2. `Consumer` içindeki microtask yüklemesi `Selector` + tek seferlik yüke çekilir.
-3. `FiveCard` sözleşmesi (`davaData` map) korunur. Açtığım davalar kartıyla birleştirilmez.
+`FiveCardCaseInformation` `lib/widgets/katildigim_case_card.dart`. Sayfa adı dışa aktarır. `davaData` sözleşmesi aynı. Açtığım davalar kartıyla birleştirilmedi. `Consumer` içindeki microtask yüklemesi duruyor (madde 4.1.2).
 
-### Tur 14 — `actigim_davalar_page.dart`
+### Tur 14 — `actigim_davalar_page.dart` (iskelet ayrıldı, microtask hariç)
 
-Hive taraması build dışına alındı. Kalan iş yapısal:
-
-1. `ActigimDavaCard` yeni dosyaya. Önbellek davranışı aynı kalsın. `FiveCardCaseInformation` bu turda `actigim_case_card.dart` oldu.
-2. `InactiveDavaCard` ve `TreeMenuPageheadlines` ayrı tur.
-3. Sayfa iskeleti (`ActigimDavalarPage`) en son, kartlar oturduktan sonra.
-4. `Consumer` içindeki `Future.microtask` yüklemesi ayrı tur (madde 4.1.2).
+1. `ActigimDavaCard` `lib/widgets/actigim_dava_card.dart`. Hive önbelleği aynı.
+2. `FiveCardCaseInformation` `lib/widgets/actigim_case_card.dart`.
+3. `InactiveDavaCard` `lib/widgets/inactive_dava_card.dart`.
+4. `TreeMenuPageheadlines` `lib/widgets/tree_menu_page_headlines.dart`. Dava aç kopyasıyla birleştirilmedi.
+5. `showLeftIcons` ve `isHeaderCollapsed` `lib/widgets/actigim_page_chrome.dart` içinde. Liste ve red bölümü üst widget olarak gelir. Başlık veya sol menü açılınca sayfa `setState` etmez. `initiallyCollapsed` yalnız `initState` içinde uygulanır. `Consumer2` ve build içindeki post-frame yükleme duruyor (madde 4.1.2).
 
 ### Tur 15 — `home_page.dart`
 
-1. Üst blok (üç satır + seyir başlığı) kendi widget'ında, kendi `setState` ile katlanır.
-2. `HaykirCardWidget` `lib/widgets/home_haykir_card.dart`.
+1. Üst blok ve sol menü kendi widget'ında, kendi `setState` ile katlanır. Gelen dava ikonunun yanıp sönmesi de orada kalır.
+2. `HaykirCardWidget` `lib/widgets/home_haykir_card.dart` oldu.
 3. Kayıtlı davalar boş durumu yerinde kalır; metin ve tokmak ikonu değişmez.
 4. Snack helper en son.
 
@@ -360,11 +357,13 @@ Hive taraması build dışına alındı. Kalan iş yapısal:
 - `AppTheme` renkleri arşiv kromuna uygulanmadı. İstatistik başlığı tema ana rengini parametre olarak alır.
 - Kullanılmayan `CommonDavaCardWidget`, `AnimatedPrimaryButton`, `ModernSectionHeader` silinmedi.
 - `ActigimDavaCard` `lib/widgets/actigim_dava_card.dart` dosyasında. Açılış tarihi önbelleği aynı.
+- İki `TreeMenuPageheadlines` birleştirilmedi. Açtığım davalar kopyası `tree_menu_page_headlines.dart`, dava aç kopyası `dava_ac_page_headline.dart`.
+- Ana sayfa haykır kartı `lib/widgets/home_haykir_card.dart`. `WaveClipper` ve `WavePainter` kartla birlikte durur.
 - Sohbet avatarları `CachedAvatarWidget` olmadı. Mevcut `CircleAvatar` bazı adreslerde fotoğrafın üstüne kişi ikonu çiziyor; ortak widget bu yerleşimi üretmez.
 - `*.g.dart` üretilen modeller aynı.
 
 ## 7. Sıradaki tek tur
 
-**Sıradaki:** `InactiveDavaCard`, ardından `TreeMenuPageheadlines` ve `_HeadlineDavaCountBadge` ayrı dosyaya çıksın. Microtask yüklemesi bu turda değişmez.
+**Sıradaki:** `home_page` başlığı ve sol menüsü kendi `setState`'ine alınsın. Gelen dava ikonunun 500 ms yanıp sönmesi de o widget'ta kalsın. Akış, boş kayıt durumu ve snack'ler bu turda değişmez. Microtask yüklemesi (madde 4.1.2) ayrıdır; davranışa duyarlı olduğu için bu turda elle düzeltilmez.
 
-`ActigimDavaCard` `lib/widgets/actigim_dava_card.dart` dosyasında. Hive önbelleği aynı.
+Yapısal plan bitmiş değildir. Estetik faz (Tur 17) bu liste kapanmadan başlamaz.

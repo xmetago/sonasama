@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
-import '../widgets/common_header_widgets.dart';
 import '../widgets/actigim_case_card.dart';
 import '../widgets/inactive_dava_card.dart';
-import '../widgets/tree_menu_page_headlines.dart';
+import '../widgets/actigim_page_chrome.dart';
 export '../widgets/tree_menu_page_headlines.dart' show TreeMenuPageheadlines;
 export '../widgets/actigim_dava_card.dart' show ActigimDavaCard;
 export '../widgets/actigim_case_card.dart' show Dava, FiveCardCaseInformation;
-import 'gelen_davalar_page.dart' hide Dava, FiveCardCaseInformation;
-import 'yargila_page.dart' hide Dava, FiveCardCaseInformation;
-import 'davaci_unlulur_page.dart';
-import 'trend_insights_page.dart';
 import '../services/hive_database_service.dart';
 import '../services/dava_seed_service.dart';
 import '../utils/dialog_utils.dart';
@@ -22,8 +16,6 @@ import '../providers/auth_provider.dart';
 import '../providers/dava_provider.dart';
 
 import 'dava_ac_page.dart' hide Dava, FiveCardCaseInformation, TreeMenuPageheadlines;
-import 'katildigim_davalar_page.dart' hide Dava, FiveCardCaseInformation;
-import 'haykirislarim_page.dart';
 import '../widgets/ilgililerin_seyir_defteri_widgeti.dart';
 import '../widgets/actigim_dava_sayilari_section.dart';
 import '../services/actigim_dava_istatistik_service.dart';
@@ -44,8 +36,6 @@ class ActigimDavalarPage extends StatefulWidget {
 }
 
 class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
-  bool showLeftIcons = false;
-  late bool isHeaderCollapsed;
   List<Map<String, dynamic>> _actigimDavalar = [];
   List<Dava> rejectedDavaList = []; // Red edilen davalar
   final Map<String, bool> _seyirDefteriCollapsedByDavaId = <String, bool>{};
@@ -70,7 +60,6 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
   @override
   void initState() {
     super.initState();
-    isHeaderCollapsed = widget.initiallyCollapsed;
     _loadOpenedDavalar();
     _loadRejectedDavalar();
     _calculateStatistics();
@@ -478,323 +467,111 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
         
         return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Üst Arayüz Bölümü - diğer sayfalar gibi aç/kapa (collapse)
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                height: isHeaderCollapsed ? 40 : null,
-                child: isHeaderCollapsed
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
-                        child: Row(
-                          children: [
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: Icon(
-                                MdiIcons.menuOpen,
-                                size: 18,
-                                color: Colors.black54,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  showLeftIcons = !showLeftIcons;
-                                });
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                '|| AÇTIĞIM DAVALAR ||',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                  color: Color(0xFF2F3E35),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(
-                                Icons.keyboard_arrow_down,
-                                size: 18,
-                                color: Colors.black,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  isHeaderCollapsed = !isHeaderCollapsed;
-                                });
-                              },
-                              tooltip: 'Arayüzü Aç',
-                            ),
-                          ],
-                        ),
-                      )
-                    : Column(
-                        children: [
-                          // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
-                          ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
-                          // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
-                          ),
-                          // ROW 3: Profil Bölümü
-                          Padding(
-                            padding: const EdgeInsets.all(4.0),
-                            child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
-                              userEmail: widget.userEmail,
-                              onShowSavedDavalar: () {
-                                // Global utility fonksiyonunu kullan
-                                if (widget.userEmail != null) {
-                                  unawaited(_showSavedDavalarAndRefresh());
-                                }
-                              },
-                            ),
-                          ),
-                          // ROW 4: Hamburger Iconu, Başlık ve collapse oku
-                          TreeMenuPageheadlines(
-                              onMenuPressed: () {
-                                setState(() {
-                                  showLeftIcons = !showLeftIcons;
-                                });
-                              },
-                              onToggleCollapse: () {
-                                setState(() {
-                                  isHeaderCollapsed = !isHeaderCollapsed;
-                                });
-                              },
-                              isCollapsed: isHeaderCollapsed,
-                              onShowSavedDavalar: () {
-                                if (widget.userEmail != null) {
-                                  unawaited(_showSavedDavalarAndRefresh());
-                                }
-                              },
-                              highlightSaveIcon: _highlightSaveIcon,
-                              hasPendingSavedDava: _hasPendingSavedDava,
-                              headlineDavaCount: _actigimDavalar.length,
-                            ),
-                        ],
-                      ),
-              ),
-              // ROW 5: Red Edilen Davalar Bölümü (FiveCardCaseInformation widget kullanarak)
-              if (rejectedDavaList.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    children: [
-                      // Başlık
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.shade300, width: 2),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.cancel, color: Colors.red.shade700, size: 24),
-                            const SizedBox(width: 8),
-                            Text(
-                              'RED EDİLEN DAVALAR (${rejectedDavaList.length})',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red.shade700,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Red edilen dava kartları
-                      ...rejectedDavaList.map((dava) => InactiveDavaCard(dava: dava)),
-                    ],
-                  ),
-                ),
-              ],
-
-              // ROW 6: 6 Icon Solda, Sağda Text Yazma Alanı (Scrollable with ListTile)
-              Padding(
+      body: ActigimPageChrome(
+        userEmail: widget.userEmail,
+        initiallyCollapsed: widget.initiallyCollapsed,
+        highlightSaveIcon: _highlightSaveIcon,
+        hasPendingSavedDava: _hasPendingSavedDava,
+        headlineDavaCount: _actigimDavalar.length,
+        onShowSavedDavalar: () {
+          if (widget.userEmail != null) {
+            unawaited(_showSavedDavalarAndRefresh());
+          }
+        },
+        rejectedSection: rejectedDavaList.isEmpty
+            ? null
+            : Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Column(
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: showLeftIcons ? 60 : 0,
-                      child: showLeftIcons
-                          ? SingleChildScrollView(
-                              child: Column(
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => GelenDavalarPage(userEmail: widget.userEmail)),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
-                                    child: Icon(
-                                      MdiIcons.briefcaseArrowLeftRight,
-                                      size: 24,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => YargilaPage(userEmail: widget.userEmail)),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                    child: Image.asset('lib/icons/06_yargila_left_row_icon.png', width: 24, height: 24),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => KatildigimDavalarPage(userEmail: widget.userEmail)),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                    child: Image.asset('lib/icons/06_left_row_katildigim_davalar_icon.png', width: 24, height: 24),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => DavaciUnlulurPage(userEmail: widget.userEmail),
-                                      ),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                    child: Image.asset('lib/icons/06_left_row_unlulerin_actigi_davalar_iconu.png', width: 24, height: 24),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => HaykirislarimPage(userEmail: widget.userEmail),
-                                      ),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                    child: Image.asset('lib/icons/06_left_row_haykirislarim.png', width: 24, height: 24),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => TrendInsightsPage(userEmail: widget.userEmail),
-                                      ),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                    child: Icon(
-                                      MdiIcons.trendingUp,
-                                      size: 24,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                          : const SizedBox.shrink(),
-                    ),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade300, width: 2),
+                      ),
+                      child: Row(
                         children: [
-                          _buildOnayTestSeedBanner(),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12.0),
-                            child: ActigimDavaSayilariSection(
-                              actigim: _actigimSayisi,
-                              hakli: _hakliOldugumSayisi,
-                              haksiz: _haksizOldugumSayisi,
-                              banaAcilan: _banaAcilanSayisi,
+                          Icon(Icons.cancel, color: Colors.red.shade700, size: 24),
+                          const SizedBox(width: 8),
+                          Text(
+                            'RED EDİLEN DAVALAR (${rejectedDavaList.length})',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade700,
+                              letterSpacing: 1,
                             ),
                           ),
-                          if (_actigimDavalar.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.all(32),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.folder_open,
-                                    size: 64,
-                                    color: Colors.grey[400],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Henüz dava açmadınız',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Davacı olarak açtığınız davalar burada, ilgililerin seyir defteri ile görünür',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[500],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  OutlinedButton.icon(
-                                    onPressed: _seedOnayTestDavalar,
-                                    icon: const Icon(Icons.science_outlined),
-                                    label: const Text('Test: HAKLI + HAKSIZ dava yükle'),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: _actigimDavalar.length,
-                              itemBuilder: (BuildContext context, int index) {
-                                final Map<String, dynamic> davaData =
-                                    _actigimDavalar[index];
-                                return _buildActigimSeyirDefteriCard(davaData);
-                              },
-                            ),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    ...rejectedDavaList.map((dava) => InactiveDavaCard(dava: dava)),
                   ],
                 ),
               ),
-            ],
-          ),
+        listPane: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildOnayTestSeedBanner(),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: ActigimDavaSayilariSection(
+                actigim: _actigimSayisi,
+                hakli: _hakliOldugumSayisi,
+                haksiz: _haksizOldugumSayisi,
+                banaAcilan: _banaAcilanSayisi,
+              ),
+            ),
+            if (_actigimDavalar.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.folder_open,
+                      size: 64,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Henüz dava açmadınız',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Davacı olarak açtığınız davalar burada, ilgililerin seyir defteri ile görünür',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    OutlinedButton.icon(
+                      onPressed: _seedOnayTestDavalar,
+                      icon: const Icon(Icons.science_outlined),
+                      label: const Text('Test: HAKLI + HAKSIZ dava yükle'),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _actigimDavalar.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final Map<String, dynamic> davaData = _actigimDavalar[index];
+                  return _buildActigimSeyirDefteriCard(davaData);
+                },
+              ),
+          ],
         ),
       ),
     );
