@@ -11,7 +11,7 @@ Denetim `lib/` altındaki elle yazılmış Dart dosyaları üzerinde yapıldı. 
 | Dosya | Satır | `setState` | Not |
 | --- | ---: | ---: | --- |
 | `lib/screens/actigim_davalar_page.dart` | ~580 | | Kart, başlık ve iskelet ayrı dosyada. `Consumer2` ve microtask duruyor |
-| `lib/screens/home_page.dart` | ~2730 | | Akış tembel. `HaykirCardWidget` ayrıldı. Başlık ve gövde aynı `setState` |
+| `lib/screens/home_page.dart` | ~2170 | | Akış tembel. Kart ve iskelet ayrı. Snack'ler duruyor |
 | `lib/widgets/ilgililerin_seyir_defteri_widgeti.dart` | 4510 | 31 | Ekran kadar büyük widget |
 | `lib/screens/katildigim_davalar_page.dart` | 3824 | 30 | Kart `build` içinde `Consumer<DavaProvider>` |
 | `lib/screens/dava_ac_page.dart` | 3086 | 34 | Form, menü ve diyalog aynı dosyada |
@@ -239,7 +239,7 @@ Her biri kendi adımında, ilk kullanımındaki piksel ölçüsüne kilitlenerek
 
 7. **Önbelleksiz avatar.** `CachedAvatarWidget` dururken ekranlar `CircleAvatar` / `NetworkImage` kuruyor. Sohbet ve yönetim listelerinde aynı URL tekrar iner. Geçiş, yarıçap ve yedek ikon birebir verilerek yapılmalı.
 
-8. **Ana sayfa başlığı ile akışın aynı state'te olması.** `home_page.dart` 4674 satır, 16 `setState`, 68 `SnackBar`. Akış tembel olsa da sol menü veya başlık katlanması tüm iskeleti kurar. Üst üç satır ayrı widget'a (`common_header_widgets` zaten parça parça) ve akış ayrı `StatefulWidget`'a bölünmeli. `setState` hangi alt ağaçtaysa yalnız o kurulur.
+8. **Ana sayfa başlığı ile akışın aynı state'te olması — başlık kısmı kapatıldı.** Katlanma, sol menü ve gelen-dava ikonunun 500 ms yanıp sönmesi `lib/widgets/home_page_chrome.dart` içinde. Bu `setState` akışı yeniden kurmaz. Sayfanın `Consumer2` bildirimi akışı yine kurar. Snack'ler duruyor.
 
 ### 4.3 Düşük (yine de birikecek)
 
@@ -331,12 +331,12 @@ Sekmeler veya bölümler ayrı widget. Üç `ListView.builder` korunur. Diyalogl
 4. `TreeMenuPageheadlines` `lib/widgets/tree_menu_page_headlines.dart`. Dava aç kopyasıyla birleştirilmedi.
 5. `showLeftIcons` ve `isHeaderCollapsed` `lib/widgets/actigim_page_chrome.dart` içinde. Liste ve red bölümü üst widget olarak gelir. Başlık veya sol menü açılınca sayfa `setState` etmez. `initiallyCollapsed` yalnız `initState` içinde uygulanır. `Consumer2` ve build içindeki post-frame yükleme duruyor (madde 4.1.2).
 
-### Tur 15 — `home_page.dart`
+### Tur 15 — `home_page.dart` (iskelet ayrıldı, snack hariç)
 
-1. Üst blok ve sol menü kendi widget'ında, kendi `setState` ile katlanır. Gelen dava ikonunun yanıp sönmesi de orada kalır.
-2. `HaykirCardWidget` `lib/widgets/home_haykir_card.dart` oldu.
-3. Kayıtlı davalar boş durumu yerinde kalır; metin ve tokmak ikonu değişmez.
-4. Snack helper en son.
+1. Üst blok, sol menü ve gelen-dava ikonunun yanıp sönmesi `lib/widgets/home_page_chrome.dart`. Süre 500 ms. Akış `feed` olarak gelir; menü veya yanıp sönme sayfa `setState` etmez.
+2. `HaykirCardWidget` `lib/widgets/home_haykir_card.dart`.
+3. Kayıtlı davalar boş durumu yerinde. Metin ve tokmak ikonu aynı.
+4. Snack helper en son. Renk ve süre farkları duruyor.
 
 ### Tur 16 — dev widget'lar
 
@@ -359,11 +359,12 @@ Sekmeler veya bölümler ayrı widget. Üç `ListView.builder` korunur. Diyalogl
 - `ActigimDavaCard` `lib/widgets/actigim_dava_card.dart` dosyasında. Açılış tarihi önbelleği aynı.
 - İki `TreeMenuPageheadlines` birleştirilmedi. Açtığım davalar kopyası `tree_menu_page_headlines.dart`, dava aç kopyası `dava_ac_page_headline.dart`.
 - Ana sayfa haykır kartı `lib/widgets/home_haykir_card.dart`. `WaveClipper` ve `WavePainter` kartla birlikte durur.
+- Ana sayfa başlığı `lib/widgets/home_page_chrome.dart`. Boş kayıt durumu ve snack'ler sayfada.
 - Sohbet avatarları `CachedAvatarWidget` olmadı. Mevcut `CircleAvatar` bazı adreslerde fotoğrafın üstüne kişi ikonu çiziyor; ortak widget bu yerleşimi üretmez.
 - `*.g.dart` üretilen modeller aynı.
 
 ## 7. Sıradaki tek tur
 
-**Sıradaki:** `home_page` başlığı ve sol menüsü kendi `setState`'ine alınsın. Gelen dava ikonunun 500 ms yanıp sönmesi de o widget'ta kalsın. Akış, boş kayıt durumu ve snack'ler bu turda değişmez. Microtask yüklemesi (madde 4.1.2) ayrıdır; davranışa duyarlı olduğu için bu turda elle düzeltilmez.
+**Sıradaki:** `yargila_page.dart` içindeki `ModernYargilaCard` ve `DashedLinePainter` ayrı dosyaya çıksın. Geri sayım satırı `buildYargilaCountdownRow` olarak kalır. Kartın gövdesi değişmez.
 
-Yapısal plan bitmiş değildir. Estetik faz (Tur 17) bu liste kapanmadan başlamaz.
+Yapısal plan bitmiş değildir. Estetik faz (Tur 17) bu liste kapanmadan başlamaz. Kalan yapısal iş: Tur 16 dev widget dosyaları, madde 4.1.2 Selector ve microtask, snack göçleri (renk ve süre korunarak), Tur 9 küçük listeler, Tur 10 admin bölümleri, dava aç form alanları, arkadaşlık kullanıcı satırı.
