@@ -365,4 +365,6 @@ Hive taraması build dışına alındı. Kalan iş yapısal:
 
 ## 7. Sıradaki tek tur
 
-**Sıradaki:** kalan `FiveCardCaseInformation` kopyaları tek tek kendi dosyasına çıksın. Sözleşmeler birleşmez. İlk parça en küçük olanı: `masraflar_page.dart`. Sayfa sınıfı yeniden dışa aktarır. Ardından büyük sayfa bölmeleri (`GroupSelectionDialog`, `ActigimDavaCard`) aynı kuralla.
+**Sıradaki:** `delilleri_incele_page.dart` içindeki `FiveCardCaseInformation` kendi dosyasına çıksın. `Dava` modeli kartla gider, sayfa yeniden dışa aktarır. Sözleşme birleşmez. Sonra `yargila_page.dart`, `haykir_page.dart`, `dava_ac_page.dart`.
+
+Masraf kartı bu turda taşındı: `lib/widgets/masraflar_case_card.dart`.
