@@ -7,6 +7,7 @@ import '../models/evidence_model.dart';
 import '../services/evidence_service.dart';
 import '../services/hive_database_service.dart';
 import 'delil_detay_page.dart';
+import '../widgets/shared/app_snack.dart';
 
 class DelilEklePage extends StatefulWidget {
   final String? userEmail;
@@ -464,9 +465,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
 
   void _openEvidenceAddSheet(String type) {
     if (_isDavaOpened) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('❌ Dava açıldığı için delil eklenemez')),
-      );
+      showAppSnack(context, '❌ Dava açıldığı için delil eklenemez');
       return;
     }
 
@@ -477,15 +476,11 @@ class _DelilEklePageState extends State<DelilEklePage> {
 
     bool validateTitleDesc() {
       if (_titleController.text.trim().isEmpty || _descriptionController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lütfen başlık ve açıklama alanlarını doldurun')),
-        );
+        showAppSnack(context, 'Lütfen başlık ve açıklama alanlarını doldurun');
         return false;
       }
       if (_descriptionController.text.trim().length < 6) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Açıklama en az 6 karakter olmalı')),
-        );
+        showAppSnack(context, 'Açıklama en az 6 karakter olmalı');
         return false;
       }
       return true;
@@ -1311,9 +1306,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
         // Dosyanın var olup olmadığını kontrol et
         if (!await file.exists()) {
           print('❌ Dosya bulunamadı: ${image.path}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('❌ Seçilen dosya bulunamadı')),
-          );
+          showAppSnack(context, '❌ Seçilen dosya bulunamadı');
           return;
         }
         
@@ -1323,9 +1316,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
         // Dosya boyutu kontrolü
         if (fileSize > EvidenceLimits.maxImageSize) {
           print('❌ Dosya boyutu çok büyük: $fileSize > ${EvidenceLimits.maxImageSize}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('❌ Resim dosyası ${EvidenceLimits.maxImageSize ~/ (1024 * 1024)}MB\'dan büyük olamaz')),
-          );
+          showAppSnack(context, '❌ Resim dosyası ${EvidenceLimits.maxImageSize ~/ (1024 * 1024)}MB\'dan büyük olamaz');
           return;
         }
 
@@ -1346,9 +1337,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
       }
     } catch (e) {
       print('❌ Resim seçilirken hata: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Resim seçilirken hata: $e')),
-      );
+      showAppSnack(context, '❌ Resim seçilirken hata: $e');
     }
   }
 
@@ -1367,18 +1356,14 @@ class _DelilEklePageState extends State<DelilEklePage> {
 
         // Dosya boyutu kontrolü
         if (fileSize > EvidenceLimits.maxVideoSize) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('❌ Video dosyası ${EvidenceLimits.maxVideoSize ~/ (1024 * 1024)}MB\'dan büyük olamaz')),
-          );
+          showAppSnack(context, '❌ Video dosyası ${EvidenceLimits.maxVideoSize ~/ (1024 * 1024)}MB\'dan büyük olamaz');
           return;
         }
 
         await _addEvidence('video', video.path, fileSize);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Video seçilirken hata: $e')),
-      );
+      showAppSnack(context, '❌ Video seçilirken hata: $e');
     }
   }
 
@@ -1396,36 +1381,28 @@ class _DelilEklePageState extends State<DelilEklePage> {
 
         // Dosya boyutu kontrolü
         if (fileSize > EvidenceLimits.maxPdfSize) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('❌ PDF dosyası ${EvidenceLimits.maxPdfSize ~/ (1024 * 1024)}MB\'dan büyük olamaz')),
-          );
+          showAppSnack(context, '❌ PDF dosyası ${EvidenceLimits.maxPdfSize ~/ (1024 * 1024)}MB\'dan büyük olamaz');
           return;
         }
 
         await _addEvidence('text', result.files.single.path!, fileSize);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ PDF seçilirken hata: $e')),
-      );
+      showAppSnack(context, '❌ PDF seçilirken hata: $e');
     }
   }
 
   // Link ekleme
   void _addLink() async {
     if (_linkController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lütfen geçerli bir URL girin')),
-      );
+      showAppSnack(context, 'Lütfen geçerli bir URL girin');
       return;
     }
 
     // Basit URL doğrulama
     if (!_linkController.text.startsWith('http://') &&
         !_linkController.text.startsWith('https://')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Geçerli bir URL girin (http:// veya https:// ile başlamalı)')),
-      );
+      showAppSnack(context, 'Geçerli bir URL girin (http:// veya https:// ile başlamalı)');
       return;
     }
 
@@ -1440,9 +1417,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
     
     if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
       print('❌ Başlık veya açıklama boş');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lütfen başlık ve açıklama alanlarını doldurun')),
-      );
+      showAppSnack(context, 'Lütfen başlık ve açıklama alanlarını doldurun');
       return;
     }
 
@@ -1477,32 +1452,14 @@ class _DelilEklePageState extends State<DelilEklePage> {
         // Verileri yenileme
         _loadEvidenceData();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ ${result['evidence'].title} başarıyla eklendi'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        showAppSnack(context, '✅ ${result['evidence'].title} başarıyla eklendi', backgroundColor: Colors.green, duration: const Duration(seconds: 3));
       } else {
         print('❌ Delil eklenemedi: ${result['error']}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ ${result['error']}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        showAppSnack(context, '❌ ${result['error']}', backgroundColor: Colors.red, duration: const Duration(seconds: 5));
       }
     } catch (e) {
       print('❌ Delil eklenirken hata: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Delil eklenirken hata: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      showAppSnack(context, '❌ Delil eklenirken hata: $e', backgroundColor: Colors.red, duration: const Duration(seconds: 5));
     }
   }
 
@@ -1547,22 +1504,16 @@ class _DelilEklePageState extends State<DelilEklePage> {
   // Delil silme
   Future<void> _deleteEvidence(String evidenceId) async {
     if (_isDavaOpened) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('❌ Dava açıldığı için delil silinemez')),
-      );
+      showAppSnack(context, '❌ Dava açıldığı için delil silinemez');
       return;
     }
 
     try {
       await _evidenceService.deleteEvidence(evidenceId);
       _loadEvidenceData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Delil silindi')),
-      );
+      showAppSnack(context, '✅ Delil silindi');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Delil silinirken hata: $e')),
-      );
+      showAppSnack(context, '❌ Delil silinirken hata: $e');
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../screens/delil_listesi_ekrani.dart';
 import '../services/hive_database_service.dart';
 import 'comment_section.dart';
+import 'shared/app_snack.dart';
 
 class ModernDavaCard extends StatefulWidget {
   final String userEmail;
@@ -267,12 +268,7 @@ class _ModernDavaCardState extends State<ModernDavaCard> {
                         children: [
                           IconButton(
                             onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('📷 Fotoğraf ekleme özelliği yakında!'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
+                              showAppSnack(context, '📷 Fotoğraf ekleme özelliği yakında!', duration: Duration(seconds: 2));
                             },
                             icon: Icon(Icons.photo_camera, color: Colors.green[600]),
                             tooltip: 'Fotoğraf Ekle',
@@ -358,13 +354,7 @@ class _ModernDavaCardState extends State<ModernDavaCard> {
                       
                       widget.onYorum?.call(yorumMetni);
                       Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('💬 Yorum eklendi: "$yorumMetni"${isGizliTanik ? ' (Gizli Tanık olarak)' : ''}'),
-                          backgroundColor: Colors.green[600],
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
+                      showAppSnack(context, '💬 Yorum eklendi: "$yorumMetni"${isGizliTanik ? ' (Gizli Tanık olarak)' : ''}', backgroundColor: Colors.green[600], duration: const Duration(seconds: 3));
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -523,9 +513,7 @@ class _ModernDavaCardState extends State<ModernDavaCard> {
                     onPressed: () {
                       final id = widget.davaId;
                       if (id == null || id.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Bu dava için davaId bulunamadı.')),
-                        );
+                        showAppSnack(context, 'Bu dava için davaId bulunamadı.');
                         return;
                       }
                       Navigator.push(

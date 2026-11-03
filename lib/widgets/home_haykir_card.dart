@@ -11,6 +11,7 @@ import '../services/hive_database_service.dart';
 import '../utils/haykir_duration.dart';
 import 'expandable_comment_text.dart';
 import 'haykir_card_shell.dart';
+import 'shared/app_snack.dart';
 
 class HaykirCardWidget extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -297,23 +298,9 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                         'commentCount': stats['commentCount'] ?? 0,
                       });
                       _refreshInteractionUi(haykirId: haykirId);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('✅ Yorum eklendi!'),
-                          duration: Duration(seconds: 1),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                      showAppSnack(context, '✅ Yorum eklendi!', backgroundColor: Colors.green, duration: Duration(seconds: 1));
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            result['error']?.toString() ?? 'Yorum eklenemedi',
-                          ),
-                          duration: const Duration(seconds: 3),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      showAppSnack(context, result['error']?.toString() ?? 'Yorum eklenemedi', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
                     }
                   },
                 ),
@@ -470,14 +457,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                   : () {
                       if (isRetweeted) {
                         if (_isRetweetPermanent(haykirId)) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  '⚠️ Grup-19 ile yapılan retweet geri alınamaz!'),
-                              duration: Duration(seconds: 3),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
+                          showAppSnack(context, '⚠️ Grup-19 ile yapılan retweet geri alınamaz!', backgroundColor: Colors.orange, duration: Duration(seconds: 3));
                           return;
                         }
                         _undoRetweet(haykirId);
@@ -614,15 +594,9 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                 await _persistPostPayload({'isSaved': newIsSaved});
                 _refreshInteractionUi(haykirId: haykirId);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(newIsSaved
+                  showAppSnack(context, newIsSaved
                           ? '✅ Kaydedildi!'
-                          : '❌ Kayıt kaldırıldı!'),
-                      duration: const Duration(seconds: 2),
-                      backgroundColor: Colors.purple,
-                    ),
-                  );
+                          : '❌ Kayıt kaldırıldı!', backgroundColor: Colors.purple, duration: const Duration(seconds: 2));
                 }
               },
             ),
@@ -797,13 +771,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                     await widget.davaProvider
                         .removeHomeFeedPost(widget.post['id']);
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                              '✅ Haykır seyir defterinden kaldırıldı'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+                      showAppSnack(context, '✅ Haykır seyir defterinden kaldırıldı', duration: Duration(seconds: 2));
                     }
                   },
                   tooltip: 'Seyir defterinden kaldır',
@@ -820,12 +788,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
   Future<void> _onGroupIconTap(String haykirId) async {
     if (widget.userEmail == null || widget.userEmail!.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Kullanıcı bilgisi bulunamadı'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnack(context, '❌ Kullanıcı bilgisi bulunamadı', backgroundColor: Colors.red);
       }
       return;
     }
@@ -835,12 +798,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
       final haykirData = HiveDatabaseService.getHaykir(haykirId);
       if (haykirData == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('❌ Haykır bulunamadı'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          showAppSnack(context, '❌ Haykır bulunamadı', backgroundColor: Colors.red);
         }
         return;
       }
@@ -872,13 +830,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
           // Widget yeniden build edilecek ve grup ikonu pasif olacak
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-                '✅ Haykıra katıldınız! "KATILDIĞIM" sekmesinde görünecek.'),
-            duration: const Duration(seconds: 3),
-            backgroundColor: Colors.purple,
-            action: SnackBarAction(
+        showAppSnack(context, '✅ Haykıra katıldınız! "KATILDIĞIM" sekmesinde görünecek.', backgroundColor: Colors.purple, duration: const Duration(seconds: 3), action: SnackBarAction(
               label: 'Görüntüle',
               textColor: Colors.white,
               onPressed: () {
@@ -891,19 +843,12 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                   ),
                 );
               },
-            ),
-          ),
-        );
+            ),);
       }
     } catch (e) {
       print('❌ Haykıra katılma hatası: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Hata: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }
     }
   }
@@ -1125,24 +1070,14 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
   // ✅ Adım 2: Retweet işlemini gerçekleştir
   Future<void> _processRetweet(String haykirId, String selectedOption) async {
     if (widget.userEmail == null || widget.userEmail!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ Kullanıcı bilgisi bulunamadı'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppSnack(context, '❌ Kullanıcı bilgisi bulunamadı', backgroundColor: Colors.red);
       return;
     }
 
     try {
       final haykirData = HiveDatabaseService.getHaykir(haykirId);
       if (haykirData == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Haykır bulunamadı'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnack(context, '❌ Haykır bulunamadı', backgroundColor: Colors.red);
         return;
       }
 
@@ -1375,14 +1310,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  '✅ Grup19\'a gönderildi! $totalInvitations kişiye davet gönderildi (Grup19 + haykır başlatan kişi). Bu retweet geri alınamaz.'),
-              duration: const Duration(seconds: 4),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          showAppSnack(context, '✅ Grup19\'a gönderildi! $totalInvitations kişiye davet gönderildi (Grup19 + haykır başlatan kişi). Bu retweet geri alınamaz.', backgroundColor: Colors.orange, duration: const Duration(seconds: 4));
         }
       } else if (selectedOption == 'sadece_ben') {
         // ✅ Sadece ben seçildi: Sadece kendi seyir defterine kaydet (zaten yukarıda yapıldı)
@@ -1402,14 +1330,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  '✅ Seyir defterinize eklendi! Artık retweet yapamazsınız.'),
-              duration: Duration(seconds: 3),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          showAppSnack(context, '✅ Seyir defterinize eklendi! Artık retweet yapamazsınız.', backgroundColor: Colors.orange, duration: Duration(seconds: 3));
         }
       }
 
@@ -1426,12 +1347,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
     } catch (e) {
       print('❌ Retweet hatası: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Hata: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }
     }
   }
@@ -1443,13 +1359,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
     // ✅ Grup-19 ile yapılmışsa geri alınamaz
     if (_isRetweetPermanent(haykirId)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('⚠️ Grup-19 ile yapılan retweet geri alınamaz!'),
-            duration: Duration(seconds: 3),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        showAppSnack(context, '⚠️ Grup-19 ile yapılan retweet geri alınamaz!', backgroundColor: Colors.orange, duration: Duration(seconds: 3));
       }
       return;
     }
@@ -1497,23 +1407,12 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
       _refreshInteractionUi(haykirId: haykirId);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Retweet geri alındı'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        showAppSnack(context, '✅ Retweet geri alındı', backgroundColor: Colors.orange, duration: Duration(seconds: 2));
       }
     } catch (e) {
       print('❌ Retweet geri alma hatası: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Hata: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }
     }
   }
@@ -1680,13 +1579,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                         userEmail: widget.userEmail!,
                         widgetId: widgetId,
                       );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('❌ "$label" kayıttan kaldırıldı'),
-                          duration: const Duration(seconds: 2),
-                          backgroundColor: Colors.grey[700],
-                        ),
-                      );
+                      showAppSnack(context, '❌ "$label" kayıttan kaldırıldı', backgroundColor: Colors.grey[700], duration: const Duration(seconds: 2));
                     } else {
                       // Widget'ı kaydet
                       HiveDatabaseService.saveWidget(
@@ -1706,13 +1599,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                                   '',
                         },
                       );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content:
-                              Text('✅ "$label" kaydedilenler arşivine eklendi'),
-                          duration: const Duration(seconds: 2),
-                          backgroundColor: Colors.purple,
-                          action: SnackBarAction(
+                      showAppSnack(context, '✅ "$label" kaydedilenler arşivine eklendi', backgroundColor: Colors.purple, duration: const Duration(seconds: 2), action: SnackBarAction(
                             label: 'Görüntüle',
                             textColor: Colors.white,
                             onPressed: () {
@@ -1724,18 +1611,10 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                                 ),
                               );
                             },
-                          ),
-                        ),
-                      );
+                          ));
                     }
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('⚠️ Kaydetmek için giriş yapmalısınız'),
-                        duration: Duration(seconds: 2),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
+                    showAppSnack(context, '⚠️ Kaydetmek için giriş yapmalısınız', backgroundColor: Colors.orange, duration: Duration(seconds: 2));
                   }
                 },
           borderRadius: BorderRadius.circular(12),

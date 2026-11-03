@@ -8,11 +8,17 @@ void showAppSnack(
   String message, {
   Color? backgroundColor,
   Duration? duration,
+  SnackBarBehavior? behavior,
+  ShapeBorder? shape,
+  SnackBarAction? action,
 }) {
   final SnackBar snackBar = SnackBar(
     content: Text(message),
     backgroundColor: backgroundColor,
     duration: duration ?? const Duration(milliseconds: 4000),
+    behavior: behavior,
+    shape: shape,
+    action: action,
   );
   ScaffoldMessenger.of(context).showSnackBar(snackBar);
 }

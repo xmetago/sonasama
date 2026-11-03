@@ -6,6 +6,7 @@ import '../providers/dava_provider.dart';
 import '../screens/saved_widgets_page.dart';
 import '../services/hive_database_service.dart';
 import 'expandable_comment_text.dart';
+import 'shared/app_snack.dart';
 
 /// Kart üzerindeki HAYKIR butonu: haykırışı seyir defterine yayınlar.
 Future<bool> publishHaykirToHomeFeed({
@@ -356,12 +357,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
 
                               if (!published) {
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('❌ Haykırış yayınlanamadı. Lütfen tekrar deneyin.'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
+                                  showAppSnack(context, '❌ Haykırış yayınlanamadı. Lütfen tekrar deneyin.', backgroundColor: Colors.red);
                                 }
                                 return;
                               }
@@ -634,13 +630,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                                         if (isRetweeted) {
                                           // Grup-19 ile yapılmışsa geri alınamaz
                                           if (_isRetweetPermanent()) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('⚠️ Grup-19 ile yapılan retweet geri alınamaz!'),
-                                                duration: Duration(seconds: 3),
-                                                backgroundColor: Colors.orange,
-                                              ),
-                                            );
+                                            showAppSnack(context, '⚠️ Grup-19 ile yapılan retweet geri alınamaz!', backgroundColor: Colors.orange, duration: Duration(seconds: 3));
                                             return;
                                           }
                                           // Sadece ben ile yapılmışsa geri al
@@ -737,13 +727,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                                   }
                                   
                                   if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(newIsKina ? '👋 Kına gönderildi!' : '❌ Kına kaldırıldı!'),
-                                        duration: const Duration(seconds: 1),
-                                        backgroundColor: Colors.grey,
-                                      ),
-                                    );
+                                    showAppSnack(context, newIsKina ? '👋 Kına gönderildi!' : '❌ Kına kaldırıldı!', backgroundColor: Colors.grey, duration: const Duration(seconds: 1));
                                   }
                                 },
                               ),
@@ -800,21 +784,9 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                                             if (result['success'] == true) {
                                               _commentController.clear();
                                               _loadInteractionStats(); // Yorumları yeniden yükle
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('✅ Yorum eklendi!'),
-                                                  duration: Duration(seconds: 1),
-                                                  backgroundColor: Colors.green,
-                                                ),
-                                              );
+                                              showAppSnack(context, '✅ Yorum eklendi!', backgroundColor: Colors.green, duration: Duration(seconds: 1));
                                             } else {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(result['error']?.toString() ?? 'Yorum eklenemedi'),
-                                                  duration: const Duration(seconds: 3),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
+                                              showAppSnack(context, result['error']?.toString() ?? 'Yorum eklenemedi', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
                                             }
                                           }
                                         },
@@ -1005,13 +977,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                   userEmail: widget.userEmail!,
                   widgetId: widgetId,
                 );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('❌ "$label" kayıttan kaldırıldı'),
-                    duration: const Duration(seconds: 2),
-                    backgroundColor: Colors.grey[700],
-                  ),
-                );
+                showAppSnack(context, '❌ "$label" kayıttan kaldırıldı', backgroundColor: Colors.grey[700], duration: const Duration(seconds: 2));
               } else {
                 // Widget'ı kaydet
                 HiveDatabaseService.saveWidget(
@@ -1025,12 +991,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                   isDisabled: false,
                   sourcePage: 'haykir_page',
                 );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('✅ "$label" kaydedilenler arşivine eklendi'),
-                    duration: const Duration(seconds: 2),
-                    backgroundColor: Colors.purple,
-                    action: SnackBarAction(
+                showAppSnack(context, '✅ "$label" kaydedilenler arşivine eklendi', backgroundColor: Colors.purple, duration: const Duration(seconds: 2), action: SnackBarAction(
                       label: 'Görüntüle',
                       textColor: Colors.white,
                       onPressed: () {
@@ -1041,18 +1002,10 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                           ),
                         );
                       },
-                    ),
-                  ),
-                );
+                    ));
               }
             } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('⚠️ Kaydetmek için giriş yapmalısınız'),
-                  duration: Duration(seconds: 2),
-                  backgroundColor: Colors.orange,
-                ),
-              );
+              showAppSnack(context, '⚠️ Kaydetmek için giriş yapmalısınız', backgroundColor: Colors.orange, duration: Duration(seconds: 2));
             }
           },
           borderRadius: BorderRadius.circular(12),
@@ -1545,13 +1498,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ Grup19\'a gönderildi! $totalInvitations kişiye davet gönderildi (Grup19 + haykır başlatan kişi). Bu retweet geri alınamaz.'),
-              duration: const Duration(seconds: 4),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          showAppSnack(context, '✅ Grup19\'a gönderildi! $totalInvitations kişiye davet gönderildi (Grup19 + haykır başlatan kişi). Bu retweet geri alınamaz.', backgroundColor: Colors.orange, duration: const Duration(seconds: 4));
         }
       } else if (selectedOption == 'sadece_ben') {
         // ✅ Sadece ben seçildi: Sadece kendi seyir defterine kaydet (zaten yukarıda yapıldı)
@@ -1570,13 +1517,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
         }
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Seyir defterinize eklendi! Artık retweet yapamazsınız.'),
-              duration: Duration(seconds: 3),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          showAppSnack(context, '✅ Seyir defterinize eklendi! Artık retweet yapamazsınız.', backgroundColor: Colors.orange, duration: Duration(seconds: 3));
         }
       }
       
@@ -1588,12 +1529,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
     } catch (e) {
       print('❌ Haykır retweet hatası: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Hata: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }
     }
   }
@@ -1608,13 +1544,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
     // ✅ Grup-19 ile yapılmışsa geri alınamaz
     if (_isRetweetPermanent()) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('⚠️ Grup-19 ile yapılan retweet geri alınamaz!'),
-            duration: Duration(seconds: 3),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        showAppSnack(context, '⚠️ Grup-19 ile yapılan retweet geri alınamaz!', backgroundColor: Colors.orange, duration: Duration(seconds: 3));
       }
       return;
     }
@@ -1657,23 +1587,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
       });
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Retweet geri alındı'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        showAppSnack(context, '✅ Retweet geri alındı', backgroundColor: Colors.orange, duration: Duration(seconds: 2));
       }
     } catch (e) {
       print('❌ Retweet geri alma hatası: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Hata: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }
     }
   }

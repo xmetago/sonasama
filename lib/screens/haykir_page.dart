@@ -9,6 +9,7 @@ import '../providers/dava_provider.dart';
 import '../utils/haykir_duration.dart';
 
 import '../widgets/haykir_case_card.dart';
+import '../widgets/shared/app_snack.dart';
 export '../widgets/haykir_case_card.dart' show Haykir, FiveCardCaseInformation, publishHaykirToHomeFeed;
 
 
@@ -136,24 +137,13 @@ class _HaykirPageState extends State<HaykirPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Ön hazırlık kartı oluşturuldu. Yayınlamak için karttaki HAYKIR\'a basın.'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        showAppSnack(context, '✅ Ön hazırlık kartı oluşturuldu. Yayınlamak için karttaki HAYKIR\'a basın.', backgroundColor: Colors.orange, duration: Duration(seconds: 3));
       }
 
       setState(() {});
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Hata: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }
     }
   }
@@ -652,12 +642,7 @@ class _HaykirPageState extends State<HaykirPage> {
                                                       if (diremText.isNotEmpty) {
                                                         if (diremText.length > 19) {
                                                           if (mounted) {
-                                                            ScaffoldMessenger.of(context).showSnackBar(
-                                                              const SnackBar(
-                                                                content: Text('❌ Direm maksimum 19 karakter olmalıdır!'),
-                                                                backgroundColor: Colors.red,
-                                                              ),
-                                                            );
+                                                            showAppSnack(context, '❌ Direm maksimum 19 karakter olmalıdır!', backgroundColor: Colors.red);
                                                           }
                                                           return;
                                                         }
@@ -681,21 +666,11 @@ class _HaykirPageState extends State<HaykirPage> {
                                                           });
 
                                                           if (mounted) {
-                                                            ScaffoldMessenger.of(context).showSnackBar(
-                                                              SnackBar(
-                                                                content: Text('✅ "$diremText" Üyelerden kategorisine eklendi!'),
-                                                                backgroundColor: Colors.green,
-                                                              ),
-                                                            );
+                                                            showAppSnack(context, '✅ "$diremText" Üyelerden kategorisine eklendi!', backgroundColor: Colors.green);
                                                           }
                                                         } catch (e) {
                                                           if (mounted) {
-                                                            ScaffoldMessenger.of(context).showSnackBar(
-                                                              SnackBar(
-                                                                content: Text('❌ Hata: $e'),
-                                                                backgroundColor: Colors.red,
-                                                              ),
-                                                            );
+                                                            showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
                                                           }
                                                         }
                                                       }
@@ -856,23 +831,11 @@ class _HaykirPageState extends State<HaykirPage> {
 
                                             if (mounted) {
                                               setState(() {});
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    '✅ Haykırış silindi ve seyir defterinden kaldırıldı.',
-                                                  ),
-                                                  backgroundColor: Colors.green,
-                                                ),
-                                              );
+                                              showAppSnack(context, '✅ Haykırış silindi ve seyir defterinden kaldırıldı.', backgroundColor: Colors.green);
                                             }
                                           } catch (e) {
                                             if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('❌ Hata: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
+                                              showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
                                             }
                                           }
                                         }

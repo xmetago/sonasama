@@ -8,6 +8,7 @@ import '../utils/comment_utils.dart';
 import '../widgets/common_header_widgets.dart';
 import './haykir_page.dart'; // ✅ HAYKIR sayfasına yönlendirme için
 import '../widgets/modern_dava_card.dart';
+import '../widgets/shared/app_snack.dart';
 export '../widgets/davet_card.dart';
 export '../widgets/modern_dava_card.dart';
 
@@ -257,13 +258,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
           (e['id']?.toString() ?? '') == targetId);
     });
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('✅ Davet bitirildi: ${davet['davaAdi']}'),
-        backgroundColor: const Color(0xFF10B981), // Yeşil
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '✅ Davet bitirildi: ${davet['davaAdi']}', backgroundColor: const Color(0xFF10B981), duration: const Duration(seconds: 2));
 
     // Listeyi tazele (aktifleri yeniden yükle)
     _loadAktifDavetler();
@@ -296,13 +291,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
         _loadAktifDavetler();
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('📢 HAYKIR açıldı: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}'),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      showAppSnack(context, '📢 HAYKIR açıldı: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}', backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
       return;
     }
     
@@ -343,23 +332,11 @@ class _DavetlerPageState extends State<DavetlerPage> {
 
     if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('👁️ Dava izlenmeye alındı: ${davet['davaAdi'] ?? 'Dava'}'),
-          backgroundColor: const Color(0xFF10B981), // Yeşil
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      showAppSnack(context, '👁️ Dava izlenmeye alındı: ${davet['davaAdi'] ?? 'Dava'}', backgroundColor: const Color(0xFF10B981), duration: const Duration(seconds: 2));
   }
 
   void _onDelilEkleInvitation(Map<String, dynamic> davet) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('📋 Delil ekleme: ${davet['davaAdi']}'),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '📋 Delil ekleme: ${davet['davaAdi']}', backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
   }
 
   Future<void> _onYorumInvitation(
@@ -431,13 +408,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
     }
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('💬 Yorum eklendi: "$yorumMetni"'),
-        backgroundColor: const Color(0xFF10B981), // Yeşil
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '💬 Yorum eklendi: "$yorumMetni"', backgroundColor: const Color(0xFF10B981), duration: const Duration(seconds: 2));
   }
 
   void _onRetweetInvitation(Map<String, dynamic> davet) async {
@@ -485,13 +456,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
               // ✅ Katıldığım HAYKIR'lar sayfasından da kaldır
               await HiveDatabaseService.removeKatildigimHaykir(widget.userEmail!, haykirId);
               
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('🔄 HAYKIR paylaşımı geri alındı: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}'),
-                  backgroundColor: Colors.grey,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              showAppSnack(context, '🔄 HAYKIR paylaşımı geri alındı: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}', backgroundColor: Colors.grey, duration: const Duration(seconds: 2));
             } catch (e) {
               print('⚠️ HAYKIR retweet geri alma hatası: $e');
             }
@@ -521,24 +486,12 @@ class _DavetlerPageState extends State<DavetlerPage> {
             // ✅ HAYKIR için Katıldığım HAYKIR'lar sayfasına ekle
             await _addToKatildigimHaykirler(davet);
             
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('🔄 HAYKIR daveti Seyir Defteri\'nde paylaşıldı ve Katıldığım HAYKIR\'lar\'a eklendi: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}'),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 3),
-              ),
-            );
+            showAppSnack(context, '🔄 HAYKIR daveti Seyir Defteri\'nde paylaşıldı ve Katıldığım HAYKIR\'lar\'a eklendi: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}', backgroundColor: Colors.orange, duration: const Duration(seconds: 3));
           }
         }
       } catch (e) {
         print('❌ HAYKIR retweet hatası: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ HAYKIR paylaşım hatası: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        showAppSnack(context, '❌ HAYKIR paylaşım hatası: $e', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
       }
       return;
     }
@@ -561,13 +514,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
           // ✅ Katıldığım Davalar sayfasından da kaldır
           await HiveDatabaseService.removeKatildigimDava(widget.userEmail!, davaId);
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('🔄 Davet paylaşımı geri alındı: ${davet['davaAdi']}'),
-              backgroundColor: Colors.grey,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          showAppSnack(context, '🔄 Davet paylaşımı geri alındı: ${davet['davaAdi']}', backgroundColor: Colors.grey, duration: const Duration(seconds: 2));
         } else {
           // ✅ Retweet yapılıyor - Seyir Defteri'ne ekle
           final nowIso = DateTime.now().toIso8601String();
@@ -593,33 +540,15 @@ class _DavetlerPageState extends State<DavetlerPage> {
           // ✅ YENİ: Katıldığım Davalar sayfasına da ekle
           await _addToKatildigimDavalar(davet);
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('🔄 Davet Seyir Defteri\'nde paylaşıldı ve Katıldığım Davalar\'a eklendi: ${davet['davaAdi']}'),
-              backgroundColor: const Color(0xFF10B981), // Yeşil
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          showAppSnack(context, '🔄 Davet Seyir Defteri\'nde paylaşıldı ve Katıldığım Davalar\'a eklendi: ${davet['davaAdi']}', backgroundColor: const Color(0xFF10B981), duration: const Duration(seconds: 3));
         }
       } else {
         print('⚠️ Dava ID bulunamadı, Seyir Defteri\'ne eklenemedi');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('⚠️ Dava ID bulunamadı, paylaşılamadı'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showAppSnack(context, '⚠️ Dava ID bulunamadı, paylaşılamadı', backgroundColor: Colors.orange, duration: Duration(seconds: 2));
       }
     } catch (e) {
       print('❌ Seyir Defteri paylaşım hatası: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Paylaşım hatası: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      showAppSnack(context, '❌ Paylaşım hatası: $e', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
     }
   }
 
@@ -740,13 +669,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
       print('⚠️ Seyir defteri güncelleme hatası: $e');
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('👍 Davet beğenildi: ${davet['davaAdi']}'),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '👍 Davet beğenildi: ${davet['davaAdi']}', backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
   }
 
   void _onBegenmemeInvitation(Map<String, dynamic> davet) {
@@ -791,13 +714,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
       print('⚠️ Seyir defteri güncelleme hatası: $e');
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('👎 Davet beğenilmedi: ${davet['davaAdi']}'),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '👎 Davet beğenilmedi: ${davet['davaAdi']}', backgroundColor: Colors.red, duration: const Duration(seconds: 2));
   }
 
   @override
@@ -1041,36 +958,18 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
     setState(() {
       davalar[index]['isOpened'] = true;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('✅ Dava kaydedildi: ${davalar[index]['davaAdi']}'),
-        backgroundColor: Colors.greenAccent,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '✅ Dava kaydedildi: ${davalar[index]['davaAdi']}', backgroundColor: Colors.greenAccent, duration: const Duration(seconds: 2));
   }
 
   void _onOpen(int index) {
     setState(() {
       davalar[index]['isOpened'] = true;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('⚖️ Dava başlatıldı: ${davalar[index]['davaAdi']}'),
-        backgroundColor: Colors.blue,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '⚖️ Dava başlatıldı: ${davalar[index]['davaAdi']}', backgroundColor: Colors.blue, duration: const Duration(seconds: 2));
   }
 
   void _onDelilEkle(int index) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('📋 Delil ekleme sayfası açılıyor: ${davalar[index]['davaAdi']}'),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '📋 Delil ekleme sayfası açılıyor: ${davalar[index]['davaAdi']}', backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
   }
 
   Future<void> _onYorum(
@@ -1112,13 +1011,7 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
           CommentUtils.countAllComments(davalar[index]['yorumlar']);
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('💬 Yorum eklendi: ${davalar[index]['davaAdi']}'),
-        backgroundColor: Colors.blue,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '💬 Yorum eklendi: ${davalar[index]['davaAdi']}', backgroundColor: Colors.blue, duration: const Duration(seconds: 2));
   }
 
   void _onRetweet(int index) {
@@ -1141,13 +1034,7 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
         ? '🔄 Dava paylaşıldı: ${davalar[index]['davaAdi']}'
         : '🔄 Paylaşım kaldırıldı: ${davalar[index]['davaAdi']}';
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, message, backgroundColor: Colors.green, duration: const Duration(seconds: 2));
   }
 
   void _onBegeni(int index) {
@@ -1175,13 +1062,7 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
         ? '👍 Beğenildi: ${davalar[index]['davaAdi']}'
         : '👍 Beğeni kaldırıldı: ${davalar[index]['davaAdi']}';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, message, backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
   }
 
   void _onBegenmeme(int index) {
@@ -1209,13 +1090,7 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
         ? '👎 Beğenilmedi: ${davalar[index]['davaAdi']}'
         : '👎 Beğenmeme kaldırıldı: ${davalar[index]['davaAdi']}';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, message, backgroundColor: Colors.red, duration: const Duration(seconds: 2));
   }
 
   @override

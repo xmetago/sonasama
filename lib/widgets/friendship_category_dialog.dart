@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/registration_model.dart';
 import '../utils/app_theme.dart';
+import 'shared/app_snack.dart';
 
 /// Kategori seçme diyaloğu. Limit, mevcut kategori ve kayıt sayfa durumundan gelir.
 class FriendshipCategoryDialog extends StatelessWidget {
@@ -216,13 +217,7 @@ class FriendshipCategoryDialog extends StatelessWidget {
         return GestureDetector(
           onTap: () {
             if (!canSelect) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$categoryName kategorisi dolu! Limit: $limit'),
-                  backgroundColor: AppTheme.errorColor,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              showAppSnack(context, '$categoryName kategorisi dolu! Limit: $limit', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating);
               return;
             }
             Navigator.of(context).pop();

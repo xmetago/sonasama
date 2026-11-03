@@ -27,6 +27,7 @@ import 'category_page.dart';
 import '../widgets/twitter_post_composer.dart';
 import '../utils/constants.dart';
 import '../utils/category_icon_utils.dart';
+import '../widgets/shared/app_snack.dart';
 
 // Eski Dava modeli
 class Dava {
@@ -525,20 +526,10 @@ class _HomePageState extends State<HomePage> {
           }
         },
         onComment: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('💬 Yorum özelliği yakında!'),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          showAppSnack(context, '💬 Yorum özelliği yakında!', duration: Duration(seconds: 2));
         },
         onShare: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('📤 Paylaşım özelliği yakında!'),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          showAppSnack(context, '📤 Paylaşım özelliği yakında!', duration: Duration(seconds: 2));
         },
       );
     } else if (type == 'dava_share') {
@@ -649,25 +640,12 @@ class _HomePageState extends State<HomePage> {
             try {
               final ok = await davaProvider.removeHomeFeedPost(postId.isNotEmpty ? postId : post['id']?.toString() ?? '');
               if (ok && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        '✅ "${davaData['davaAdi'] ?? 'Dava'}" seyir defterinizden kaldırıldı'),
-                    backgroundColor: Colors.green,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
+                showAppSnack(context, '✅ "${davaData['davaAdi'] ?? 'Dava'}" seyir defterinizden kaldırıldı', backgroundColor: Colors.green, duration: const Duration(seconds: 2));
               }
             } catch (e) {
               print('❌ Seyir defterinden kaldırma hatası: $e');
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('❌ Hata: ${e.toString()}'),
-                    backgroundColor: Colors.red,
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
+                showAppSnack(context, '❌ Hata: ${e.toString()}', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
               }
               // Hata durumunda listeyi tekrar yüklemek en güvenlisi
               _homeFeedPagingController.refresh();
@@ -761,33 +739,16 @@ class _HomePageState extends State<HomePage> {
               // Yenile
               await davaProvider.refreshAll();
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      '✅ Paylaşım bitirildi: ${payload['davaAdi'] ?? 'Dava'}'),
-                  backgroundColor: Colors.blue,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              showAppSnack(context, '✅ Paylaşım bitirildi: ${payload['davaAdi'] ?? 'Dava'}', backgroundColor: Colors.blue, duration: const Duration(seconds: 2));
             }
           },
           onOpen: () {
             // Dava detaylar�n� a�
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('? Dava detaylar� a��l�yor...'),
-                duration: Duration(seconds: 2),
-              ),
-            );
+            showAppSnack(context, '? Dava detaylar� a��l�yor...', duration: Duration(seconds: 2));
           },
           onDelilEkle: () {
             // Delil ekle
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('? Delil ekleme sayfas� a��l�yor...'),
-                duration: Duration(seconds: 2),
-              ),
-            );
+            showAppSnack(context, '? Delil ekleme sayfas� a��l�yor...', duration: Duration(seconds: 2));
           },
           onYorum: (yorumMetni,
               {String? parentCommentId, bool isGizliTanik = false}) async {
@@ -859,14 +820,7 @@ class _HomePageState extends State<HomePage> {
               print('⚠️ Invitation güncelleme hatası: $e');
             }
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    '💬 Yorum eklendi: "$yorumMetni"${isGizliTanik ? ' (Gizli Tanık olarak)' : ''}'),
-                backgroundColor: Colors.green[600],
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            showAppSnack(context, '💬 Yorum eklendi: "$yorumMetni"${isGizliTanik ? ' (Gizli Tanık olarak)' : ''}', backgroundColor: Colors.green[600], duration: const Duration(seconds: 2));
           },
           onRetweet: () async {
             // Retweet say�s�n� art�r - Provider kullanarak
@@ -888,12 +842,7 @@ class _HomePageState extends State<HomePage> {
 
             await davaProvider.updateHomeFeedPost(post['id'], updatedPost);
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('? Payla��m yeniden payla��ld�!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
+            showAppSnack(context, '? Payla��m yeniden payla��ld�!', duration: Duration(seconds: 2));
           },
           onBegeni: () async {
             // Be�eni say�s�n� art�r - Provider kullanarak
@@ -951,12 +900,7 @@ class _HomePageState extends State<HomePage> {
               print('⚠️ Invitation güncelleme hatası: $e');
             }
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('? Be�enildi!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
+            showAppSnack(context, '? Be�enildi!', duration: Duration(seconds: 2));
           },
           onBegenmeme: () async {
             // Be�enmeme say�s�n� art�r - Provider kullanarak
@@ -1014,12 +958,7 @@ class _HomePageState extends State<HomePage> {
               print('⚠️ Invitation güncelleme hatası: $e');
             }
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('? Be�enilmedi!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
+            showAppSnack(context, '? Be�enilmedi!', duration: Duration(seconds: 2));
           },
         ),
       );
@@ -1309,26 +1248,12 @@ class _HomePageState extends State<HomePage> {
           postId.isNotEmpty ? postId : post['id']?.toString() ?? '',
         );
         if (ok && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '✅ "${davaData['davaAdi'] ?? 'Dava'}" seyir defterinizden kaldırıldı',
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          showAppSnack(context, '✅ "${davaData['davaAdi'] ?? 'Dava'}" seyir defterinizden kaldırıldı', backgroundColor: Colors.green, duration: const Duration(seconds: 2));
         }
       } catch (e) {
         print('❌ Seyir defterinden kaldırma hatası: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ Hata: ${e.toString()}'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          showAppSnack(context, '❌ Hata: ${e.toString()}', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
           _homeFeedPagingController.refresh();
         }
       }
@@ -1941,12 +1866,7 @@ class _HomePageState extends State<HomePage> {
     if (selectedAction == _PostSheetAction.admin) {
       final adminEmail = widget.userEmail?.trim();
       if (adminEmail == null || adminEmail.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Admin e-posta bilgisi bulunamadı.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnack(context, 'Admin e-posta bilgisi bulunamadı.', backgroundColor: Colors.red);
         return;
       }
       Navigator.of(context).push(

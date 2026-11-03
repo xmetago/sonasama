@@ -13,6 +13,7 @@ import 'chat_detail_page.dart';
 import '../widgets/common_header_widgets.dart';
 import '../widgets/friendship_category_dialog.dart';
 import '../utils/app_theme.dart';
+import '../widgets/shared/app_snack.dart';
 
 class FriendshipManagementPage extends StatefulWidget {
   final String userEmail;
@@ -467,16 +468,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     if (currentUser == null) return;
 
     if (!_canAddToCategory(category)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}'),
-          backgroundColor: const Color(0xFFF44336),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, '$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}', backgroundColor: const Color(0xFFF44336), behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
       return;
     }
 
@@ -499,16 +493,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         icon: Icons.person_add,
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Arkadaşlık isteği gönderilirken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Arkadaşlık isteği gönderilirken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 
@@ -577,16 +564,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
   // Arkadaşlık kabul etme
   Future<void> _acceptFriendship(Map<String, dynamic> request, String category) async {
     if (!_canAddToCategory(category)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}'),
-          backgroundColor: const Color(0xFFF44336),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, '$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}', backgroundColor: const Color(0xFFF44336), behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
       return;
     }
 
@@ -647,16 +627,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         icon: Icons.check_circle_outline,
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Arkadaşlık kabul edilirken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Arkadaşlık kabul edilirken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 
@@ -677,27 +650,13 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         FriendshipStatus.rejected
       );
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Arkadaşlık reddedildi'),
-          backgroundColor: AppTheme.warningColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Arkadaşlık reddedildi', backgroundColor: AppTheme.warningColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Arkadaşlık reddedilirken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Arkadaşlık reddedilirken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 
@@ -1122,16 +1081,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                                   if (_pendingRequests.isNotEmpty) {
                                     _showIncomingRequestsList();
                                   } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: const Text('Bekleyen arkadaşlık isteği yok'),
-                                        backgroundColor: AppTheme.infoColor,
-                                        behavior: SnackBarBehavior.floating,
-                                        shape: RoundedRectangleBorder(
+                                    showAppSnack(context, 'Bekleyen arkadaşlık isteği yok', backgroundColor: AppTheme.infoColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(10),
-                                        ),
-                                      ),
-                                    );
+                                        ));
                                   }
                                 },
                               ),
@@ -1346,16 +1298,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
           _addUserToCategory(user, category);
         } else {
           // Limit dolu uyarısı
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}'),
-              backgroundColor: AppTheme.errorColor,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
+          showAppSnack(context, '$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          );
+              ));
         }
       },
       child: Container(
@@ -1721,31 +1666,17 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${user.judgeName} başarıyla silindi'),
-          backgroundColor: AppTheme.successColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, '${user.judgeName} başarıyla silindi', backgroundColor: AppTheme.successColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Kullanıcı silinirken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Kullanıcı silinirken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 
@@ -1860,36 +1791,21 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${user.judgeName} başarıyla engellendi'),
-          backgroundColor: AppTheme.warningColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, '${user.judgeName} başarıyla engellendi', backgroundColor: AppTheme.warningColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-          action: SnackBarAction(
+          ), action: SnackBarAction(
             label: 'Engeli Kaldır',
             textColor: Colors.white,
             onPressed: () => _unblockUser(user),
-          ),
-        ),
-      );
+          ));
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Kullanıcı engellenirken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Kullanıcı engellenirken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 
@@ -1914,31 +1830,17 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${user.judgeName} engeli kaldırıldı'),
-          backgroundColor: AppTheme.successColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, '${user.judgeName} engeli kaldırıldı', backgroundColor: AppTheme.successColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Engel kaldırılırken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Engel kaldırılırken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 }
