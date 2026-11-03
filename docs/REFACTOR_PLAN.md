@@ -329,7 +329,7 @@ Sıra: `GroupSelectionDialog`, `TreeMenuPageheadlines`, form alanları (`ModernT
 
 Hive taraması build dışına alındı. Kalan iş yapısal:
 
-1. `ActigimDavaCard` yeni dosyaya. Önbellek davranışı aynı kalsın.
+1. `ActigimDavaCard` yeni dosyaya. Önbellek davranışı aynı kalsın. `FiveCardCaseInformation` bu turda `actigim_case_card.dart` oldu.
 2. `InactiveDavaCard` ve `TreeMenuPageheadlines` ayrı tur.
 3. Sayfa iskeleti (`ActigimDavalarPage`) en son, kartlar oturduktan sonra.
 4. `Consumer` içindeki `Future.microtask` yüklemesi ayrı tur (madde 4.1.2).
@@ -365,6 +365,6 @@ Hive taraması build dışına alındı. Kalan iş yapısal:
 
 ## 7. Sıradaki tek tur
 
-**Sıradaki:** `actigim_davalar_page.dart` içindeki `FiveCardCaseInformation` kendi dosyasına çıksın. `ActigimDavaCard` ve Hive önbelleği ayrı tur. Microtask yüklemesi bu turda değişmez.
+**Sıradaki:** `ActigimDavaCard` `lib/widgets/actigim_dava_card.dart` dosyasına çıksın. Hive açılış tarihi önbelleği aynı kalsın. `InactiveDavaCard` ve `TreeMenuPageheadlines` ayrı tur. Microtask yüklemesi bu turda değişmez.
 
-Taşınan kartlar: `masraflar_case_card.dart`, `delil_case_card.dart`, `yargila_case_card.dart`, `haykir_case_card.dart`, `dava_ac_case_card.dart`, `katildigim_case_card.dart`. Katıldığım kart `davaData` map sözleşmesini korur. `GroupSelectionDialog` `group_selection_dialog.dart` içinde.
+`FiveCardCaseInformation` kopyaları kendi dosyalarında: gelen, masraf, delil, yargıla, haykır, dava aç, katıldığım, açtığım. Sözleşmeler birleşmedi. `GroupSelectionDialog` `group_selection_dialog.dart` içinde.
