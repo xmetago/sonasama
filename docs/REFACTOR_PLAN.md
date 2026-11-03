@@ -365,6 +365,6 @@ Hive taraması build dışına alındı. Kalan iş yapısal:
 
 ## 7. Sıradaki tek tur
 
-**Sıradaki:** `yargila_page.dart` içindeki `FiveCardCaseInformation` kendi dosyasına çıksın. `ModernYargilaCard` bu turda sayfada kalır. Sözleşme birleşmez. Sonra `haykir_page.dart` ve `dava_ac_page.dart`.
+**Sıradaki:** `haykir_page.dart` içindeki `FiveCardCaseInformation` `lib/widgets/haykir_case_card.dart` dosyasına çıksın. Sosyal sayaç state'i kartta kalır. 44 snack ayrı tur. Sonra `dava_ac_page.dart` içindeki kart.
 
-Taşınan kartlar: `masraflar_case_card.dart`, `delil_case_card.dart`. Sayfalar adları yeniden dışa aktarır.
+Taşınan kartlar: `masraflar_case_card.dart`, `delil_case_card.dart`, `yargila_case_card.dart`. `ModernYargilaCard` sayfada kaldı. Sayaç satırı `buildYargilaCountdownRow` oldu; süre ve snack aynı.
