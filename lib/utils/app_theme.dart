@@ -63,6 +63,29 @@ class AppTheme {
   static const Color iconAccent = Color(0xFFE94B3C);          // Vurgu ikonları
   static const Color iconMuted = Color(0xFF6EE7B7);           // Sessiz ikonlar (açık yeşil)
 
+  // ========== KART & GÖLGE ==========
+
+  static List<BoxShadow> get cardShadow => [
+    BoxShadow(
+      color: successColor.withOpacity(0.1),
+      blurRadius: 8,
+      offset: const Offset(0, 2),
+    ),
+  ];
+
+  static BoxDecoration cardDecoration({
+    Color? color,
+    double borderRadius = 16,
+    bool bordered = false,
+  }) {
+    return BoxDecoration(
+      color: color ?? cardBackgroundColor,
+      borderRadius: BorderRadius.circular(borderRadius),
+      boxShadow: cardShadow,
+      border: bordered ? Border.all(color: dividerColor.withOpacity(0.7)) : null,
+    );
+  }
+
   // ========== TİPOGRAFİ ==========
   
   // Başlıklar

@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:uuid/uuid.dart';
 import '../models/chat_message_model.dart';
 import 'hive_database_service.dart';
 import 'user_session_service.dart';
@@ -13,6 +15,8 @@ class ChatServiceFirestore {
   static Box<ChatMessageModel>? _chatMessageBox;
   static const String _messagesCollection = 'messages';
   static const String _conversationsCollection = 'conversations';
+
+  static bool get _firebaseReady => Firebase.apps.isNotEmpty;
   
   /// Hive box'a erişim (ChatService için)
   static Box<ChatMessageModel>? get chatMessageBox => _chatMessageBox;
@@ -52,7 +56,8 @@ class ChatServiceFirestore {
       receiverId,
     );
 
-    final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+    final now = DateTime.now();
+    final messageId = const Uuid().v4();
     final message = ChatMessageModel(
       id: messageId,
       conversationId: conversationId,
@@ -63,7 +68,7 @@ class ChatServiceFirestore {
       receiverId: receiverId,
       receiverEmail: receiverEmail,
       text: text,
-      createdAt: DateTime.now(),
+      createdAt: now,
       isRead: false,
       imageUrl: imageUrl,
       fileUrl: fileUrl,
@@ -73,6 +78,11 @@ class ChatServiceFirestore {
     );
 
     // Firestore'a kaydet
+    if (!_firebaseReady) {
+      await _chatMessageBox?.put(messageId, message);
+      return message;
+    }
+
     try {
       await _firestore
           .collection(_messagesCollection)
@@ -96,6 +106,8 @@ class ChatServiceFirestore {
   /// Konuşma bilgisini güncelle
   static Future<void> _updateConversation(
       String conversationId, ChatMessageModel message) async {
+    if (!_firebaseReady) return;
+
     try {
       await _firestore
           .collection(_conversationsCollection)
@@ -116,6 +128,10 @@ class ChatServiceFirestore {
   static Future<List<ChatMessageModel>> getMessages(
       String userId1, String userId2) async {
     final conversationId = ChatMessageModel.createConversationId(userId1, userId2);
+
+    if (!_firebaseReady) {
+      return getMessagesFromHive(conversationId);
+    }
 
     try {
       final snapshot = await _firestore
@@ -223,6 +239,10 @@ class ChatServiceFirestore {
   static Stream<List<ChatMessageModel>> watchConversation(
       String userId1, String userId2) {
     final conversationId = ChatMessageModel.createConversationId(userId1, userId2);
+
+    if (!_firebaseReady) {
+      return _watchConversationFromHive(conversationId);
+    }
 
     try {
       return _firestore

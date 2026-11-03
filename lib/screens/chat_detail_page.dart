@@ -1,8 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
-import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/chat_message_model.dart';
 import '../services/chat_service.dart';
@@ -37,19 +37,15 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   StreamSubscription<List<ChatMessageModel>>? _messagesSubscription;
   types.User? _currentUser;
   types.User? _receiverUser;
-  final TextEditingController _messageController = TextEditingController();
-  final RefreshController _refreshController = RefreshController(initialRefresh: false);
-  
-  // Ses kaydı durumu
+
   bool _isRecording = false;
   int _recordingDuration = 0;
-  bool _isLoadingMessages = false;
+  bool _isLoadingMessages = true;
 
   @override
   void initState() {
     super.initState();
     _initializeUsers();
-    _loadMessages(); // Async çağrı
     _startListening();
   }
 
@@ -70,171 +66,161 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     );
   }
 
-  Future<void> _loadMessages({bool isRefresh = false}) async {
-    final currentUser = UserSessionService.getCurrentUser();
-    if (currentUser == null) {
-      if (isRefresh) _refreshController.refreshCompleted();
-      return;
+  List<types.Message> _dedupeAndSort(List<ChatMessageModel> raw) {
+    final uniqueMessages = <String, types.Message>{};
+    for (final chatMessage in raw) {
+      final message = _convertToChatMessage(chatMessage);
+      uniqueMessages[message.id] = message;
     }
 
-    if (isRefresh) {
+    return uniqueMessages.values.toList()
+      ..sort((a, b) {
+        final aTime = a.createdAt ?? 0;
+        final bTime = b.createdAt ?? 0;
+        if (aTime != bTime) {
+          // flutter_chat_ui en yeni mesajı listenin başında bekler.
+          return bTime.compareTo(aTime);
+        }
+        return b.id.compareTo(a.id);
+      });
+  }
+
+  void _applyMessages(List<ChatMessageModel> chatMessages) {
+    if (!mounted) return;
+
+    final nextMessages = _dedupeAndSort(chatMessages);
+    final unchanged = !_isLoadingMessages &&
+        _messages.length == nextMessages.length &&
+        _messages.every(
+          (message) => nextMessages.any((next) => next.id == message.id),
+        );
+
+    if (unchanged) return;
+
+    void updateState() {
+      if (!mounted) return;
       setState(() {
-        _isLoadingMessages = true;
+        _messages
+          ..clear()
+          ..addAll(nextMessages);
+        _isLoadingMessages = false;
       });
     }
 
-    try {
-      final messages = await ChatService.getMessages(currentUser.id, widget.receiverId);
-      if (mounted) {
-        // Mesajları benzersiz ID'lere göre filtrele ve sırala
-        final uniqueMessages = <String, types.Message>{};
-        for (final chatMessage in messages) {
-          final message = _convertToChatMessage(chatMessage);
-          uniqueMessages[message.id] = message;
-        }
-        
-        final sortedMessages = uniqueMessages.values.toList()
-          ..sort((a, b) {
-            final aTime = a.createdAt ?? 0;
-            final bTime = b.createdAt ?? 0;
-            return aTime.compareTo(bTime); // Artan sıra: en eski → en yeni
-          });
-        
-        setState(() {
-          _messages.clear();
-          _messages.addAll(sortedMessages);
-          _isLoadingMessages = false;
-        });
-      }
+    // Stream emit'i layout/build sırasında gelirse setState çakışmasını önle.
+    if (WidgetsBinding.instance.schedulerPhase != SchedulerPhase.idle) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => updateState());
+    } else {
+      updateState();
+    }
+  }
 
-      // Mesajları okundu olarak işaretle
+  Future<void> _markConversationRead() async {
+    final currentUser = UserSessionService.getCurrentUser();
+    if (currentUser == null) return;
+
+    try {
       await ChatService.markConversationAsRead(currentUser.id, widget.receiverId);
-      
-      if (isRefresh) {
-        _refreshController.refreshCompleted();
-      }
     } catch (e) {
-      print('⚠️ Mesajlar yüklenirken hata: $e');
-      // Hata durumunda Hive'dan yükle
-      final messages = ChatService.getMessagesSync(currentUser.id, widget.receiverId);
-      if (mounted) {
-        // Mesajları benzersiz ID'lere göre filtrele ve sırala
-        final uniqueMessages = <String, types.Message>{};
-        for (final chatMessage in messages) {
-          final message = _convertToChatMessage(chatMessage);
-          uniqueMessages[message.id] = message;
-        }
-        
-        final sortedMessages = uniqueMessages.values.toList()
-          ..sort((a, b) {
-            final aTime = a.createdAt ?? 0;
-            final bTime = b.createdAt ?? 0;
-            return aTime.compareTo(bTime); // Artan sıra: en eski → en yeni
-          });
-        
-        setState(() {
-          _messages.clear();
-          _messages.addAll(sortedMessages);
-          _isLoadingMessages = false;
-        });
-      }
-      
-      if (isRefresh) {
-        _refreshController.refreshFailed();
+      if (kDebugMode) {
+        debugPrint('Konuşma okundu işaretlenemedi: $e');
       }
     }
   }
-  
+
+  Future<void> _forceRefresh() async {
+    final currentUser = UserSessionService.getCurrentUser();
+    if (currentUser == null) return;
+
+    setState(() {
+      _isLoadingMessages = true;
+    });
+
+    try {
+      final messages = await ChatService.getMessages(currentUser.id, widget.receiverId);
+      _applyMessages(messages);
+      await ChatService.markConversationAsRead(currentUser.id, widget.receiverId);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Mesaj yenileme hatası: $e');
+      }
+      try {
+        final fallback = ChatService.getMessagesSync(currentUser.id, widget.receiverId);
+        _applyMessages(fallback);
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _isLoadingMessages = false;
+          });
+        }
+      }
+    }
+  }
 
   void _startListening() {
     final currentUser = UserSessionService.getCurrentUser();
-    if (currentUser == null) return;
+    if (currentUser == null) {
+      setState(() {
+        _isLoadingMessages = false;
+      });
+      return;
+    }
 
     _messagesSubscription = ChatService.watchConversation(
       currentUser.id,
       widget.receiverId,
-    ).listen((chatMessages) {
-      if (!mounted) return;
-      
-      // Mesajları benzersiz ID'lere göre filtrele ve sırala
-      final uniqueMessages = <String, types.Message>{};
-      for (final chatMessage in chatMessages) {
-        final message = _convertToChatMessage(chatMessage);
-        uniqueMessages[message.id] = message;
-      }
-      
-      // Listeyi oluştur ve sırala (en eski → en yeni)
-      // flutter_chat_ui paketi mesajları üstten alta doğru gösterir
-      // En eski mesaj üstte, en yeni mesaj altta olmalı
-      final sortedMessages = uniqueMessages.values.toList()
-        ..sort((a, b) {
-          final aTime = a.createdAt ?? 0;
-          final bTime = b.createdAt ?? 0;
-          return aTime.compareTo(bTime); // Artan sıra: en eski → en yeni
-        });
-      
-      // Debug: Mesaj sıralamasını kontrol et
-      if (sortedMessages.isNotEmpty) {
-        print('📨 Mesaj sıralaması:');
-        for (int i = 0; i < sortedMessages.length; i++) {
-          final msg = sortedMessages[i];
-          print('  [$i] ID: ${msg.id}, Zaman: ${msg.createdAt}, Metin: ${msg is types.TextMessage ? msg.text : "Diğer"}');
+    ).listen(
+      (chatMessages) {
+        _applyMessages(chatMessages);
+        _markConversationRead();
+      },
+      onError: (Object e) {
+        if (kDebugMode) {
+          debugPrint('Mesaj stream hatası: $e');
         }
-      }
-      
-      setState(() {
-        _messages.clear();
-        _messages.addAll(sortedMessages);
-      });
-
-      // Yeni mesajlar geldiğinde okundu olarak işaretle
-      ChatService.markConversationAsRead(currentUser.id, widget.receiverId);
-    });
+        if (mounted) {
+          setState(() {
+            _isLoadingMessages = false;
+          });
+        }
+      },
+    );
   }
 
   types.Message _convertToChatMessage(ChatMessageModel chatMessage) {
+    final author = types.User(
+      id: chatMessage.senderId,
+      firstName: chatMessage.senderName,
+      imageUrl: chatMessage.senderAvatarUrl,
+    );
+    final createdAt = chatMessage.createdAt.millisecondsSinceEpoch;
 
-    // Görsel mesaj
     if (chatMessage.imageUrl != null) {
       return types.ImageMessage(
-        author: types.User(
-          id: chatMessage.senderId,
-          firstName: chatMessage.senderName,
-          imageUrl: chatMessage.senderAvatarUrl,
-        ),
-        createdAt: chatMessage.createdAt.millisecondsSinceEpoch,
+        author: author,
+        createdAt: createdAt,
         id: chatMessage.id,
         name: chatMessage.text.isNotEmpty ? chatMessage.text : 'Görsel',
-        size: 0, // Boyut bilgisi yoksa 0
+        size: 1,
         uri: chatMessage.imageUrl!,
       );
     }
 
-    // Dosya mesajı
     if (chatMessage.fileUrl != null) {
       return types.FileMessage(
-        author: types.User(
-          id: chatMessage.senderId,
-          firstName: chatMessage.senderName,
-          imageUrl: chatMessage.senderAvatarUrl,
-        ),
-        createdAt: chatMessage.createdAt.millisecondsSinceEpoch,
+        author: author,
+        createdAt: createdAt,
         id: chatMessage.id,
         name: chatMessage.text.isNotEmpty ? chatMessage.text : 'Dosya',
-        size: 0,
+        size: 1,
         uri: chatMessage.fileUrl!,
       );
     }
 
-    // Sesli mesaj
     if (chatMessage.audioUrl != null) {
       return types.CustomMessage(
-        author: types.User(
-          id: chatMessage.senderId,
-          firstName: chatMessage.senderName,
-          imageUrl: chatMessage.senderAvatarUrl,
-        ),
-        createdAt: chatMessage.createdAt.millisecondsSinceEpoch,
+        author: author,
+        createdAt: createdAt,
         id: chatMessage.id,
         metadata: {
           'type': 'audio',
@@ -244,14 +230,9 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       );
     }
 
-    // Metin mesajı
     return types.TextMessage(
-      author: types.User(
-        id: chatMessage.senderId,
-        firstName: chatMessage.senderName,
-        imageUrl: chatMessage.senderAvatarUrl,
-      ),
-      createdAt: chatMessage.createdAt.millisecondsSinceEpoch,
+      author: author,
+      createdAt: createdAt,
       id: chatMessage.id,
       text: chatMessage.text,
     );
@@ -259,13 +240,11 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
 
   void _handleSendPressed(types.PartialText message) async {
     try {
-      // Mesajı gönder - stream otomatik olarak güncelleyecek
       await ChatService.sendMessage(
         receiverId: widget.receiverId,
         receiverEmail: widget.receiverEmail,
         text: message.text,
       );
-      // Manuel ekleme yapmıyoruz - stream zaten ekleyecek
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -279,7 +258,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   }
 
   void _handleAttachmentPressed() {
-    // Dosya ekleme özelliği gelecekte eklenecek
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Dosya ekleme özelliği yakında eklenecek'),
@@ -288,56 +266,30 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   }
 
   void _handleMessageTap(BuildContext context, types.Message message) {
-    // Mesaja tıklandığında yapılacak işlemler
     if (message is types.ImageMessage) {
-      // Görseli büyüt
       showDialog(
         context: context,
         builder: (context) => Dialog(
           child: Image.network(message.uri),
         ),
       );
-    } else if (message is types.CustomMessage) {
-      // Sesli mesaj için özel işlem (zaten AudioMessagePlayer widget'ı içinde oynatılıyor)
-      final metadata = message.metadata;
-      if (metadata != null && metadata['type'] == 'audio') {
-        // Sesli mesaj oynatıcı widget'ı zaten gösteriliyor
-      }
     }
   }
 
-  /// Link önizlemesi için callback
   void _handlePreviewDataFetched(
     types.TextMessage message,
     types.PreviewData previewData,
   ) {
-    // flutter_chat_ui otomatik olarak link preview'ları gösterir
-    // Bu callback preview verisi alındığında çağrılır
-    print('🔗 Link önizlemesi alındı: ${previewData.link}');
-  }
-
-  /// Emoji seçildiğinde çağrılır
-  void _onEmojiSelected(String emoji) async {
-    // Seçilen emojiyi clipboard'a kopyala
-    await Clipboard.setData(ClipboardData(text: emoji));
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Emoji kopyalandı: $emoji - Mesaj alanına yapıştırabilirsiniz (Ctrl+V / Cmd+V)'),
-          duration: const Duration(seconds: 2),
-          action: SnackBarAction(
-            label: 'Tamam',
-            onPressed: () {},
-          ),
-        ),
-      );
+    if (kDebugMode) {
+      debugPrint('Link önizlemesi alındı: ${previewData.link}');
     }
   }
 
-  /// Emoji picker widget'ı (Bottom Sheet olarak)
+  void _onEmojiSelected(String emoji) {
+    _handleSendPressed(types.PartialText(text: emoji));
+  }
+
   void _showEmojiPicker() {
-    print('🎨 Emoji picker açılıyor...');
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -349,17 +301,13 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: SimpleEmojiPicker(
-            onEmojiSelected: (emoji) {
-              print('✅ Emoji seçildi: $emoji');
-              _onEmojiSelected(emoji);
-            },
+            onEmojiSelected: _onEmojiSelected,
           ),
         );
       },
     );
   }
 
-  /// Ses kaydına başla
   Future<void> _startRecording() async {
     try {
       final success = await AudioMessageService.startRecording(
@@ -377,18 +325,18 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
           _isRecording = true;
           _recordingDuration = 0;
         });
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Mikrofon izni gerekli'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mikrofon izni gerekli'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
-      print('❌ Ses kaydı başlatılamadı: $e');
+      if (kDebugMode) {
+        debugPrint('Ses kaydı başlatılamadı: $e');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -400,11 +348,12 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     }
   }
 
-  /// Ses kaydını durdur ve gönder
   Future<void> _stopRecordingAndSend() async {
+    final recordedDuration = _recordingDuration;
+
     try {
       final filePath = await AudioMessageService.stopRecording();
-      
+
       if (filePath == null || filePath.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -424,7 +373,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         });
       }
 
-      // Loading göster
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -447,14 +395,12 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       final currentUser = UserSessionService.getCurrentUser();
       if (currentUser == null) return;
 
-      // Mesaj ID'si oluştur
       final messageId = DateTime.now().millisecondsSinceEpoch.toString();
       final conversationId = ChatMessageModel.createConversationId(
         currentUser.id,
         widget.receiverId,
       );
 
-      // Ses dosyasını Firebase Storage'a yükle
       String? audioUrl;
       try {
         audioUrl = await AudioMessageService.uploadAudioToStorage(
@@ -463,7 +409,9 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
           conversationId: conversationId,
         );
       } catch (e) {
-        print('❌ Ses yükleme hatası: $e');
+        if (kDebugMode) {
+          debugPrint('Ses yükleme hatası: $e');
+        }
       }
 
       if (audioUrl == null || audioUrl.isEmpty) {
@@ -471,7 +419,9 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Ses dosyası yüklenemedi. İnternet bağlantınızı ve Firebase Storage ayarlarını kontrol edin.'),
+              content: Text(
+                'Ses dosyası yüklenemedi. İnternet bağlantınızı ve Firebase Storage ayarlarını kontrol edin.',
+              ),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 5),
             ),
@@ -480,27 +430,28 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         return;
       }
 
-      // Mesajı gönder
       await ChatService.sendMessage(
         receiverId: widget.receiverId,
         receiverEmail: widget.receiverEmail,
         text: '🎤 Sesli mesaj',
         audioUrl: audioUrl,
-        audioDuration: _recordingDuration,
+        audioDuration: recordedDuration,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Sesli mesaj gönderildi'),
+            content: Text('Sesli mesaj gönderildi'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
-      print('❌ Ses kaydı gönderilemedi: $e');
+      if (kDebugMode) {
+        debugPrint('Ses kaydı gönderilemedi: $e');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -513,7 +464,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     }
   }
 
-  /// Ses kaydını iptal et
   Future<void> _cancelRecording() async {
     await AudioMessageService.cancelRecording();
     if (mounted) {
@@ -530,11 +480,58 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
+  Widget _buildMessagesLoadingPlaceholder() {
+    return ColoredBox(
+      color: const Color(0xFFF5F5F5),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: ListView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 5,
+          padding: const EdgeInsets.all(16),
+          itemBuilder: (context, index) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Align(
+                alignment: index.isEven
+                    ? Alignment.centerLeft
+                    : Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (index.isEven) ...[
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Container(
+                      width: 200,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _messagesSubscription?.cancel();
-    _messageController.dispose();
-    _refreshController.dispose();
     AudioMessageService.dispose();
     super.dispose();
   }
@@ -570,15 +567,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  width: 150,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
               ],
             ),
           ),
@@ -606,24 +594,22 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.receiverName,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  // Online durumu gösterilebilir
-                ],
+              child: Text(
+                widget.receiverName,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
         ),
         actions: [
-          // Emoji butonu
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _forceRefresh,
+            tooltip: 'Yenile',
+          ),
           IconButton(
             icon: const Icon(Icons.emoji_emotions_outlined),
             onPressed: _showEmojiPicker,
@@ -634,62 +620,10 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         elevation: 1,
       ),
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          // Mesajlar yüklenirken shimmer göster
           if (_isLoadingMessages && _messages.isEmpty)
-            Shimmer.fromColors(
-              baseColor: Colors.grey[300]!,
-              highlightColor: Colors.grey[100]!,
-              child: Container(
-                color: Colors.white,
-                child: ListView.builder(
-                  itemCount: 5,
-                  padding: const EdgeInsets.all(16),
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Row(
-                        mainAxisAlignment: index % 2 == 0 
-                            ? MainAxisAlignment.start 
-                            : MainAxisAlignment.end,
-                        children: [
-                          if (index % 2 == 0) ...[
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Container(
-                            width: 200,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          if (index % 2 != 0) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            )
+            _buildMessagesLoadingPlaceholder()
           else
             Chat(
               messages: _messages,
@@ -700,39 +634,38 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               showUserAvatars: true,
               showUserNames: true,
               user: _currentUser!,
-            customMessageBuilder: (message, {required messageWidth}) {
-              final metadata = message.metadata;
-              if (metadata != null && metadata['type'] == 'audio') {
-                final audioUrl = metadata['audioUrl'] as String?;
-                final duration = metadata['duration'] as int?;
-                final isSent = message.author.id == _currentUser?.id;
-                
-                if (audioUrl != null) {
-                  return AudioMessagePlayer(
-                    audioUrl: audioUrl,
-                    duration: duration,
-                    isSent: isSent,
-                  );
+              customMessageBuilder: (message, {required messageWidth}) {
+                final metadata = message.metadata;
+                if (metadata != null && metadata['type'] == 'audio') {
+                  final audioUrl = metadata['audioUrl'] as String?;
+                  final duration = metadata['duration'] as int?;
+                  final isSent = message.author.id == _currentUser?.id;
+
+                  if (audioUrl != null) {
+                    return AudioMessagePlayer(
+                      audioUrl: audioUrl,
+                      duration: duration,
+                      isSent: isSent,
+                    );
+                  }
                 }
-              }
-                          return const SizedBox.shrink();
-            },
-            theme: const DefaultChatTheme(
-              primaryColor: Color(0xFF1976D2),
-              backgroundColor: Color(0xFFF5F5F5),
-              inputBackgroundColor: Colors.white,
-              inputTextColor: Colors.black87,
-              receivedMessageBodyTextStyle: TextStyle(
-                color: Colors.black87,
-                fontSize: 16,
-              ),
-              sentMessageBodyTextStyle: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
+                return const SizedBox.shrink();
+              },
+              theme: const DefaultChatTheme(
+                primaryColor: Color(0xFF1976D2),
+                backgroundColor: Color(0xFFF5F5F5),
+                inputBackgroundColor: Colors.white,
+                inputTextColor: Colors.black87,
+                receivedMessageBodyTextStyle: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 16,
+                ),
+                sentMessageBodyTextStyle: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
               ),
             ),
-          ),
-          // Ses kaydı göstergesi
           if (_isRecording)
             Positioned(
               bottom: 0,
@@ -748,7 +681,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                 ),
                 child: Row(
                   children: [
-                    // Kayıt ikonu
                     Container(
                       width: 12,
                       height: 12,
@@ -758,7 +690,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Süre
                     Text(
                       _formatDuration(_recordingDuration),
                       style: TextStyle(
@@ -768,13 +699,11 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                       ),
                     ),
                     const Spacer(),
-                    // İptal butonu
                     TextButton(
                       onPressed: _cancelRecording,
                       child: const Text('İptal'),
                     ),
                     const SizedBox(width: 8),
-                    // Gönder butonu
                     ElevatedButton.icon(
                       onPressed: _stopRecordingAndSend,
                       icon: const Icon(Icons.send),
@@ -790,7 +719,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
             ),
         ],
       ),
-      // Ses kaydı butonu (floating action button)
       floatingActionButton: _isRecording
           ? null
           : FloatingActionButton(
@@ -804,4 +732,3 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     );
   }
 }
-

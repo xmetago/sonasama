@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'dart:convert';
 import '../screens/home_page.dart';
@@ -7,7 +8,7 @@ import '../screens/chat_detail_page.dart';
 import '../screens/friendship_management_page.dart';
 import '../screens/davetler_page.dart';
 import '../screens/uyarilar_page.dart';
-import '../screens/album_olustur_page.dart';
+import '../services/durtme_service.dart';
 import '../services/hive_database_service.dart';
 import '../services/local_notification_service.dart';
 import '../widgets/timed_action_buttons.dart';
@@ -176,7 +177,7 @@ class _OneFriendPhoneBellMenuState extends State<OneFriendPhoneBellMenu> {
       child: Row(
         children: [
           // Solda biraz boşluk bırak
-          const SizedBox(width: 24),
+          const SizedBox(width: 90),
           // Adım 2: Solundaki ikonları aç-kapa için - menü kapalıyken yer kaplamaz, açıkken eski konumlarında görünür
           ClipRect(
             child: AnimatedSize(
@@ -337,6 +338,99 @@ class _OneFriendPhoneBellMenuState extends State<OneFriendPhoneBellMenu> {
   }
 }
 
+const List<Map<String, dynamic>> _durtmeKelimeData = [
+  {
+    'kelime': 'İyi',
+    'icon': Icons.thumb_up,
+    'color': Colors.green,
+    'fontWeight': FontWeight.w600,
+  },
+  {
+    'kelime': 'Kötü',
+    'icon': Icons.thumb_down,
+    'color': Colors.red,
+    'fontWeight': FontWeight.w700,
+  },
+  {
+    'kelime': 'Çirkin',
+    'icon': Icons.sentiment_very_dissatisfied,
+    'color': Colors.brown,
+    'fontWeight': FontWeight.w500,
+  },
+  {
+    'kelime': 'Özel',
+    'icon': Icons.star,
+    'color': Colors.amber,
+    'fontWeight': FontWeight.w600,
+  },
+  {
+    'kelime': 'Güzel',
+    'icon': Icons.favorite,
+    'color': Colors.pink,
+    'fontWeight': FontWeight.w600,
+  },
+  {
+    'kelime': 'Fena',
+    'icon': Icons.warning,
+    'color': Colors.orange,
+    'fontWeight': FontWeight.w700,
+  },
+  {
+    'kelime': 'Hoş',
+    'icon': Icons.mood,
+    'color': Colors.lightBlue,
+    'fontWeight': FontWeight.w500,
+  },
+  {
+    'kelime': 'Yakışıklı',
+    'icon': Icons.face,
+    'color': Colors.blue,
+    'fontWeight': FontWeight.w600,
+  },
+  {
+    'kelime': 'Boş ver',
+    'icon': Icons.block,
+    'color': Colors.grey,
+    'fontWeight': FontWeight.w500,
+  },
+  {
+    'kelime': 'İmkansız',
+    'icon': Icons.cancel,
+    'color': Colors.redAccent,
+    'fontWeight': FontWeight.w700,
+  },
+  {
+    'kelime': 'Aptal',
+    'icon': Icons.sentiment_dissatisfied,
+    'color': Colors.deepOrange,
+    'fontWeight': FontWeight.w600,
+  },
+  {
+    'kelime': 'Çılgın',
+    'icon': Icons.bolt,
+    'color': Colors.purple,
+    'fontWeight': FontWeight.w700,
+  },
+  {
+    'kelime': 'Deli',
+    'icon': Icons.psychology,
+    'color': Colors.indigo,
+    'fontWeight': FontWeight.w600,
+  },
+  {
+    'kelime': 'Olmaz',
+    'icon': Icons.close,
+    'color': Colors.red,
+    'fontWeight': FontWeight.w700,
+  },
+  {
+    'kelime': 'Belki',
+    'icon': Icons.help_outline,
+    'color': Colors.teal,
+    'fontWeight': FontWeight.w500,
+  },
+];
+
 // Profil Bölümü
 class SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant extends StatefulWidget {
   final VoidCallback? onDavalaPressed;
@@ -362,11 +456,87 @@ class SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant extends StatefulW
 
 class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends State<SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant> {
   String? _profileImageUrl; // Profil resmi URL'si
+  ActiveDurtmeOnProfile? _activeDurtmeOnProfile;
 
   @override
   void initState() {
     super.initState();
     _loadProfileImage();
+    _loadActiveDurtmeOnProfile();
+  }
+
+  @override
+  void didUpdateWidget(
+    covariant SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant oldWidget,
+  ) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userEmail != widget.userEmail ||
+        oldWidget.targetUserEmail != widget.targetUserEmail) {
+      _loadProfileImage();
+      setState(_loadActiveDurtmeOnProfile);
+    }
+  }
+
+  void _loadActiveDurtmeOnProfile() {
+    final profileEmail = widget.targetUserEmail ?? widget.userEmail;
+    if (profileEmail == null || profileEmail.isEmpty) {
+      _activeDurtmeOnProfile = null;
+      return;
+    }
+
+    _activeDurtmeOnProfile = DurtmeService.getActiveDurtmeForProfile(
+      profileEmail: profileEmail,
+    );
+  }
+
+  bool _isKotuKelime(String kelime) {
+    return kelime.trim().toLowerCase() == 'kötü';
+  }
+
+  void _showDurtmeSenderName(String senderName) {
+    final name = senderName.trim().isEmpty ? 'Bilinmeyen' : senderName.trim();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Dürten: $name'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _buildActiveDurtmeKelimeLabel(ActiveDurtmeOnProfile info) {
+    final label = DurtmeService.formatKelimeLabel(info.kelime);
+    final isKotu = _isKotuKelime(info.kelime);
+    final senderName =
+        info.senderName.trim().isEmpty ? 'Bilinmeyen' : info.senderName.trim();
+
+    final text = Text(
+      label,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        color: isKotu ? Colors.red[800] : Colors.amber[900],
+        letterSpacing: 0.4,
+      ),
+    );
+
+    return Tooltip(
+      message: senderName,
+      preferBelow: true,
+      waitDuration: const Duration(milliseconds: 150),
+      showDuration: const Duration(seconds: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showDurtmeSenderName(senderName),
+          borderRadius: BorderRadius.circular(4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: text,
+          ),
+        ),
+      ),
+    );
   }
 
   // Profil resmini Hive'dan yükle
@@ -410,15 +580,6 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
     
     // Geçersiz format
     return null;
-  }
-
-  @override
-  void didUpdateWidget(SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // userEmail veya targetUserEmail değiştiğinde profil resmini yeniden yükle
-    if (oldWidget.userEmail != widget.userEmail || oldWidget.targetUserEmail != widget.targetUserEmail) {
-      _loadProfileImage();
-    }
   }
 
   // Modern uyarı gösterme fonksiyonu
@@ -530,449 +691,222 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
 
   // Bu fonksiyonlar artık gerekli değil, TimedActionButtons widget'ı kendi kontrolünü yapıyor
 
-  // Dürtme alanı (SEYİR DEFTERİ) dialog'unu göster
-  void _showDurtmeAlani(BuildContext context) {
-    // Her kelime için ikon, renk ve font bilgileri
-    final List<Map<String, dynamic>> kelimeData = [
-      {
-        'kelime': 'İyi',
-        'icon': Icons.thumb_up,
-        'color': Colors.green,
-        'fontWeight': FontWeight.w600,
-      },
-      {
-        'kelime': 'Kötü',
-        'icon': Icons.thumb_down,
-        'color': Colors.red,
-        'fontWeight': FontWeight.w700,
-      },
-      {
-        'kelime': 'Çirkin',
-        'icon': Icons.sentiment_very_dissatisfied,
-        'color': Colors.brown,
-        'fontWeight': FontWeight.w500,
-      },
-      {
-        'kelime': 'Özel',
-        'icon': Icons.star,
-        'color': Colors.amber,
-        'fontWeight': FontWeight.w600,
-      },
-      {
-        'kelime': 'Güzel',
-        'icon': Icons.favorite,
-        'color': Colors.pink,
-        'fontWeight': FontWeight.w600,
-      },
-      {
-        'kelime': 'Fena',
-        'icon': Icons.warning,
-        'color': Colors.orange,
-        'fontWeight': FontWeight.w700,
-      },
-      {
-        'kelime': 'Hoş',
-        'icon': Icons.mood,
-        'color': Colors.lightBlue,
-        'fontWeight': FontWeight.w500,
-      },
-      {
-        'kelime': 'Yakışıklı',
-        'icon': Icons.face,
-        'color': Colors.blue,
-        'fontWeight': FontWeight.w600,
-      },
-      {
-        'kelime': 'Boş ver',
-        'icon': Icons.block,
-        'color': Colors.grey,
-        'fontWeight': FontWeight.w500,
-      },
-      {
-        'kelime': 'İmkansız',
-        'icon': Icons.cancel,
-        'color': Colors.redAccent,
-        'fontWeight': FontWeight.w700,
-      },
-      {
-        'kelime': 'Aptal',
-        'icon': Icons.sentiment_dissatisfied,
-        'color': Colors.deepOrange,
-        'fontWeight': FontWeight.w600,
-      },
-      {
-        'kelime': 'Çılgın',
-        'icon': Icons.bolt,
-        'color': Colors.purple,
-        'fontWeight': FontWeight.w700,
-      },
-      {
-        'kelime': 'Deli',
-        'icon': Icons.psychology,
-        'color': Colors.indigo,
-        'fontWeight': FontWeight.w600,
-      },
-      {
-        'kelime': 'Olmaz',
-        'icon': Icons.close,
-        'color': Colors.red,
-        'fontWeight': FontWeight.w700,
-      },
-      {
-        'kelime': 'Belki',
-        'icon': Icons.help_outline,
-        'color': Colors.teal,
-        'fontWeight': FontWeight.w500,
-      },
-    ];
+  Widget _buildProfileActionChip({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    bool emphasized = true,
+  }) {
+    final color = emphasized ? Colors.black87 : Colors.black54;
+    final borderColor = emphasized ? Colors.black26 : Colors.black12;
 
-    showDialog(
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 14, color: color),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        foregroundColor: color,
+        side: BorderSide(color: borderColor),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+    );
+  }
+
+  void _showDurtmeAlani(
+    BuildContext context, {
+    required String targetJudgeName,
+    required String targetUserId,
+    required String targetUserEmail,
+    required String senderEmail,
+    required bool isSelfDurtme,
+  }) {
+    showModalBottomSheet<void>(
       context: context,
-      barrierColor: Colors.black54,
-      builder: (BuildContext context) {
-        return TweenAnimationBuilder<double>(
-          duration: const Duration(milliseconds: 300),
-          tween: Tween(begin: 0.0, end: 1.0),
-          curve: Curves.easeOutBack,
-          builder: (context, value, child) {
-            return Transform.scale(
-              scale: value,
-              child: Opacity(
-                opacity: value,
-                child: Dialog(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 400),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.62,
+          minChildSize: 0.45,
+          maxChildSize: 0.85,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 10),
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white,
-                          Colors.grey[50]!,
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 30,
-                          offset: const Offset(0, 10),
-                          spreadRadius: 5,
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.touch_app, color: Colors.amber[800], size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Dürt',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                isSelfDurtme
+                                    ? '...'
+                                    : '$targetJudgeName\'e hızlı tepki gönder',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(sheetContext),
+                          tooltip: 'Kapat',
                         ),
                       ],
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Modern başlık çubuğu (gradyan arka plan)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.amber[100]!,
-                                  Colors.amber[50]!,
-                                ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.amber.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                // Sol tarafta üç kırmızı çizgi (animasyonlu)
-                                TweenAnimationBuilder<double>(
-                                  duration: const Duration(milliseconds: 600),
-                                  tween: Tween(begin: 0.0, end: 1.0),
-                                  curve: Curves.elasticOut,
-                                  builder: (context, value, child) {
-                                    return Transform.scale(
-                                      scale: value,
-                                      child: Row(
-                                        children: List.generate(3, (index) => Container(
-                                          margin: const EdgeInsets.only(right: 3),
-                                          width: 5,
-                                          height: 24,
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topCenter,
-                                              end: Alignment.bottomCenter,
-                                              colors: [
-                                                Colors.red[400]!,
-                                                Colors.red[600]!,
-                                              ],
-                                            ),
-                                            borderRadius: BorderRadius.circular(3),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.red.withOpacity(0.5),
-                                                blurRadius: 4,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ],
-                                          ),
-                                        )),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 12),
-                                // Başlık yazısı
-                                Expanded(
-                                  child: TweenAnimationBuilder<double>(
-                                    duration: const Duration(milliseconds: 500),
-                                    tween: Tween(begin: 0.0, end: 1.0),
-                                    curve: Curves.easeOut,
-                                    builder: (context, value, child) {
-                                      return Opacity(
-                                        opacity: value,
-                                        child: Transform.translate(
-                                          offset: Offset(0, 10 * (1 - value)),
-                                          child: const Text(
-                                            'Seni Dürtüyorum',
-                                            style: TextStyle(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.black87,
-                                              letterSpacing: 1.2,
-                                              shadows: [
-                                                Shadow(
-                                                  color: Colors.black12,
-                                                  blurRadius: 4,
-                                                  offset: Offset(0, 2),
-                                                ),
-                                              ],
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                // Sağ tarafta animasyonlu speaker ikonu
-                                TweenAnimationBuilder<double>(
-                                  duration: const Duration(milliseconds: 800),
-                                  tween: Tween(begin: 0.0, end: 1.0),
-                                  curve: Curves.elasticOut,
-                                  builder: (context, value, child) {
-                                    return Transform.scale(
-                                      scale: value,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: Colors.amber[100],
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.amber.withOpacity(0.4),
-                                              blurRadius: 6,
-                                              spreadRadius: 1,
-                                            ),
-                                          ],
-                                        ),
-                                        child: Icon(
-                                          Icons.record_voice_over_sharp,
-                                          color: Colors.amber[800],
-                                          size: 22,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Modern kelimeler grid'i
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    Colors.green[50]!,
-                                    Colors.lightGreen[50]!,
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Colors.green[200]!,
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.green.withOpacity(0.1),
-                                    blurRadius: 15,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: Stack(
-                                children: [
-                                  // Sol üstte animasyonlu kalem ikonu
-                                  TweenAnimationBuilder<double>(
-                                    duration: const Duration(milliseconds: 1000),
-                                    tween: Tween(begin: 0.0, end: 1.0),
-                                    curve: Curves.elasticOut,
-                                    builder: (context, value, child) {
-                                      return Positioned(
-                                        left: -10,
-                                        top: -10,
-                                        child: Transform.rotate(
-                                          angle: -0.3 * value,
-                                          child: Transform.scale(
-                                            scale: value,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: [
-                                                    Colors.blue[400]!,
-                                                    Colors.blue[600]!,
-                                                  ],
-                                                ),
-                                                shape: BoxShape.circle,
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.blue.withOpacity(0.4),
-                                                    blurRadius: 6,
-                                                    spreadRadius: 1,
-                                                  ),
-                                                ],
-                                              ),
-                                              child: const Icon(
-                                                Icons.edit,
-                                                color: Colors.white,
-                                                size: 16,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  // Kelimeler grid'i (3 sütun)
-                                  GridView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 3,
-                                      crossAxisSpacing: 10,
-                                      mainAxisSpacing: 10,
-                                      childAspectRatio: 2.1,
-                                    ),
-                                    itemCount: kelimeData.length,
-                                    itemBuilder: (context, index) {
-                                      final data = kelimeData[index];
-                                      return TweenAnimationBuilder<double>(
-                                        duration: Duration(milliseconds: 300 + (index * 50)),
-                                        tween: Tween(begin: 0.0, end: 1.0),
-                                        curve: Curves.easeOutBack,
-                                        builder: (context, value, child) {
-                                          return Transform.scale(
-                                            scale: value,
-                                            child: Opacity(
-                                              opacity: value,
-                                              child: _ModernKelimeKart(
-                                                kelime: data['kelime'] as String,
-                                                icon: data['icon'] as IconData,
-                                                color: data['color'] as Color,
-                                                fontWeight: data['fontWeight'] as FontWeight,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Modern kapat butonu
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: TweenAnimationBuilder<double>(
-                              duration: const Duration(milliseconds: 600),
-                              tween: Tween(begin: 0.0, end: 1.0),
-                              curve: Curves.easeOut,
-                              builder: (context, value, child) {
-                                return Opacity(
-                                  opacity: value,
-                                  child: Transform.translate(
-                                    offset: Offset(0, 20 * (1 - value)),
-                                    child: Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.grey[200]!,
-                                            Colors.grey[300]!,
-                                          ],
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          onTap: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(vertical: 14),
-                                            child: const Text(
-                                              'Kapat',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.black87,
-                                                letterSpacing: 1,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: GridView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 14,
+                        childAspectRatio: 0.82,
                       ),
+                      itemCount: _durtmeKelimeData.length,
+                      itemBuilder: (context, index) {
+                        final data = _durtmeKelimeData[index];
+                        return _ModernKelimeKart(
+                          kelime: data['kelime'] as String,
+                          icon: data['icon'] as IconData,
+                          color: data['color'] as Color,
+                          fontWeight: data['fontWeight'] as FontWeight,
+                          onTap: () => _onDurtmeKelimeSelected(
+                            sheetContext,
+                            kelime: data['kelime'] as String,
+                            targetJudgeName: targetJudgeName,
+                            targetUserId: targetUserId,
+                            targetUserEmail: targetUserEmail,
+                            senderEmail: senderEmail,
+                            isSelfDurtme: isSelfDurtme,
+                          ),
+                        );
+                      },
                     ),
                   ),
-                ),
+                ],
               ),
             );
           },
         );
       },
     );
+  }
+
+  Future<void> _onDurtmeKelimeSelected(
+    BuildContext sheetContext, {
+    required String kelime,
+    required String targetJudgeName,
+    required String targetUserId,
+    required String targetUserEmail,
+    required String senderEmail,
+    required bool isSelfDurtme,
+  }) async {
+    HapticFeedback.lightImpact();
+    final messenger = ScaffoldMessenger.maybeOf(sheetContext);
+
+    final result = await DurtmeService.sendDurtme(
+      senderEmail: senderEmail,
+      receiverId: targetUserId,
+      receiverEmail: targetUserEmail,
+      kelime: kelime,
+    );
+
+    if (!sheetContext.mounted) return;
+    Navigator.of(sheetContext).pop();
+
+    if (messenger == null) return;
+
+    switch (result.result) {
+      case DurtmeSendResult.success:
+        if (mounted) {
+          setState(_loadActiveDurtmeOnProfile);
+        }
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              isSelfDurtme
+                  ? 'Kendine "$kelime" dürtmesi gönderildi'
+                  : '$targetJudgeName\'e "$kelime" dürtmesi gönderildi',
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      case DurtmeSendResult.cooldown:
+        final message = result.remaining != null && result.reason != null
+            ? DurtmeService.cooldownMessage(
+                reason: result.reason!,
+                remaining: result.remaining!,
+              )
+            : 'Tekrar dürtmek için 19 sa bekleyin';
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      case DurtmeSendResult.noSession:
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Oturum bulunamadı, dürtme gönderilemedi'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      case DurtmeSendResult.error:
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Dürtme gönderilemedi, lütfen tekrar deneyin'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    }
   }
 
   @override
@@ -1058,71 +992,68 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Adım 3: Kullanıcı adına GestureDetector ekle - tıklanınca sohbet başlat
-                GestureDetector(
-                  onTap: isTargetUser && targetUserId != null && targetUserEmail != null && widget.userEmail != null
-                      ? () {
-                          // Başka bir kullanıcıyla sohbet başlat
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ChatDetailPage(
-                                receiverId: targetUserId,
-                                receiverEmail: targetUserEmail,
-                                receiverName: judgeName,
-                                receiverAvatarUrl: targetUserAvatarUrl,
-                                userEmail: widget.userEmail,
-                              ),
-                            ),
-                          );
-                        }
-                      : null, // Kendi profilini gösteriyorsa tıklama yok
-                  child: Text(
-                    judgeName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.black,
-                      decoration: isTargetUser ? TextDecoration.underline : TextDecoration.none,
-                    ),
+                Text(
+                  judgeName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.black,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 const ProfileIconsRow(),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        // ✅ Step-5: Albüm oluşturma sayfasına git
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AlbumOlusturPage(
-                              userEmail: widget.userEmail,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Icon(
-                        MdiIcons.pictureInPictureTopRightOutline,
-                        size: 24,
-                        color: Colors.redAccent,
+                if (targetUserId != null &&
+                    targetUserEmail != null &&
+                    widget.userEmail != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (isTargetUser) ...[
+                        _buildProfileActionChip(
+                          icon: Icons.chat_bubble_outline,
+                          label: 'Sohbet',
+                          emphasized: true,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatDetailPage(
+                                  receiverId: targetUserId,
+                                  receiverEmail: targetUserEmail,
+                                  receiverName: judgeName,
+                                  receiverAvatarUrl: targetUserAvatarUrl,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      _buildProfileActionChip(
+                        icon: Icons.waving_hand,
+                        label: 'Dürt',
+                        emphasized: true,
+                        onPressed: () {
+                          _showDurtmeAlani(
+                            context,
+                            targetJudgeName: judgeName,
+                            targetUserId: targetUserId,
+                            targetUserEmail: targetUserEmail,
+                            senderEmail: widget.userEmail!,
+                            isSelfDurtme: !isTargetUser,
+                          );
+                        },
                       ),
-                    ),
-                    const SizedBox(width: 38),
-                    GestureDetector(
-                      onTap: () {
-                        _showDurtmeAlani(context);
-                      },
-                      child: const Icon(
-                        Icons.record_voice_over_sharp,
-                        color: Colors.black54,
-                        size: 24,
-                      ),
-                    ),
-                  ],
-                ),
+                      if (_activeDurtmeOnProfile != null) ...[
+                        const SizedBox(width: 8),
+                        _buildActiveDurtmeKelimeLabel(_activeDurtmeOnProfile!),
+                      ],
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -1141,144 +1072,74 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
   }
 }
 
-// Modern kelime kartı widget'ı
-class _ModernKelimeKart extends StatefulWidget {
+// Kelime düğmesi — dürtme bottom sheet içinde yuvarlak ikon + alt etiket
+class _ModernKelimeKart extends StatelessWidget {
   final String kelime;
   final IconData icon;
   final Color color;
   final FontWeight fontWeight;
+  final VoidCallback onTap;
 
   const _ModernKelimeKart({
     required this.kelime,
     required this.icon,
     required this.color,
     required this.fontWeight,
+    required this.onTap,
   });
 
-  @override
-  State<_ModernKelimeKart> createState() => _ModernKelimeKartState();
-}
-
-class _ModernKelimeKartState extends State<_ModernKelimeKart>
-    with SingleTickerProviderStateMixin {
-  bool _isPressed = false;
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
+  static const double _circleSize = 62;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) {
-        setState(() => _isPressed = true);
-        _animationController.forward();
-      },
-      onTapUp: (_) {
-        setState(() => _isPressed = false);
-        _animationController.reverse();
-        // Haptic feedback
-        // HapticFeedback.lightImpact();
-      },
-      onTapCancel: () {
-        setState(() => _isPressed = false);
-        _animationController.reverse();
-      },
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white,
-                widget.color.withOpacity(0.1),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: widget.color.withOpacity(0.5),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: widget.color.withOpacity(0.3),
-                blurRadius: _isPressed ? 8 : 12,
-                spreadRadius: _isPressed ? 1 : 2,
-                offset: Offset(0, _isPressed ? 2 : 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // İkon container (gradyan arka plan)
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      widget.color.withOpacity(0.2),
-                      widget.color.withOpacity(0.1),
-                    ],
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            splashColor: color.withOpacity(0.2),
+            highlightColor: color.withOpacity(0.1),
+            child: Ink(
+              width: _circleSize,
+              height: _circleSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withOpacity(0.12),
+                border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.color.withOpacity(0.3),
-                      blurRadius: 4,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  widget.icon,
-                  color: widget.color,
-                  size: 22,
-                ),
+                ],
               ),
-              const SizedBox(height: 6),
-              // Kelime metni
-              Text(
-                widget.kelime,
-                style: TextStyle(
-                  color: widget.color,
-                  fontSize: 13,
-                  fontWeight: widget.fontWeight,
-                  letterSpacing: 0.8,
-                  shadows: [
-                    Shadow(
-                      color: widget.color.withOpacity(0.3),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+              child: Icon(icon, color: color, size: 26),
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Text(
+            kelime,
+            style: TextStyle(
+              color: color.withOpacity(0.95),
+              fontSize: 11,
+              fontWeight: fontWeight,
+              height: 1.15,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -2156,6 +2156,19 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  String? _profileTargetEmail(AuthProvider authProvider) {
+    final viewer = authProvider.userEmail?.trim();
+    final viewed = widget.userEmail?.trim();
+    if (viewer == null ||
+        viewed == null ||
+        viewer.isEmpty ||
+        viewed.isEmpty ||
+        viewer.toLowerCase() == viewed.toLowerCase()) {
+      return null;
+    }
+    return viewed;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer2<AuthProvider, DavaProvider>(
@@ -2305,7 +2318,10 @@ class _HomePageState extends State<HomePage> {
                                   vertical: 2.0, horizontal: 4.0),
                               child:
                                   SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
-                                userEmail: widget.userEmail,
+                                userEmail:
+                                    authProvider.userEmail ?? widget.userEmail,
+                                targetUserEmail:
+                                    _profileTargetEmail(authProvider),
                                 onShowSavedDavalar: () {
                                   // Global utility fonksiyonunu kullan
                                   if (widget.userEmail != null) {

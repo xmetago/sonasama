@@ -77,6 +77,15 @@ class _ChatPageState extends State<ChatPage> {
         return;
       }
 
+      // Tüm kullanıcıları al
+      final allUsers = HiveDatabaseService.getAllRegistrations();
+
+      await FriendCategoryService.migrateLegacyCategoriesIfNeeded(
+        ownerUserId: currentUser.id,
+        ownerEmail: currentUser.email,
+        allUsers: allUsers,
+      );
+
       // Normalize edilmiş kategoriyi kontrol et
       final allCategories = FriendCategoryService.listByOwner(currentUser.id);
       final grup19UserIds = <String>{};
@@ -88,9 +97,6 @@ class _ChatPageState extends State<ChatPage> {
         }
       }
 
-      // Tüm kullanıcıları al
-      final allUsers = HiveDatabaseService.getAllRegistrations();
-      
       // Grup-19 kategorisindeki kullanıcıları bul ve Friend listesine dönüştür
       friends = [];
       

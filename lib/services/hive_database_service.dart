@@ -870,6 +870,79 @@ class HiveDatabaseService {
     }
   }
 
+  /// Kullanıcının engellediği kişileri getir
+  static List<FriendshipModel> getBlockedUsers(String userId) {
+    return _friendshipBox?.values
+        .where((f) =>
+            f.requesterId == userId &&
+            f.status == FriendshipStatus.blocked)
+        .toList() ??
+        [];
+  }
+
+  /// Kullanıcı engelle (kalıcı)
+  static Future<void> blockUser(String blockerId, String blockedUserId) async {
+    final id = '${blockerId}_$blockedUserId';
+    final existing = getFriendshipByUsers(blockerId, blockedUserId);
+    if (existing != null) {
+      await updateFriendship(existing.copyWith(
+        status: FriendshipStatus.blocked,
+        updatedAt: DateTime.now(),
+      ));
+    } else {
+      await sendFriendshipRequest(FriendshipModel(
+        id: id,
+        requesterId: blockerId,
+        recipientId: blockedUserId,
+        status: FriendshipStatus.blocked,
+        createdAt: DateTime.now(),
+      ));
+    }
+  }
+
+  /// Engel kaldır
+  static Future<void> unblockUser(String blockerId, String blockedUserId) async {
+    final existing = getFriendshipByUsers(blockerId, blockedUserId);
+    if (existing != null && existing.status == FriendshipStatus.blocked) {
+      await deleteFriendship(existing.id);
+    }
+  }
+
+  /// Kullanıcı engellenmiş mi?
+  static bool isUserBlocked(String blockerId, String blockedUserId) {
+    final friendship = getFriendshipByUsers(blockerId, blockedUserId);
+    return friendship?.status == FriendshipStatus.blocked;
+  }
+
+  /// Tek yönlü kategori kaydı ile FriendshipModel senkronu
+  static Future<void> syncCategoryFriendship(
+    String ownerId,
+    String targetId,
+    String category,
+  ) async {
+    final id = '${ownerId}_$targetId';
+    final existing = getFriendshipByUsers(ownerId, targetId);
+    if (existing?.status == FriendshipStatus.blocked) return;
+
+    await sendFriendshipRequest(FriendshipModel(
+      id: existing?.id ?? id,
+      requesterId: ownerId,
+      recipientId: targetId,
+      status: FriendshipStatus.following,
+      createdAt: existing?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+      message: 'Kategori: $category',
+    ));
+  }
+
+  /// Kategori kaldırıldığında following kaydını temizle
+  static Future<void> removeCategoryFriendship(String ownerId, String targetId) async {
+    final existing = getFriendshipByUsers(ownerId, targetId);
+    if (existing != null && existing.status == FriendshipStatus.following) {
+      await deleteFriendship(existing.id);
+    }
+  }
+
   // ========== REGISTRATION (KAYIT) İŞLEMLERİ ==========
   
   /// Tüm kayıtları getir
@@ -4125,6 +4198,223 @@ class HiveDatabaseService {
       await _hediyeUyariBox?.put(bildirimKey, bildirimler);
     } catch (e) {
       print('❌ Gelen dava bildirimi eklenemedi: $e');
+    }
+  }
+
+  /// Dürtme bildirimi ekle (UyarilarPage).
+  static Future<void> appendDurtmeBildirimi({
+    required String receiverEmail,
+    required String senderName,
+    required String senderEmail,
+    required String kelime,
+  }) async {
+    try {
+      if (_hediyeUyariBox == null || !_hediyeUyariBox!.isOpen) {
+        _hediyeUyariBox = await Hive.openBox(_hediyeUyariBoxName);
+      }
+      final bildirimKey = 'bildirimler_$receiverEmail';
+      final existingBildirimler = _hediyeUyariBox?.get(bildirimKey);
+      final List<Map<String, dynamic>> bildirimler = existingBildirimler != null
+          ? (existingBildirimler as List).map((item) {
+              if (item is Map) {
+                return Map<String, dynamic>.from(item);
+              }
+              return item as Map<String, dynamic>;
+            }).toList()
+          : <Map<String, dynamic>>[];
+
+      bildirimler.add({
+        'id': 'durtme_${senderEmail}_${receiverEmail}_${DateTime.now().millisecondsSinceEpoch}',
+        'type': 'durtme',
+        'senderName': senderName,
+        'senderEmail': senderEmail,
+        'kelime': kelime,
+        'uyariMesaji': '$senderName seni dürtüyor: $kelime',
+        'olusturmaTarihi': DateTime.now().toIso8601String(),
+      });
+      await _hediyeUyariBox?.put(bildirimKey, bildirimler);
+    } catch (e) {
+      print('❌ Dürtme bildirimi eklenemedi: $e');
+    }
+  }
+
+  static String _durtmeCooldownKey(String senderEmail, String receiverEmail) =>
+      'durtme_cooldown_${senderEmail}_$receiverEmail';
+
+  static String _durtmeLastOnProfileKey(String receiverEmail) =>
+      'durtme_last_profile_$receiverEmail';
+
+  static String _durtmeSenderLastKey(String senderEmail) =>
+      'durtme_sender_last_$senderEmail';
+
+  /// Aynı kişiye tekrar dürtme için kalan bekleme süresi (günlük limit).
+  static Duration? getDurtmeCooldownRemaining(
+    String senderEmail,
+    String receiverEmail, {
+    required Duration cooldown,
+  }) {
+    try {
+      final raw = _hediyeUyariBox?.get(
+        _durtmeCooldownKey(senderEmail, receiverEmail),
+      );
+      if (raw is! String) return null;
+      final sentAt = DateTime.tryParse(raw);
+      if (sentAt == null) return null;
+      final elapsed = DateTime.now().difference(sentAt);
+      if (elapsed >= cooldown) return null;
+      return cooldown - elapsed;
+    } catch (e) {
+      print('❌ Dürtme cooldown okunamadı: $e');
+      return null;
+    }
+  }
+
+  static Future<void> recordDurtmeCooldown(
+    String senderEmail,
+    String receiverEmail,
+  ) async {
+    try {
+      if (_hediyeUyariBox == null || !_hediyeUyariBox!.isOpen) {
+        _hediyeUyariBox = await Hive.openBox(_hediyeUyariBoxName);
+      }
+      await _hediyeUyariBox?.put(
+        _durtmeCooldownKey(senderEmail, receiverEmail),
+        DateTime.now().toIso8601String(),
+      );
+    } catch (e) {
+      print('❌ Dürtme cooldown kaydedilemedi: $e');
+    }
+  }
+
+  /// Gönderenin son dürtmesini kaydet (19 saatlik global limit).
+  static Future<void> recordDurtmeSenderLast(
+    String senderEmail,
+    String receiverEmail,
+  ) async {
+    try {
+      if (_hediyeUyariBox == null || !_hediyeUyariBox!.isOpen) {
+        _hediyeUyariBox = await Hive.openBox(_hediyeUyariBoxName);
+      }
+      await _hediyeUyariBox?.put(
+        _durtmeSenderLastKey(senderEmail),
+        {
+          'receiverEmail': receiverEmail,
+          'sentAt': DateTime.now().toIso8601String(),
+        },
+      );
+    } catch (e) {
+      print('❌ Dürtme gönderen kaydı yazılamadı: $e');
+    }
+  }
+
+  /// Gönderen 19 saat içinde başka birine dürtmüş mü?
+  static Duration? getDurtmeSenderGlobalCooldownRemaining(
+    String senderEmail,
+    String targetReceiverEmail, {
+    required Duration cooldown,
+  }) {
+    try {
+      final raw = _hediyeUyariBox?.get(_durtmeSenderLastKey(senderEmail));
+      if (raw is! Map) return null;
+
+      final lastReceiver = raw['receiverEmail']?.toString();
+      final sentAtRaw = raw['sentAt']?.toString();
+      if (lastReceiver == null ||
+          lastReceiver.isEmpty ||
+          sentAtRaw == null ||
+          lastReceiver == targetReceiverEmail) {
+        return null;
+      }
+
+      final sentAt = DateTime.tryParse(sentAtRaw);
+      if (sentAt == null) return null;
+
+      final elapsed = DateTime.now().difference(sentAt);
+      if (elapsed >= cooldown) return null;
+      return cooldown - elapsed;
+    } catch (e) {
+      print('❌ Dürtme gönderen cooldown okunamadı: $e');
+      return null;
+    }
+  }
+
+  /// Alıcı son 19 dakika içinde dürtüldüyse kalan koruma süresi.
+  static Duration? getDurtmeReceiverShieldRemaining(
+    String receiverEmail, {
+    required Duration shieldDuration,
+  }) {
+    try {
+      final raw = _hediyeUyariBox?.get(
+        _durtmeLastOnProfileKey(receiverEmail),
+      );
+      if (raw is! Map) return null;
+
+      final sentAtRaw = raw['sentAt']?.toString();
+      if (sentAtRaw == null) return null;
+
+      final sentAt = DateTime.tryParse(sentAtRaw);
+      if (sentAt == null) return null;
+
+      final elapsed = DateTime.now().difference(sentAt);
+      if (elapsed >= shieldDuration) return null;
+      return shieldDuration - elapsed;
+    } catch (e) {
+      print('❌ Dürtme alıcı koruması okunamadı: $e');
+      return null;
+    }
+  }
+
+  /// Profil sahibine yapılan son dürtmenin kelimesini kaydet (19 saat gösterim).
+  static Future<void> recordLastDurtmeOnProfile({
+    required String receiverEmail,
+    required String senderEmail,
+    required String senderName,
+    required String kelime,
+  }) async {
+    try {
+      if (_hediyeUyariBox == null || !_hediyeUyariBox!.isOpen) {
+        _hediyeUyariBox = await Hive.openBox(_hediyeUyariBoxName);
+      }
+      await _hediyeUyariBox?.put(
+        _durtmeLastOnProfileKey(receiverEmail),
+        {
+          'kelime': kelime,
+          'sentAt': DateTime.now().toIso8601String(),
+          'senderEmail': senderEmail,
+          'senderName': senderName,
+        },
+      );
+    } catch (e) {
+      print('❌ Profil dürtme kelimesi kaydedilemedi: $e');
+    }
+  }
+
+  /// Profil sahibine son 19 saat içinde dürtme yapıldıysa ham kaydı döndürür.
+  static Map<String, dynamic>? getActiveDurtmeOnProfileRaw({
+    required String receiverEmail,
+    required Duration maxAge,
+  }) {
+    try {
+      final raw = _hediyeUyariBox?.get(
+        _durtmeLastOnProfileKey(receiverEmail),
+      );
+      if (raw is! Map) return null;
+
+      final kelime = raw['kelime']?.toString();
+      final sentAtRaw = raw['sentAt']?.toString();
+      if (kelime == null || kelime.isEmpty || sentAtRaw == null) return null;
+
+      final sentAt = DateTime.tryParse(sentAtRaw);
+      if (sentAt == null) return null;
+
+      if (DateTime.now().difference(sentAt) >= maxAge) return null;
+
+      return Map<String, dynamic>.from(
+        raw.map((key, value) => MapEntry(key.toString(), value)),
+      );
+    } catch (e) {
+      print('❌ Profil dürtme kelimesi okunamadı: $e');
+      return null;
     }
   }
 

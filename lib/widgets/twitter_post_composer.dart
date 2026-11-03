@@ -351,15 +351,57 @@ enum ComposerQuickAction {
 class TwitterPostComposer extends StatefulWidget {
   final String? userEmail;
   final ComposerQuickAction quickAction;
+  /// FAB → Anket Paylaş akışında anket formunu composer içinde açar (ek dialog yok).
+  final bool startInPollMode;
 
   const TwitterPostComposer({
     super.key,
     this.userEmail,
     this.quickAction = ComposerQuickAction.text,
+    this.startInPollMode = false,
   });
 
   @override
   State<TwitterPostComposer> createState() => _TwitterPostComposerState();
+}
+
+/// Anket paylaşımı — tam sayfa route (dialog/sheet çakışması yok).
+class PollPostPage extends StatelessWidget {
+  final String? userEmail;
+
+  const PollPostPage({super.key, this.userEmail});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          'Anket Paylaş',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: TwitterPostComposer(
+            userEmail: userEmail,
+            startInPollMode: true,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _TwitterPostComposerState extends State<TwitterPostComposer> {
@@ -377,6 +419,10 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      if (widget.startInPollMode) {
+        await _addPoll();
+        return;
+      }
       switch (widget.quickAction) {
         case ComposerQuickAction.image:
           await _addMedia();
@@ -411,6 +457,7 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
         ),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Ana post yazma alanı
           Padding(
@@ -472,7 +519,8 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
                         onChanged: (value) {
                           setState(() {});
                         },
-                        maxLines: _isExpanded ? null : 1,
+                        maxLines: _isExpanded ? 6 : 1,
+                        minLines: 1,
                         maxLength: 280,
                         // Türkçe karakter desteği - input formatter kaldırıldı, tüm karakterler kabul edilir
                         style: const TextStyle(
@@ -503,7 +551,9 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
                       ],
 
                       // Alt butonlar
-                      if (_isExpanded || _textController.text.isNotEmpty) ...[
+                      if (_isExpanded ||
+                          _textController.text.isNotEmpty ||
+                          _pollData != null) ...[
                         const SizedBox(height: 16),
                         Row(
                           children: [
@@ -878,6 +928,10 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
       setState(() {
         _isExpanded = false;
       });
+
+      if (widget.startInPollMode && mounted) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -967,13 +1021,31 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => _PollCreationDialog(),
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: _PollEditorPanel(
+              onPollCreated: (data) => Navigator.of(dialogContext).pop(data),
+              onCancel: () {
+                Navigator.of(dialogContext).pop();
+                if (widget.startInPollMode &&
+                    _pollData == null &&
+                    mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+          ),
+        );
+      },
     );
 
-    if (result != null) {
-      setState(() {
-        _pollData = result;
-      });
+    if (result != null && mounted) {
+      setState(() => _pollData = result);
     }
   }
 }
@@ -1323,13 +1395,21 @@ class TwitterPostCard extends StatelessWidget {
   }
 }
 
-/// Anket oluşturma dialog'u
-class _PollCreationDialog extends StatefulWidget {
+/// Anket oluşturma formu — composer içinde inline kullanılır.
+class _PollEditorPanel extends StatefulWidget {
+  final ValueChanged<Map<String, dynamic>> onPollCreated;
+  final VoidCallback onCancel;
+
+  const _PollEditorPanel({
+    required this.onPollCreated,
+    required this.onCancel,
+  });
+
   @override
-  State<_PollCreationDialog> createState() => _PollCreationDialogState();
+  State<_PollEditorPanel> createState() => _PollEditorPanelState();
 }
 
-class _PollCreationDialogState extends State<_PollCreationDialog> {
+class _PollEditorPanelState extends State<_PollEditorPanel> {
   final TextEditingController _questionController = TextEditingController();
   final List<TextEditingController> _optionControllers = [
     TextEditingController(),
@@ -1340,7 +1420,7 @@ class _PollCreationDialogState extends State<_PollCreationDialog> {
   @override
   void dispose() {
     _questionController.dispose();
-    for (var controller in _optionControllers) {
+    for (final controller in _optionControllers) {
       controller.dispose();
     }
     super.dispose();
@@ -1376,182 +1456,175 @@ class _PollCreationDialogState extends State<_PollCreationDialog> {
         _optionControllers.map((controller) => controller.text.trim()).toList();
     final now = DateTime.now();
 
-    final pollData = {
+    widget.onPollCreated({
       'question': _questionController.text.trim(),
       'options': options,
       'duration': _durationDays,
       'endsAt': now.add(Duration(days: _durationDays)).toIso8601String(),
-      'votes': {for (var option in options) option: 0},
+      'votes': {for (final option in options) option: 0},
       'userVotes': {},
       'createdAt': now.toIso8601String(),
-    };
-
-    Navigator.of(context).pop(pollData);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFCFD9DE)),
         borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFFF7F9F9),
       ),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 400),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Başlık
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              pollTypeBadgeIcon(size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
                   'Anket Oluştur',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            TextField(
-              controller: _questionController,
-              maxLength: 120,
-              maxLines: 3,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: 'Anket sorusu',
-                hintText: 'Örn: Favori sporunuz hangisi?',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
+              ),
+              IconButton(
+                onPressed: widget.onCancel,
+                icon: const Icon(Icons.close, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _questionController,
+            maxLength: 120,
+            maxLines: 2,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: 'Anket sorusu',
+              hintText: 'Örn: Favori sporunuz hangisi?',
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
               ),
             ),
-            const SizedBox(height: 16),
-
-            // Seçenekler
-            ..._optionControllers.asMap().entries.map((entry) {
-              final index = entry.key;
-              final controller = entry.value;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        // Türkçe karakter desteği - input formatter kaldırıldı, tüm karakterler kabul edilir
-                        decoration: InputDecoration(
-                          hintText: 'Seçenek ${index + 1}',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 12,
-                          ),
+          ),
+          const SizedBox(height: 12),
+          ..._optionControllers.asMap().entries.map((entry) {
+            final index = entry.key;
+            final controller = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      decoration: InputDecoration(
+                        hintText: 'Seçenek ${index + 1}',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        maxLength: 50,
-                        onChanged: (value) => setState(() {}),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                       ),
+                      maxLength: 50,
+                      onChanged: (_) => setState(() {}),
                     ),
-                    if (_optionControllers.length > 2)
-                      IconButton(
-                        onPressed: () => _removeOption(index),
-                        icon: const Icon(Icons.close, size: 20),
-                        color: Colors.red,
-                      ),
-                  ],
-                ),
-              );
-            }),
-
-            // Seçenek ekle butonu
-            if (_optionControllers.length < 4)
-              TextButton.icon(
-                onPressed: _addOption,
-                icon: const Icon(Icons.add),
-                label: const Text('Seçenek Ekle'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.blue,
+                  ),
+                  if (_optionControllers.length > 2)
+                    IconButton(
+                      onPressed: () => _removeOption(index),
+                      icon: const Icon(Icons.close, size: 20),
+                      color: Colors.red,
+                    ),
+                ],
+              ),
+            );
+          }),
+          if (_optionControllers.length < 4)
+            TextButton.icon(
+              onPressed: _addOption,
+              icon: const Icon(Icons.add),
+              label: const Text('Seçenek Ekle'),
+              style: TextButton.styleFrom(
+                foregroundColor: _kTwitterPollBlue,
+              ),
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Text('Anket süresi:', style: TextStyle(fontSize: 14)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButton<int>(
+                  value: _durationDays,
+                  isExpanded: true,
+                  items: [1, 2, 3, 7]
+                      .map(
+                        (days) => DropdownMenuItem(
+                          value: days,
+                          child: Text('$days gün'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _durationDays = value);
+                    }
+                  },
                 ),
               ),
-
-            const SizedBox(height: 16),
-
-            // Süre seçimi
-            Row(
-              children: [
-                const Text(
-                  'Anket süresi:',
-                  style: TextStyle(fontSize: 16),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: DropdownButton<int>(
-                    value: _durationDays,
-                    isExpanded: true,
-                    items: [1, 2, 3, 7]
-                        .map((days) => DropdownMenuItem(
-                              value: days,
-                              child: Text('$days gün'),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _durationDays = value;
-                        });
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // Butonlar
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            ],
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: widget.onCancel,
                   child: const Text('İptal'),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: _canCreate() ? _createPoll : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: _kTwitterPollBlue,
                     foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 48),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
+                      horizontal: 20,
+                      vertical: 10,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
                   ),
-                  child: const Text('Oluştur'),
+                  child: const Text('Anketi Ekle'),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
