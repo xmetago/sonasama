@@ -21,7 +21,7 @@ Denetim `lib/` altındaki elle yazılmış Dart dosyaları üzerinde yapıldı. 
 | `lib/widgets/modern_hukum_card.dart` | 2296 | 22 | |
 | `lib/screens/friendship_management_page.dart` | 2273 | 23 | |
 | `lib/screens/statistics_dashboard_page.dart` | ~1838 | 14 | Tur 2: ortak krom + `ListView.builder` |
-| `lib/screens/davetler_page.dart` | 2084 | 22 | 48 `SnackBar` |
+| `lib/screens/davetler_page.dart` | ~1286 | 22 | Tur 7: `DavetCard` ve `ModernDavaCard` ayrıldı. 48 snack duruyor |
 | `lib/screens/gelen_davalar_page.dart` | ~490 | 13 | Tur 6: dış `Consumer` kalktı. Kart `gelen_dava_card.dart` |
 | `lib/widgets/twitter_post_composer.dart` | 1632 | 18 | |
 | `lib/screens/delil_ekle_page.dart` | 1577 | 6 | 40 `SnackBar` |
@@ -295,9 +295,9 @@ Ortak kabuk `lib/widgets/shared/dava_count_headline_page.dart`. İki sayfa kendi
 1. Sayfanın tamamını saran `Consumer<DavaProvider>` kalktı. Liste `_davaList` ve `setState` ile güncelleniyor; sayı rozeti kendi `Consumer`'ında (`incomingDavaCount`). Üst şerit artık her provider bildiriminde kurulmuyor.
 2. `Dava`, `FiveCardCaseInformation` ve `DashedLinePainter` `lib/widgets/gelen_dava_card.dart` dosyasına taşındı. Sözleşme ve gövde aynı. Sayfa bu üç adı yeniden dışa aktarır; eski importlar bozulmaz. `yargila_page`, `actigim_davalar_page` ve `haykir_page` içindeki aynı isimler sayfa importunda gizlendi. Diğer yedi kopyaya dokunulmadı. Kullanılmayan `_buildModernRow` uyarısı kartla birlikte duruyor.
 
-### Tur 7 — `davetler_page.dart`
+### Tur 7 — `davetler_page.dart` (kartlar ayrıldı)
 
-`DavetCard` ve `ModernDavaCard` zaten dosyanın altında. Ayrı dosyalara taşı. Snack çağrılarını `AppSnack` ile değiştir (renk ve süre aynı). `ModernInvitationCard` ile ilişkiyi bu turda birleştirme; ikisi yan yana durup fark listesi çıkarılacak.
+`DavetCard` → `lib/widgets/davet_card.dart`. `ModernDavaCard` → `lib/widgets/modern_dava_card.dart`. Gövde aynı. Sayfa her iki adı yeniden dışa aktarır; `home_page.dart` içindeki `show ModernDavaCard` importu durur. Snack'ler yerinde: arka plan kırmızı, turuncu, yeşil, mavi ve gri; süre 2 veya 3 saniye. `showAppSnack` bu farkları tek varsayılanla ezmez. `ModernInvitationCard` ile birleştirilmedi.
 
 ### Tur 8 — `friendship_management_page.dart`
 
@@ -365,4 +365,4 @@ Hive taraması build dışına alındı. Kalan iş yapısal:
 
 ## 7. Sıradaki tek tur
 
-**Tur 7:** `DavetCard` ve `ModernDavaCard` ayrı dosyalara çıksın. `home_page.dart` `show ModernDavaCard` importu çalışmaya devam etsin (sayfa yeniden dışa aktarsın). Snack'ler bu turda yerinde kalsın: renkler ve süreler çağrıdan çağrıya değişiyor (`Colors.red`, `Colors.orange`, `Colors.green`, 2 veya 3 saniye). `showAppSnack` ancak tek bir çağrı kendi rengini ve süresini parametre olarak geçirirse bağlanır. `ModernInvitationCard` ile birleştirilmez.
+**Tur 8, küçük parça:** `friendship_management_page.dart` içinden tek bir diyalog veya satır widget'ı ayrı dosyaya çıksın. Snack'ler ve `setState` aynı turda toplu değişmesin. Görünüm ve callback aynı kalsın.
