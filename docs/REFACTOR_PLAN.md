@@ -223,7 +223,7 @@ Her biri kendi adımında, ilk kullanımındaki piksel ölçüsüne kilitlenerek
 
 ### 4.1 Yüksek
 
-1. **Kart `build` içinde Hive taraması — bu turda kapatıldı.** `ActigimDavaCard` açılış tarihini `_kunyeOpenedAt` alanında tutar. Kutu `initState`, `didUpdateWidget`, `setState` ve hediye diyaloğu açılırken bir kez okunur. Giriş animasyonunun kareleri ve `build` artık kutuyu tarama. Künye metni ve 72 saatlik UZLAŞMA hesabı aynı tarihi kullanır. Kart dosyası henüz ayrılmadı (Tur 14).
+1. **Kart `build` içinde Hive taraması — kapatıldı.** `ActigimDavaCard` (`lib/widgets/actigim_dava_card.dart`) açılış tarihini `_kunyeOpenedAt` alanında tutar. Kutu `initState`, `didUpdateWidget`, `setState` ve hediye diyaloğu açılırken bir kez okunur. Giriş animasyonunun kareleri ve `build` kutuyu tarama. Künye metni ve 72 saatlik UZLAŞMA hesabı aynı tarihi kullanır.
 
 2. **`build` içinde yan etki.** `ActigimDavaCard` ve katıldığım dava kartı `Consumer<DavaProvider>` kuruyor, sürüm değişince `Future.microtask` ile yükleme ve ardından `setState` planlıyor. Provider her bildirildiğinde kart yeniden kurulur, yükleme yeniden tetiklenebilir. Dinlemeyi `hukumUpdateVersion` için `Selector` ile sınırlamak ve yüklemeyi `didChangeDependencies` / sürüm karşılaştırmasının tek yerine almak aynı veriyi daha az turda gösterir.
 
@@ -359,12 +359,12 @@ Hive taraması build dışına alındı. Kalan iş yapısal:
 - Kaydedilenler listeleri hâlâ `ListView` + yayılım. Kayıt sayısı kullanıcıya ait.
 - `AppTheme` renkleri arşiv kromuna uygulanmadı. İstatistik başlığı tema ana rengini parametre olarak alır.
 - Kullanılmayan `CommonDavaCardWidget`, `AnimatedPrimaryButton`, `ModernSectionHeader` silinmedi.
-- `ActigimDavaCard` dosyası ayrılmadı. Yalnız açılış tarihi taraması `build` dışına çıktı.
+- `ActigimDavaCard` `lib/widgets/actigim_dava_card.dart` dosyasında. Açılış tarihi önbelleği aynı.
 - Sohbet avatarları `CachedAvatarWidget` olmadı. Mevcut `CircleAvatar` bazı adreslerde fotoğrafın üstüne kişi ikonu çiziyor; ortak widget bu yerleşimi üretmez.
 - `*.g.dart` üretilen modeller aynı.
 
 ## 7. Sıradaki tek tur
 
-**Sıradaki:** `ActigimDavaCard` `lib/widgets/actigim_dava_card.dart` dosyasına çıksın. Hive açılış tarihi önbelleği aynı kalsın. `InactiveDavaCard` ve `TreeMenuPageheadlines` ayrı tur. Microtask yüklemesi bu turda değişmez.
+**Sıradaki:** `InactiveDavaCard`, ardından `TreeMenuPageheadlines` ve `_HeadlineDavaCountBadge` ayrı dosyaya çıksın. Microtask yüklemesi bu turda değişmez.
 
-`FiveCardCaseInformation` kopyaları kendi dosyalarında: gelen, masraf, delil, yargıla, haykır, dava aç, katıldığım, açtığım. Sözleşmeler birleşmedi. `GroupSelectionDialog` `group_selection_dialog.dart` içinde.
+`ActigimDavaCard` `lib/widgets/actigim_dava_card.dart` dosyasında. Hive önbelleği aynı.
