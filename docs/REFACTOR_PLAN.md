@@ -365,6 +365,6 @@ Hive taraması build dışına alındı. Kalan iş yapısal:
 
 ## 7. Sıradaki tek tur
 
-**Sıradaki:** `delilleri_incele_page.dart` içindeki `FiveCardCaseInformation` kendi dosyasına çıksın. `Dava` modeli kartla gider, sayfa yeniden dışa aktarır. Sözleşme birleşmez. Sonra `yargila_page.dart`, `haykir_page.dart`, `dava_ac_page.dart`.
+**Sıradaki:** `yargila_page.dart` içindeki `FiveCardCaseInformation` kendi dosyasına çıksın. `ModernYargilaCard` bu turda sayfada kalır. Sözleşme birleşmez. Sonra `haykir_page.dart` ve `dava_ac_page.dart`.
 
-Masraf kartı bu turda taşındı: `lib/widgets/masraflar_case_card.dart`.
+Taşınan kartlar: `masraflar_case_card.dart`, `delil_case_card.dart`. Sayfalar adları yeniden dışa aktarır.
