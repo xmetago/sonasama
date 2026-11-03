@@ -3,6 +3,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import 'package:provider/provider.dart';
 import '../widgets/common_header_widgets.dart';
 import '../services/hive_database_service.dart';
+import '../services/itibar_endeksi_service.dart';
 import '../utils/dialog_utils.dart';
 import '../data/direm_data.dart';
 import '../providers/dava_provider.dart';
@@ -189,11 +190,25 @@ class _HaykirPageState extends State<HaykirPage> {
         haykirData['userEmail'] = widget.userEmail;
       }
 
-      if (_ozelDiremController.text.trim().isNotEmpty) {
-        final ozelDiremText = _ozelDiremController.text.trim();
+      final author = widget.userEmail == null
+          ? null
+          : HiveDatabaseService.getRegistrationByEmail(widget.userEmail!);
+      final ozelDiremText = _ozelDiremController.text.trim();
+      if (ozelDiremText.isNotEmpty) {
         haykirData['direme'] = ozelDiremText;
         haykirData['isOzelDirem'] = 'true';
         await HiveDatabaseService.addOzelDirem(ozelDiremText);
+        if (author != null) {
+          await ItibarEndeksiService.registerDirenAuthor(
+            text: ozelDiremText,
+            authorUserId: author.id,
+          );
+        }
+      } else if (author != null && _selectedDireme != null) {
+        await ItibarEndeksiService.creditDirenReuse(
+          text: _selectedDireme!,
+          usedByUserId: author.id,
+        );
       }
 
       haykirData['isActive'] = 'true';
@@ -755,6 +770,17 @@ class _HaykirPageState extends State<HaykirPage> {
 
                                                         try {
                                                           await HiveDatabaseService.addUyelerdenDirem(diremText);
+                                                          final author = widget.userEmail == null
+                                                              ? null
+                                                              : HiveDatabaseService.getRegistrationByEmail(
+                                                                  widget.userEmail!,
+                                                                );
+                                                          if (author != null) {
+                                                            await ItibarEndeksiService.registerDirenAuthor(
+                                                              text: diremText,
+                                                              authorUserId: author.id,
+                                                            );
+                                                          }
 
                                                           setState(() {
                                                             _selectedDireme = null;

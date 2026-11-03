@@ -36,6 +36,12 @@ class UserGamifiedScoreModel {
   /// Davalara ilişkin önemli olayları listeler.
   final List<ScoreCaseHighlight> caseHighlights;
 
+  /// Beş metriğin aritmetik ortalaması.
+  final double itibarEndeksi;
+
+  /// 0 / 3 / 6 / 9 / 12 aylık itibar ortalamaları.
+  final List<ItibarTrendPoint> trendPoints;
+
   /// Varsayılan kurucu.
   UserGamifiedScoreModel({
     required this.targetUser,
@@ -49,6 +55,21 @@ class UserGamifiedScoreModel {
     required this.categoryDistribution,
     required this.interactionMetrics,
     required this.caseHighlights,
+    this.itibarEndeksi = 0,
+    this.trendPoints = const [],
+  });
+}
+
+/// İtibar Endeksi zaman grafiği noktası.
+class ItibarTrendPoint {
+  final int monthsBack;
+  final String label;
+  final double average;
+
+  const ItibarTrendPoint({
+    required this.monthsBack,
+    required this.label,
+    required this.average,
   });
 }
 
@@ -69,6 +90,12 @@ class ScoreBreakdownItem {
   /// Kalem rengi.
   final Color color;
 
+  /// Hangi itibar bileşeni olduğu (`itibar`, `sosyal`, `dava`, `hediye`, `levh`, `diren`).
+  final String metricId;
+
+  /// Kesirli gösterim (İtibar Endeksi ortalaması).
+  final double? preciseValue;
+
   /// Varsayılan kurucu.
   ScoreBreakdownItem({
     required this.title,
@@ -76,6 +103,8 @@ class ScoreBreakdownItem {
     required this.points,
     required this.icon,
     required this.color,
+    this.metricId = '',
+    this.preciseValue,
   });
 }
 

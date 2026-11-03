@@ -6,7 +6,8 @@ import '../models/registration_model.dart';
 import '../models/user_gamified_score_model.dart';
 import '../services/friend_category_service.dart';
 import '../services/hive_database_service.dart';
-import '../services/user_session_service.dart';
+import '../services/itibar_endeksi_service.dart';
+import '../utils/proximity_category_rules.dart';
 
 /// Kullanıcıların oyunlaştırılmış puan kartını hesaplayan servis katmanı.
 class UserGamifiedScoreService {
@@ -29,10 +30,7 @@ class UserGamifiedScoreService {
     // ✅ Her kullanıcı için özelleştirilmiş veri hesaplama
     print('📊 Puan kartı hesaplanıyor: ${targetUser.judgeName} (${targetUser.email})');
 
-    final viewer = UserSessionService.getCurrentUser();
-    final viewerCategory = viewer == null
-        ? null
-        : FriendCategoryService.getByOwnerAndTarget(viewer.id, targetUser.id);
+    final itibar = await ItibarEndeksiService.compute(targetUser);
 
     final allFriendships = HiveDatabaseService.getAllFriendships();
     final acceptedFriendships = _countFriendships(
@@ -82,25 +80,16 @@ class UserGamifiedScoreService {
     print('   - Legacy kategoriler: ${legacyCategories.length}');
     print('   - Gelen davalar: ${incomingCases.length}');
 
-    final viewerCategoryScore = _scoreForViewerCategory(viewerCategory);
-    final acceptedScore = acceptedFriendships * 60;
-    final pendingScore = (pendingIncoming + pendingOutgoing) * 18;
-    final socialReachScore =
-        (followerCount * 35) + (followingCount * 22);
-    final strategistScore = ownCategoryRecords.length * 12;
-    final legacyScore = legacyCategories.length * 6;
-    final justiceActivityScore = incomingCases.length * 28;
+    final totalScore = (itibar.itibarEndeksi * 541)
+        .round()
+        .clamp(0, 10279);
 
-    final totalScore = viewerCategoryScore +
-        acceptedScore +
-        pendingScore +
-        socialReachScore +
-        strategistScore +
-        legacyScore +
-        justiceActivityScore;
-
-    // ✅ Debug: Toplam puan detayları
-    print('   - Toplam puan: $totalScore (Kategori: $viewerCategoryScore, Arkadaşlık: $acceptedScore, Bekleyen: $pendingScore, Sosyal: $socialReachScore, Strateji: $strategistScore, Legacy: $legacyScore, Dava: $justiceActivityScore)');
+    print(
+      '   - İtibar Endeksi: ${itibar.itibarEndeksi.toStringAsFixed(2)} '
+      '(Sosyal ${itibar.sosyalLig}, Dava ${itibar.davaEnerjisi}, '
+      'Hediye ${itibar.hediyeSadakati}, Levh ${itibar.levhMahfuz}, '
+      'Diren ${itibar.direnEndeksi})',
+    );
 
     final levelInfo = _resolveLevel(totalScore);
     print('   - Seviye: ${levelInfo.level} (${levelInfo.title})');
@@ -116,46 +105,58 @@ class UserGamifiedScoreService {
 
     final breakdownItems = [
       ScoreBreakdownItem(
-        title: 'Kategori Aurasi',
+        title: 'İtibar Endeksi',
         description:
-            viewerCategory == null ? 'Henüz kategorizasyon yapılmadı' : _viewerCategoryLabel(viewerCategory.category),
-        points: viewerCategoryScore,
-        icon: Icons.shield,
+            'Beş metriğin aritmetik ortalaması. 0, 3, 6, 9 ve 12 aylık trend için dokunun.',
+        points: itibar.itibarEndeksi.round(),
+        preciseValue: itibar.itibarEndeksi,
+        metricId: 'itibar',
+        icon: Icons.insights_outlined,
         color: Colors.deepPurpleAccent,
       ),
       ScoreBreakdownItem(
         title: 'Sosyal Lig',
-        description: 'Kabul edilen arkadaşlıklar',
-        points: acceptedScore,
+        description:
+            '${itibar.sosyalLigHam} kişi sizi Grup-19 seçti. Puan = kişi sayısı / 19 '
+            '(19 kişi = 1, 38 kişi = 2).',
+        points: itibar.sosyalLig,
+        metricId: 'sosyal',
         icon: Icons.groups,
         color: Colors.orangeAccent,
       ),
       ScoreBreakdownItem(
-        title: 'Yeni İttifaklar',
-        description: 'Bekleyen istekler',
-        points: pendingScore,
-        icon: Icons.hourglass_top,
+        title: 'Dava Enerjisi',
+        description: 'Kazanılan dava +1, kaybedilen dava −1.',
+        points: itibar.davaEnerjisi,
+        metricId: 'dava',
+        icon: Icons.gavel,
         color: Colors.blueAccent,
       ),
       ScoreBreakdownItem(
-        title: 'Etkileşim Dalgası',
-        description: 'Takipçiler ve takip edilenler',
-        points: socialReachScore,
-        icon: Icons.waves,
+        title: 'Masraf/Hediye Sadakati',
+        description:
+            'Cezai hediyeyi yerine getiren +1, hediyeden kaçınan −19.',
+        points: itibar.hediyeSadakati,
+        metricId: 'hediye',
+        icon: Icons.card_giftcard,
         color: Colors.lightGreen,
       ),
       ScoreBreakdownItem(
-        title: 'Strateji Defteri',
-        description: 'Kategorize ettiği kişiler',
-        points: strategistScore + legacyScore,
-        icon: Icons.auto_awesome,
+        title: 'Levh-i Mahfûz Defteri',
+        description:
+            'Admin +0 alanına basarak puanı artırır. İleride ahlaki yaşam ölçütüne bağlanır.',
+        points: itibar.levhMahfuz,
+        metricId: 'levh',
+        icon: Icons.menu_book_outlined,
         color: Colors.pinkAccent,
       ),
       ScoreBreakdownItem(
-        title: 'Dava Enerjisi',
-        description: 'Atanan aktif davalar',
-        points: justiceActivityScore,
-        icon: Icons.balance,
+        title: 'Diren Endeksi',
+        description:
+            'Başka bir üye, sizin yazdığınız diren metnini seçerse +1.',
+        points: itibar.direnEndeksi,
+        metricId: 'diren',
+        icon: Icons.campaign_outlined,
         color: Colors.cyanAccent,
       ),
     ];
@@ -216,6 +217,16 @@ class UserGamifiedScoreService {
       categoryDistribution: combinedCategoryDistribution,
       interactionMetrics: interactionMetrics,
       caseHighlights: caseHighlights,
+      itibarEndeksi: itibar.itibarEndeksi,
+      trendPoints: itibar.trend
+          .map(
+            (point) => ItibarTrendPoint(
+              monthsBack: point.monthsBack,
+              label: point.label,
+              average: point.average,
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -251,48 +262,10 @@ class UserGamifiedScoreService {
     return progress.clamp(0.0, 1.0);
   }
 
-  /// İzleyenin atadığı kategoriye göre skor hesaplar.
-  static int _scoreForViewerCategory(FriendCategoryModel? viewerCategory) {
-    if (viewerCategory == null) return 80;
-    final normalized = _normalizeCategoryName(viewerCategory.category);
-    switch (normalized) {
-      case 'Grup-19':
-        return 320;
-      case 'Arkadaş':
-        return 220;
-      case 'Takipçi':
-        return 150;
-      case 'Herkes':
-        return 110;
-      default:
-        return 90;
-    }
-  }
-
-  /// İzleyici kategorisi için okunabilir etiket üretir.
-  static String _viewerCategoryLabel(String rawCategory) {
-    final normalized = _normalizeCategoryName(rawCategory);
-    switch (normalized) {
-      case 'Grup-19':
-        return 'Grup-19 elit kadrosunda';
-      case 'Arkadaş':
-        return 'Arkadaş halkasında';
-      case 'Takipçi':
-        return 'Takip listesinde';
-      case 'Herkes':
-        return 'Genel erişim listesinde';
-      default:
-        return '$normalized kategorisinde';
-    }
-  }
-
-  /// Kategorileri normalize eder.
+  /// Kategorileri normalize eder. Kaldırılan Herkes, Takipçi sayılır.
   static String _normalizeCategoryName(String category) {
-    final lower = category.toLowerCase();
-    if (lower.contains('grup')) return 'Grup-19';
-    if (lower.contains('ark')) return 'Arkadaş';
-    if (lower.contains('takip')) return 'Takipçi';
-    return 'Herkes';
+    return ProximityCategoryRules.normalize(category) ??
+        ProximityCategoryRules.takipci;
   }
 
   /// Arkadaşlık sayısını hesaplar.

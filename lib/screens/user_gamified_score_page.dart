@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../models/registration_model.dart';
 import '../models/user_gamified_score_model.dart';
+import '../services/hive_database_service.dart';
+import '../services/itibar_endeksi_service.dart';
 import '../services/user_gamified_score_service.dart';
+import '../services/user_session_service.dart';
+import '../utils/app_theme.dart';
+import '../widgets/profile_icons_row.dart';
 
 /// Kullanıcının oyunlaştırılmış puan kartını gösteren ekran.
 class UserGamifiedScorePage extends StatefulWidget {
@@ -25,166 +30,151 @@ class UserGamifiedScorePage extends StatefulWidget {
 
 class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
   static const int _maxScore = 10279;
-  static const int _silverThreshold = 2546;
-  static const int _bronzeThreshold = 19;
   static const List<_ScoreLevelDefinition> _scoreLevels = [
     _ScoreLevelDefinition(
-      tierLabel: 'ALTIN',
-      tierEmoji: '🟡',
-      rank: 1,
+      lig: 5,
+      rank: 19,
       concept: 'Adalet Kişisi',
       points: 10279,
-      color: Color(0xFFFFD54F),
+      color: AppTheme.warningColor,
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'ALTIN',
-      tierEmoji: '🟡',
-      rank: 2,
-      concept: 'Hikmet Kişisi',
+      lig: 4,
+      rank: 18,
+      concept: 'Vefa Kişisi',
       points: 9386,
-      color: Color(0xFFFFD54F),
+      color: AppTheme.warningColor,
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'ALTIN',
-      tierEmoji: '🟡',
-      rank: 3,
+      lig: 4,
+      rank: 17,
       concept: 'Hakkaniyet Kişisi',
       points: 8531,
-      color: Color(0xFFFFD54F),
+      color: AppTheme.warningColor,
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'ALTIN',
-      tierEmoji: '🟡',
-      rank: 4,
-      concept: 'İnanç Sahibi Kişisi',
+      lig: 4,
+      rank: 16,
+      concept: 'Hikmet Kişisi',
       points: 7714,
-      color: Color(0xFFFFD54F),
+      color: AppTheme.warningColor,
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'ALTIN',
-      tierEmoji: '🟡',
-      rank: 5,
-      concept: 'İrade Sahibi Kişisi',
+      lig: 3,
+      rank: 15,
+      concept: 'Bilgelik Sahibi Kişisi',
       points: 6935,
-      color: Color(0xFFFFD54F),
+      color: AppTheme.primaryColor,
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'ALTIN',
-      tierEmoji: '🟡',
-      rank: 6,
-      concept: 'Şahitlik Kişisi',
+      lig: 3,
+      rank: 14,
+      concept: 'Sadakat Kişisi',
       points: 6194,
-      color: Color(0xFFFFD54F),
+      color: AppTheme.primaryColor,
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'GÜMÜŞ',
-      tierEmoji: '⚪',
-      rank: 7,
+      lig: 3,
+      rank: 13,
       concept: 'Basiret Kişisi',
       points: 5491,
-      color: Color(0xFFCFD8DC),
+      color: AppTheme.primaryColor,
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'GÜMÜŞ',
-      tierEmoji: '⚪',
-      rank: 8,
-      concept: 'Feraset Kişisi',
+      lig: 3,
+      rank: 12,
+      concept: 'Şahitlik Kişisi',
       points: 4826,
-      color: Color(0xFFCFD8DC),
+      color: AppTheme.primaryColor,
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'GÜMÜŞ',
-      tierEmoji: '⚪',
-      rank: 9,
-      concept: 'Empatik (Rahmet) Kişisi',
+      lig: 3,
+      rank: 11,
+      concept: 'İspat Ehli Kişisi',
       points: 4199,
-      color: Color(0xFFCFD8DC),
+      color: AppTheme.primaryColor,
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'GÜMÜŞ',
-      tierEmoji: '⚪',
+      lig: 2,
       rank: 10,
       concept: 'Analitik / Rasyonel Kişisi',
       points: 3610,
-      color: Color(0xFFCFD8DC),
+      color: const Color(0xFF2563EB),
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'GÜMÜŞ',
-      tierEmoji: '⚪',
-      rank: 11,
-      concept: 'İspat Ehli Kişisi',
-      points: 3059,
-      color: Color(0xFFCFD8DC),
-    ),
-    _ScoreLevelDefinition(
-      tierLabel: 'GÜMÜŞ',
-      tierEmoji: '⚪',
-      rank: 12,
-      concept: 'Bilgelik Sahibi Kişisi',
-      points: 2546,
-      color: Color(0xFFCFD8DC),
-    ),
-    _ScoreLevelDefinition(
-      tierLabel: 'BRONZ',
-      tierEmoji: '🟤',
-      rank: 13,
-      concept: 'Dürüst Kişisi',
-      points: 2071,
-      color: Color(0xFFCD7F32),
-    ),
-    _ScoreLevelDefinition(
-      tierLabel: 'BRONZ',
-      tierEmoji: '🟤',
-      rank: 14,
-      concept: 'Sabır Kişisi',
-      points: 1634,
-      color: Color(0xFFCD7F32),
-    ),
-    _ScoreLevelDefinition(
-      tierLabel: 'BRONZ',
-      tierEmoji: '🟤',
-      rank: 15,
-      concept: 'Dengeli Kişisi',
-      points: 1235,
-      color: Color(0xFFCD7F32),
-    ),
-    _ScoreLevelDefinition(
-      tierLabel: 'BRONZ',
-      tierEmoji: '🟤',
-      rank: 16,
-      concept: 'Tutarlı Kişisi',
-      points: 874,
-      color: Color(0xFFCD7F32),
-    ),
-    _ScoreLevelDefinition(
-      tierLabel: 'BRONZ',
-      tierEmoji: '🟤',
-      rank: 17,
+      lig: 2,
+      rank: 9,
       concept: 'Bakış Sahibi Kişisi',
+      points: 3059,
+      color: const Color(0xFF2563EB),
+    ),
+    _ScoreLevelDefinition(
+      lig: 2,
+      rank: 8,
+      concept: 'Feraset Kişisi',
+      points: 2546,
+      color: const Color(0xFF2563EB),
+    ),
+    _ScoreLevelDefinition(
+      lig: 2,
+      rank: 7,
+      concept: 'Mizan Kişisi',
+      points: 2071,
+      color: const Color(0xFF2563EB),
+    ),
+    _ScoreLevelDefinition(
+      lig: 2,
+      rank: 6,
+      concept: 'Tutarlı Kişisi',
+      points: 1634,
+      color: const Color(0xFF2563EB),
+    ),
+    _ScoreLevelDefinition(
+      lig: 1,
+      rank: 5,
+      concept: 'İrade Sahibi Kişisi',
+      points: 1235,
+      color: const Color(0xFFB45309),
+    ),
+    _ScoreLevelDefinition(
+      lig: 1,
+      rank: 4,
+      concept: 'Sabır Kişisi',
+      points: 874,
+      color: const Color(0xFFB45309),
+    ),
+    _ScoreLevelDefinition(
+      lig: 1,
+      rank: 3,
+      concept: 'Dürüst Kişisi',
       points: 551,
-      color: Color(0xFFCD7F32),
+      color: const Color(0xFFB45309),
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'BRONZ',
-      tierEmoji: '🟤',
-      rank: 18,
-      concept: 'Fikir Sahibi Kişisi',
+      lig: 1,
+      rank: 2,
+      concept: 'Empatik (Rahmet) Kişisi',
       points: 266,
-      color: Color(0xFFCD7F32),
+      color: const Color(0xFFB45309),
     ),
     _ScoreLevelDefinition(
-      tierLabel: 'BRONZ',
-      tierEmoji: '🟤',
-      rank: 19,
+      lig: 1,
+      rank: 1,
       concept: 'Hassas Vicdanlı Kişisi',
       points: 19,
-      color: Color(0xFFCD7F32),
+      color: const Color(0xFFB45309),
     ),
   ];
 
   UserGamifiedScoreModel? _scoreModel;
   bool _isLoading = true;
+  bool _levhBusy = false;
   String? _errorMessage;
+
+  bool get _viewerIsAdmin {
+    final email = UserSessionService.getCurrentUser()?.email;
+    return HiveDatabaseService.isAdmin(email);
+  }
 
   @override
   void initState() {
@@ -231,20 +221,17 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: AppTheme.scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        title: const Text(
-          'Puan Kartı',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        backgroundColor: AppTheme.successColor,
+        foregroundColor: AppTheme.textOnPrimary,
+        title: const Text('Puan Kartı'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadScore,
+            tooltip: 'Yenile',
+            onPressed: _isLoading ? null : _loadScore,
           ),
         ],
       ),
@@ -257,26 +244,38 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(
-          color: Colors.orangeAccent,
+          color: AppTheme.successColor,
         ),
       );
     }
 
     if (_errorMessage != null) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _errorMessage!,
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _loadScore,
-              child: const Text('Tekrar Dene'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 48,
+                color: AppTheme.errorColor.withOpacity(0.8),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _loadScore,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tekrar Dene'),
+                style: AppTheme.primaryButtonStyle,
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -294,25 +293,35 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
       nextLevel,
     );
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeroHeader(score, currentLevel),
-          const SizedBox(height: 20),
-          _buildScoreSummaryCard(score, currentLevel, nextLevel),
-          const SizedBox(height: 20),
-          _buildProgressCard(currentLevel, nextLevel, progressValue),
-          const SizedBox(height: 20),
-          _buildBadgeSection(score.totalScore),
-          const SizedBox(height: 20),
-          _buildLevelsTable(currentLevel),
-          const SizedBox(height: 20),
-          _buildInsightCards(score, currentLevel, nextLevel),
-          const SizedBox(height: 32),
-          _buildActionButtons(),
-        ],
+    return RefreshIndicator(
+      color: AppTheme.successColor,
+      onRefresh: _loadScore,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeroHeader(score, currentLevel),
+            const SizedBox(height: 16),
+            _buildScoreSummaryCard(score, currentLevel, nextLevel),
+            const SizedBox(height: 16),
+            _buildProgressCard(currentLevel, nextLevel, progressValue),
+            const SizedBox(height: 16),
+            _buildBreakdownSection(score),
+            if (score.earnedBadges.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _buildEarnedBadgesSection(score),
+            ],
+            const SizedBox(height: 16),
+            _buildLevelsTable(currentLevel),
+            const SizedBox(height: 16),
+            _buildInsightCards(score, currentLevel, nextLevel),
+            const SizedBox(height: 24),
+            _buildActionButtons(),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -326,22 +335,20 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
         ? widget.targetUser.judgeName.characters.first.toUpperCase()
         : '?';
     final motto = _resolveMotto(currentLevel.concept);
+
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF1E293B),
-            Color(0xFF0F172A),
-          ],
+          colors: [AppTheme.calmGreenDark, AppTheme.primaryDarkColor],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.35),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: AppTheme.primaryColor.withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -352,14 +359,14 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
           Row(
             children: [
               CircleAvatar(
-                radius: 38,
-                backgroundColor: Colors.orangeAccent,
+                radius: 36,
+                backgroundColor: AppTheme.textOnPrimary.withOpacity(0.2),
                 child: Text(
                   initials,
                   style: const TextStyle(
-                    fontSize: 28,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppTheme.textOnPrimary,
                   ),
                 ),
               ),
@@ -370,36 +377,36 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
                   children: [
                     Text(
                       widget.targetUser.judgeName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                      style: AppTheme.headline4.copyWith(
+                        color: AppTheme.textOnPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.targetUser.email,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 14,
+                      style: AppTheme.bodySmall.copyWith(
+                        color: AppTheme.textOnPrimary.withOpacity(0.8),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: currentLevel.color.withOpacity(0.2),
+                        color: AppTheme.textOnPrimary.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: currentLevel.color),
+                        border: Border.all(
+                          color: AppTheme.textOnPrimary.withOpacity(0.4),
+                        ),
                       ),
                       child: Text(
                         currentLevel.concept,
-                        style: TextStyle(
-                          color: currentLevel.color,
+                        style: const TextStyle(
+                          color: AppTheme.textOnPrimary,
                           fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
                       ),
                     ),
@@ -408,45 +415,85 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Hassas Vicdanlı Kişisi\'nden Adalet Kişisi\'ne değer yolculuğu',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.12),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _buildHeroChip(
+                iconWidget: ProfileIconsRow.ligIcon(
+                  currentLevel.lig,
+                  size: 18,
+                  color: AppTheme.textOnPrimary,
+                ),
+                label: 'Lig ${currentLevel.lig}',
+                subtitle: ProfileIconsRow.ligLabel(currentLevel.lig),
               ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.format_quote,
-                  color: Colors.white.withOpacity(0.7),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    motto,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.85),
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
+              const SizedBox(width: 10),
+              _buildHeroChip(
+                icon: Icons.star_outline,
+                label: _formatPoints(score.totalScore),
+                subtitle: 'Toplam puan',
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '1-Hassas Vicdanlı Kişisi\'nden  --> 2- Empatik(Rahmet) Kişisi\'ne  değer yolculuğu',
+            style: AppTheme.caption.copyWith(
+              color: AppTheme.textOnPrimary.withOpacity(0.85),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Hero bölümündeki küçük bilgi çiplerini oluşturur.
+  Widget _buildHeroChip({
+    IconData? icon,
+    Widget? iconWidget,
+    required String label,
+    required String subtitle,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.textOnPrimary.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            if (iconWidget != null)
+              iconWidget
+            else
+              Icon(icon, color: AppTheme.textOnPrimary, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppTheme.textOnPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: AppTheme.textOnPrimary.withOpacity(0.75),
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -457,89 +504,7 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     _ScoreLevelDefinition currentLevel,
     _ScoreLevelDefinition? nextLevel,
   ) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF1D4ED8),
-            Color(0xFF3B82F6),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blueAccent.withOpacity(0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Seviye ${currentLevel.rank}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    currentLevel.concept,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.85),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              _buildSummaryItem(
-                label: 'Toplam Puan',
-                value: _formatPoints(score.totalScore),
-              ),
-              _buildSummaryItem(
-                label: 'Sıra',
-                value: '${currentLevel.rank}/${_scoreLevels.length}',
-              ),
-              _buildSummaryItem(
-                label: 'Seviye Durumu',
-                value: currentLevel.tierText,
-              ),
-              _buildSummaryItem(
-                label: 'Sonraki Seviye',
-                value: nextLevel?.concept ?? 'Zirve',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+    return Container();
   }
 
   /// Özet satırlarını üretir.
@@ -550,8 +515,8 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.textOnPrimary.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,16 +524,17 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.75),
-              fontSize: 12,
+              color: AppTheme.textOnPrimary.withOpacity(0.75),
+              fontSize: 11,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
+              color: AppTheme.textOnPrimary,
               fontWeight: FontWeight.bold,
+              fontSize: 14,
             ),
           ),
         ],
@@ -583,81 +549,72 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     double progressValue,
   ) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      decoration: AppTheme.cardDecoration(bordered: true),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Seviye İlerlemeniz',
-                style: TextStyle(
-                  color: Color(0xFF0F172A),
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  'Seviye İlerlemeniz',
+                  style: AppTheme.headline4,
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: AppTheme.calmGreenUltraLight,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   nextLevel == null
                       ? 'Zirvedesiniz'
-                      : '${_formatPoints(nextLevel.points)} puanda ${nextLevel.concept}',
-                  style: const TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontSize: 12,
+                      : '${_formatPoints(nextLevel.points)} puana',
+                  style: AppTheme.caption.copyWith(
+                    color: AppTheme.successDarkColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ],
           ),
+          if (nextLevel != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              nextLevel.concept,
+              style: AppTheme.bodySmall.copyWith(color: AppTheme.textSecondary),
+            ),
+          ],
           const SizedBox(height: 16),
           ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
-              minHeight: 12,
+              minHeight: 10,
               value: progressValue,
-              backgroundColor: const Color(0xFFE2E8F0),
+              backgroundColor: AppTheme.dividerColor,
               valueColor: AlwaysStoppedAnimation<Color>(currentLevel.color),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 'Başlangıç: ${_formatPoints(currentLevel.points)}',
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 12,
+                style: AppTheme.caption,
+              ),
+              Text(
+                '%${(progressValue * 100).round()}',
+                style: AppTheme.caption.copyWith(
+                  color: AppTheme.successDarkColor,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
                 'Zirve: ${_formatPoints(_maxScore)}',
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 12,
-                ),
+                style: AppTheme.caption,
               ),
             ],
           ),
@@ -666,125 +623,275 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     );
   }
 
-  /// Rozet seviyelerini gösteren bölümü oluşturur.
-  Widget _buildBadgeSection(int totalScore) {
-    final badges = [
-      _BadgeDefinition(
-        title: 'Bronz Rozet',
-        points: _bronzeThreshold,
-        color: const Color(0xFFCD7F32),
-        icon: Icons.emoji_events_outlined,
-      ),
-      _BadgeDefinition(
-        title: 'Gümüş Rozet',
-        points: _silverThreshold,
-        color: const Color(0xFFB0BEC5),
-        icon: Icons.emoji_events_outlined,
-      ),
-      _BadgeDefinition(
-        title: 'Altın Rozet',
-        points: _maxScore,
-        color: const Color(0xFFFFD54F),
-        icon: Icons.emoji_events_outlined,
-      ),
-    ];
+  /// Puan kalemlerini gösteren bölümü oluşturur.
+  Widget _buildBreakdownSection(UserGamifiedScoreModel score) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Rozetler',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+        Text('İtibar Endeksi', style: AppTheme.headline4),
+        const SizedBox(height: 4),
+        Text(
+          'Sosyal Lig, Dava Enerjisi, Masraf/Hediye Sadakati, '
+          'Levh-i Mahfûz Defteri ve Diren Endeksi ortalaması.',
+          style: AppTheme.bodySmall,
         ),
         const SizedBox(height: 12),
-        Row(
-          children: List.generate(badges.length, (index) {
-            final badge = badges[index];
-            final isActive = totalScore >= badge.points;
-            return Expanded(
-              child: Container(
-                margin: EdgeInsets.only(
-                  right: index == badges.length - 1 ? 0 : 12,
-                ),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(isActive ? 0.18 : 0.08),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: badge.color.withOpacity(isActive ? 0.9 : 0.4),
+        ...score.breakdownItems.map((item) {
+          final isItibar = item.metricId == 'itibar';
+          final card = _buildBreakdownCard(item);
+          if (!isItibar) return card;
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => _showItibarTrend(score),
+              child: card,
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildBreakdownCard(ScoreBreakdownItem item) {
+    final valueColor = _pointsColor(item);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: AppTheme.cardDecoration(bordered: true),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: item.color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(item.icon, color: item.color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: AppTheme.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: badge.color.withOpacity(0.2),
-                      child: Icon(
-                        badge.icon,
-                        color: badge.color,
-                      ),
+                Text(
+                  item.description,
+                  style: AppTheme.caption,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (item.metricId == 'itibar') ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Trend grafiği',
+                    style: AppTheme.caption.copyWith(
+                      color: item.color,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      badge.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_formatPoints(badge.points)} puan',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 11,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _formatMetricValue(item),
+                style: AppTheme.bodyMedium.copyWith(
+                  color: valueColor,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            );
-          }),
-        ),
-      ],
+              if (item.metricId == 'levh' && _viewerIsAdmin)
+                TextButton(
+                  onPressed: _levhBusy ? null : _incrementLevh,
+                  style: TextButton.styleFrom(
+                    foregroundColor: item.color,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(_levhBusy ? '...' : '+0'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _pointsColor(ScoreBreakdownItem item) {
+    final value = item.preciseValue ?? item.points.toDouble();
+    if (value < 0) return AppTheme.errorColor;
+    if (value > 0) return AppTheme.successDarkColor;
+    return AppTheme.textSecondary;
+  }
+
+  String _formatMetricValue(ScoreBreakdownItem item) {
+    if (item.preciseValue != null) {
+      return _formatSignedDouble(item.preciseValue!);
+    }
+    if (item.metricId == 'levh' && item.points == 0) return '+0';
+    return _formatSignedInt(item.points);
+  }
+
+  String _formatSignedInt(int value) {
+    if (value > 0) return '+${_formatPoints(value)}';
+    if (value < 0) return '-${_formatPoints(value.abs())}';
+    return '0';
+  }
+
+  String _formatSignedDouble(double value) {
+    final text = value.abs().toStringAsFixed(2);
+    if (value > 0) return '+$text';
+    if (value < 0) return '-$text';
+    return '0.00';
+  }
+
+  Future<void> _incrementLevh() async {
+    setState(() => _levhBusy = true);
+    try {
+      final next = await ItibarEndeksiService.incrementLevhMahfuz(
+        widget.targetUser.id,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Levh-i Mahfûz Defteri: +$next')),
+      );
+      await _loadScore();
+    } finally {
+      if (mounted) setState(() => _levhBusy = false);
+    }
+  }
+
+  void _showItibarTrend(UserGamifiedScoreModel score) {
+    final points = score.trendPoints.isEmpty
+        ? const [0, 3, 6, 9, 12]
+            .map(
+              (months) => ItibarTrendPoint(
+                monthsBack: months,
+                label: months == 12 ? '12 ay (yıllık)' : '$months ay',
+                average: score.itibarEndeksi,
+              ),
+            )
+            .toList()
+        : score.trendPoints;
+    var maxAbs = 1.0;
+    for (final point in points) {
+      final abs = point.average.abs();
+      if (abs > maxAbs) maxAbs = abs;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('İtibar Endeksi'),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _formatSignedDouble(score.itibarEndeksi),
+                  style: AppTheme.headline4.copyWith(
+                    color: score.itibarEndeksi < 0
+                        ? AppTheme.errorColor
+                        : AppTheme.successDarkColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '(Sosyal Lig + Dava Enerjisi + Masraf/Hediye Sadakati + '
+                  'Levh-i Mahfûz + Diren Endeksi) / 5',
+                  style: AppTheme.caption,
+                ),
+                const SizedBox(height: 16),
+                ...points.map((point) {
+                  final fraction = (point.average.abs() / maxAbs).clamp(0.0, 1.0);
+                  final barColor = point.average < 0
+                      ? AppTheme.errorColor
+                      : AppTheme.successColor;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(point.label, style: AppTheme.bodySmall),
+                            ),
+                            Text(
+                              _formatSignedDouble(point.average),
+                              style: AppTheme.bodySmall.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: barColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            minHeight: 8,
+                            value: fraction == 0 ? 0.04 : fraction,
+                            backgroundColor: AppTheme.dividerColor,
+                            valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Kapat'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Servisten gelen kazanılmış rozetleri gösterir.
+  Widget _buildEarnedBadgesSection(UserGamifiedScoreModel score) {
+    return Column(
+
     );
   }
 
   /// Seviye tablosunu oluşturur.
   Widget _buildLevelsTable(_ScoreLevelDefinition currentLevel) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      decoration: AppTheme.cardDecoration(bordered: true),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Değer Seviyeleri ve Puanları',
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+          Text('Değer Seviyeleri ve Puanları', style: AppTheme.headline4),
+          const SizedBox(height: 4),
+          Text(
+            'Mevcut seviyeniz vurgulanmıştır.',
+            style: AppTheme.caption,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           _buildTableHeader(),
-          const Divider(height: 1),
+          const Divider(height: 1, color: AppTheme.dividerColor),
           ..._scoreLevels.map((level) {
             final isCurrent = level.rank == currentLevel.rank;
             return _buildTableRow(level, isCurrent);
@@ -799,107 +906,106 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        children: const [
+        children: [
           Expanded(
             flex: 2,
-            child: Text(
-              'Seviye',
-              style: TextStyle(
-                color: Color(0xFF475569),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: Text('Seviye', style: _tableHeaderStyle),
           ),
           Expanded(
-            child: Text(
-              'Sıra',
-              style: TextStyle(
-                color: Color(0xFF475569),
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            child: Text('Sıra', style: _tableHeaderStyle, textAlign: TextAlign.center),
           ),
           Expanded(
             flex: 3,
-            child: Text(
-              'Kavram',
-              style: TextStyle(
-                color: Color(0xFF475569),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: Text('Kavram', style: _tableHeaderStyle),
           ),
           Expanded(
-            child: Text(
-              'Puan',
-              style: TextStyle(
-                color: Color(0xFF475569),
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.right,
-            ),
+            child: Text('Puan', style: _tableHeaderStyle, textAlign: TextAlign.right),
           ),
         ],
       ),
     );
   }
 
+  static const TextStyle _tableHeaderStyle = TextStyle(
+    color: AppTheme.textSecondary,
+    fontWeight: FontWeight.bold,
+    fontSize: 12,
+  );
+
   /// Tablo satırını üretir.
   Widget _buildTableRow(_ScoreLevelDefinition level, bool isCurrent) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
       decoration: BoxDecoration(
-        color: isCurrent ? const Color(0xFFF1F5F9) : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        color: isCurrent ? AppTheme.calmGreenUltraLight : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        border: isCurrent
+            ? Border.all(color: AppTheme.successColor.withOpacity(0.3))
+            : null,
       ),
       child: Row(
         children: [
           Expanded(
             flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: level.color.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                level.tierText,
-                style: TextStyle(
-                  color: level.color.withOpacity(0.9),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+            child: Row(
+              children: [
+                ProfileIconsRow.ligIcon(
+                  level.lig,
+                  size: 16,
+                  color: level.color,
                 ),
-              ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Lig ${level.lig}',
+                    style: TextStyle(
+                      color: level.color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
             child: Text(
               level.rank.toString(),
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF0F172A),
+              style: AppTheme.bodySmall.copyWith(
                 fontWeight: FontWeight.w600,
+                color: isCurrent ? AppTheme.successDarkColor : AppTheme.textPrimary,
               ),
             ),
           ),
           Expanded(
             flex: 3,
-            child: Text(
-              level.concept,
-              style: const TextStyle(
-                color: Color(0xFF0F172A),
-                fontWeight: FontWeight.w600,
-              ),
+            child: Row(
+              children: [
+                if (isCurrent) ...[
+                  Icon(Icons.arrow_forward, size: 14, color: AppTheme.successColor),
+                  const SizedBox(width: 4),
+                ],
+                Expanded(
+                  child: Text(
+                    level.concept,
+                    style: AppTheme.bodySmall.copyWith(
+                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                      color: isCurrent ? AppTheme.successDarkColor : AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
             child: Text(
               _formatPoints(level.points),
               textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: Color(0xFF0F172A),
+              style: AppTheme.bodySmall.copyWith(
                 fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
               ),
             ),
           ),
@@ -917,44 +1023,38 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Değer Yolculuğu Rehberi',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text('Değer Yolculuğu Rehberi', style: AppTheme.headline4),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _buildInsightCard(
-              title: 'Motto',
-              description: _resolveMotto(currentLevel.concept),
-              icon: Icons.favorite_outline,
-            ),
-            _buildInsightCard(
-              title: 'Odak Değeri',
-              description:
-                  '${currentLevel.concept} seviyesinde, doğruluk ve şeffaflık önceliğiniz.',
-              icon: Icons.track_changes_outlined,
-            ),
-            _buildInsightCard(
-              title: 'Hedef Puan',
-              description: nextLevel == null
-                  ? 'Zirvedesiniz. Adalet Kişisi seviyesini koruyun.'
-                  : '${_formatPoints(nextLevel.points)} puanda ${nextLevel.concept} olacaksınız.',
-              icon: Icons.flag_outlined,
-            ),
-            _buildInsightCard(
-              title: 'Toplam Katkı',
-              description:
-                  'Şu ana kadar ${_formatPoints(score.totalScore)} puan biriktirdiniz.',
-              icon: Icons.auto_graph_outlined,
-            ),
-          ],
+        _buildInsightCard(
+          title: 'Motto',
+          description: _resolveMotto(currentLevel.concept),
+          icon: Icons.favorite_outline,
+          color: AppTheme.accentColor,
+        ),
+        const SizedBox(height: 10),
+        _buildInsightCard(
+          title: 'Odak Değeri',
+          description:
+              '${currentLevel.concept} seviyesinde, doğruluk ve şeffaflık önceliğiniz.',
+          icon: Icons.track_changes_outlined,
+          color: AppTheme.primaryColor,
+        ),
+        const SizedBox(height: 10),
+        _buildInsightCard(
+          title: 'Hedef Puan',
+          description: nextLevel == null
+              ? 'Zirvedesiniz. Adalet Kişisi seviyesini koruyun.'
+              : '${_formatPoints(nextLevel.points)} puanda ${nextLevel.concept} olacaksınız.',
+          icon: Icons.flag_outlined,
+          color: AppTheme.warningColor,
+        ),
+        const SizedBox(height: 10),
+        _buildInsightCard(
+          title: 'Toplam Katkı',
+          description:
+              'Şu ana kadar ${_formatPoints(score.totalScore)} puan biriktirdiniz.',
+          icon: Icons.auto_graph_outlined,
+          color: AppTheme.successColor,
         ),
       ],
     );
@@ -965,44 +1065,41 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     required String title,
     required String description,
     required IconData icon,
+    required Color color,
   }) {
     return Container(
-      width: 260,
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.12),
-        ),
+      decoration: AppTheme.cardDecoration(
+        color: color.withOpacity(0.05),
+        bordered: true,
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: Colors.white.withOpacity(0.15),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 18,
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            description,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 12,
-              height: 1.4,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: AppTheme.bodySmall.copyWith(height: 1.5),
+                ),
+              ],
             ),
           ),
         ],
@@ -1012,61 +1109,51 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
 
   /// Sayfanın alt aksiyon butonlarını oluşturur.
   Widget _buildActionButtons() {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _handleManageCategory,
-            icon: const Icon(Icons.category_outlined),
-            label: const Text('Kategori Yönet'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF38BDF8),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+        if (widget.onManageCategory != null)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _handleManageCategory,
+              icon: const Icon(Icons.category_outlined),
+              label: const Text('Kategori Yönet'),
+              style: AppTheme.primaryButtonStyle.copyWith(
+                padding: WidgetStateProperty.all(
+                  const EdgeInsets.symmetric(vertical: 16),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('Geri Dön'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.12),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ),
-        ),
+        if (widget.onManageCategory != null) const SizedBox(height: 10),
+
       ],
     );
   }
 
   /// Mevcut seviye tanımını belirler.
   _ScoreLevelDefinition _resolveCurrentLevel(int totalScore) {
+    _ScoreLevelDefinition? best;
     for (final level in _scoreLevels) {
-      if (totalScore >= level.points) {
-        return level;
+      if (totalScore >= level.points &&
+          (best == null || level.rank > best.rank)) {
+        best = level;
       }
     }
-    return _scoreLevels.last;
+    return best ?? _scoreLevels.last;
   }
 
   /// Bir sonraki seviyeyi belirler.
   _ScoreLevelDefinition? _resolveNextLevel(_ScoreLevelDefinition currentLevel) {
-    final currentIndex =
-        _scoreLevels.indexWhere((level) => level.rank == currentLevel.rank);
-    if (currentIndex <= 0) {
+    if (currentLevel.rank >= 19) {
       return null;
     }
-    return _scoreLevels[currentIndex - 1];
+    for (final level in _scoreLevels) {
+      if (level.rank == currentLevel.rank + 1) {
+        return level;
+      }
+    }
+    return null;
   }
 
   /// İlerleme yüzdesini hesaplar.
@@ -1090,43 +1177,43 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
   String _resolveMotto(String concept) {
     const mottos = {
       'Hassas Vicdanlı Kişisi':
-          'Vicdanının sesini dinleyen, küçük bir adalet işaretini bile büyüten bir kalbe sahipsin.',
-      'Fikir Sahibi Kişisi':
-          'Her soruya bir yaklaşımın var; fikirlerin topluluğun pusulası oluyor.',
-      'Bakış Sahibi Kişisi':
-          'Olaylara geniş pencereden bakar, değerli içgörüler üretirsin.',
-      'Tutarlı Kişisi':
-          'Kararlarında kararlılık ve denge, güvenin temelini oluşturur.',
-      'Dengeli Kişisi':
-          'Adımların ölçülü, yaklaşımın sağduyulu; ortamı dengeye taşırsın.',
-      'Sabır Kişisi':
-          'Zorlu süreçlerde sakin kalır, adaletin zamanla güçlendiğine inanırsın.',
-      'Dürüst Kişisi':
-          'Gerçeği doğru zamanda söylemek senin için bir değer pusulasıdır.',
-      'Bilgelik Sahibi Kişisi':
-          'Bilgiyi deneyimle yoğurur, daha derin bir anlam inşa edersin.',
-      'İspat Ehli Kişisi':
-          'Kanıt odaklı yaklaşımın, kararlarını sağlamlaştırır.',
-      'Analitik / Rasyonel Kişisi':
-          'Olayları çözümleyerek netlik ve düzen getirirsin.',
+          'Pusulanın iğnesi vicdandır; yönü o belirler.',
       'Empatik (Rahmet) Kişisi':
-          'Başkasının kalbini duymak, kararlarına merhamet katar.',
-      'Feraset Kişisi':
-          'Öngörün, daha adil ve doğru kararlar almanı sağlar.',
-      'Basiret Kişisi':
-          'Derin kavrayışın, olayların özünü ortaya çıkarır.',
-      'Şahitlik Kişisi':
-          'Tanıklığın, hakikatin ve adaletin sağlam dayanağıdır.',
+          'Başkasının halini hissetmek, pusulanın hassasiyetidir.',
+      'Dürüst Kişisi':
+          'Pusula yalan söylemez; dürüstlük yönün doğruluğudur.',
+      'Sabır Kişisi':
+          'Fırtınada pusula titrer ama sapmaz; sabır istikrardır.',
       'İrade Sahibi Kişisi':
-          'İrade gücün, değer yolculuğunu istikrarlı kılar.',
-      'İnanç Sahibi Kişisi':
-          'İnancın, zor anlarda bile doğruyu savunmanı sağlar.',
-      'Hakkaniyet Kişisi':
-          'Hakkaniyete olan bağlılığın, dengeyi gözeten kararlar doğurur.',
+          'Pusula yönü gösterir, irade o yönde yürür.',
+      'Tutarlı Kişisi':
+          'El sıkışmanın değeri tutarlılığındadır; sözünde durmak.',
+      'Mizan Kişisi':
+          'Elden ele geçen hakkın ölçüsü; tartma eylemi.',
+      'Feraset Kişisi':
+          'Doğru eli doğru zamanda sıkmak; isabetli bağ kurma.',
+      'Bakış Sahibi Kişisi':
+          'Karşındakinin elini değil, niyetini görmek.',
+      'Analitik / Rasyonel Kişisi':
+          'Güvenin duygusal değil, rasyonel temellerini inşa etmek.',
+      'İspat Ehli Kişisi':
+          'Kanıt, gerçeğin aynadaki yansımasıdır.',
+      'Şahitlik Kişisi':
+          'Tanıklık, olayı olduğu gibi yansıtan aynadır.',
+      'Basiret Kişisi':
+          'Aynanın buğusunu silen derin kavrayış; özü görme.',
+      'Sadakat Kişisi':
+          'Ayna sadıktır; neyi yansıtacağını seçmez, olduğu gibi gösterir.',
+      'Bilgelik Sahibi Kişisi':
+          'Aynanın sadece yüzeyi değil, derinliğini de yansıtması.',
       'Hikmet Kişisi':
-          'Hikmetin, adaletin en olgun yorumunu temsil eder.',
+          'Terazinin kefelerini okuyabilme bilinci; yorumlama zirvesi.',
+      'Hakkaniyet Kişisi':
+          'Hakkı yerine koyma; terazinin temel işlevi.',
+      'Vefa Kişisi':
+          'Terazinin borç kefesini dengeleyen karşılıksız bağlılık.',
       'Adalet Kişisi':
-          'Adaletin en yüksek ifadesi sensin; dengeyi ve hakkı korursun.',
+          'Terazinin kendisi; tüm ışıkların birleştiği nihai denge noktası.',
     };
     return mottos[concept] ??
         'Değer odaklı ilerleyişin, topluluğun adalet bilincini güçlendiriyor.';
@@ -1149,11 +1236,8 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
 
 /// Seviye tablo tanımlarını temsil eder.
 class _ScoreLevelDefinition {
-  /// Seviye etiketini ifade eder.
-  final String tierLabel;
-
-  /// Seviye rozeti için emoji.
-  final String tierEmoji;
+  /// Lig numarası (1 Pusula … 5 ⑲).
+  final int lig;
 
   /// Puan tablosundaki sıra.
   final int rank;
@@ -1169,38 +1253,10 @@ class _ScoreLevelDefinition {
 
   /// Varsayılan kurucu.
   const _ScoreLevelDefinition({
-    required this.tierLabel,
-    required this.tierEmoji,
+    required this.lig,
     required this.rank,
     required this.concept,
     required this.points,
     required this.color,
   });
-
-  /// Görselde kullanılacak rozet metnini üretir.
-  String get tierText => '$tierEmoji $tierLabel';
 }
-
-/// Rozet seviyelerini temsil eder.
-class _BadgeDefinition {
-  /// Rozetin adı.
-  final String title;
-
-  /// Rozetin gerekli puanı.
-  final int points;
-
-  /// Rozetin rengi.
-  final Color color;
-
-  /// Rozet ikonu.
-  final IconData icon;
-
-  /// Varsayılan kurucu.
-  const _BadgeDefinition({
-    required this.title,
-    required this.points,
-    required this.color,
-    required this.icon,
-  });
-}
-

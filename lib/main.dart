@@ -99,6 +99,15 @@ Future<void> _initializeTestDataInBackground() async {
     
     // whoboom@whoboom.com kullanıcısı için test arkadaş kategorileri oluştur
     await HiveDatabaseService.createTestFriendCategories('whoboom@whoboom.com');
+
+    final adminUser = HiveDatabaseService.getRegistrationByEmail('whoboom@whoboom.com');
+    if (adminUser != null) {
+      await FriendCategoryService.migrateLegacyCategoriesIfNeeded(
+        ownerUserId: adminUser.id,
+        ownerEmail: adminUser.email,
+        allUsers: HiveDatabaseService.getAllRegistrations(),
+      );
+    }
     
     print('✅ Test verileri başarıyla yüklendi!');
   } catch (e) {
