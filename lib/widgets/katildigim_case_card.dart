@@ -113,6 +113,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
   
   // Provider senkronizasyonu
   int _lastHukumUpdateVersion = -1;
+  DavaProvider? _hukumProvider;
 
   final Map<String, String> _rolCezalari = <String, String>{};
   final Map<String, String> _rolMasraflari = <String, String>{};
@@ -232,7 +233,33 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final DavaProvider next = Provider.of<DavaProvider>(context, listen: false);
+    if (identical(_hukumProvider, next)) return;
+    _hukumProvider?.removeListener(_onHukumProviderSignal);
+    _hukumProvider = next;
+    next.addListener(_onHukumProviderSignal);
+    _onHukumProviderSignal();
+  }
+
+  void _onHukumProviderSignal() {
+    if (!mounted || _hukumProvider == null) return;
+    final int currentVersion = _hukumProvider!.hukumUpdateVersion;
+    if (_lastHukumUpdateVersion != currentVersion && mounted) {
+      _lastHukumUpdateVersion = currentVersion;
+      Future.microtask(() async {
+        if (mounted) {
+          await _loadExistingHukumler();
+          await _loadYargicCezaVeMasraf();
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _hukumProvider?.removeListener(_onHukumProviderSignal);
     WidgetsBinding.instance.removeObserver(this);
     _countdownTimer?.cancel();
     _animationController.dispose();
@@ -460,24 +487,6 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
 
   @override
   Widget build(BuildContext context) {
-    // Provider'ı dinle - hüküm verileri güncellendiğinde otomatik yenile
-    return Consumer<DavaProvider>(
-      builder: (context, davaProvider, child) {
-        // Provider değiştiğinde hüküm verilerini yeniden yükle
-        final currentVersion = davaProvider.hukumUpdateVersion;
-        
-        if (_lastHukumUpdateVersion != currentVersion && mounted) {
-          _lastHukumUpdateVersion = currentVersion;
-          
-          // Async olarak yükle
-          Future.microtask(() async {
-            if (mounted) {
-              await _loadExistingHukumler();
-              await _loadYargicCezaVeMasraf();
-            }
-          });
-        }
-        
         return AnimatedBuilder(
           animation: _animationController,
           builder: (context, child) {
@@ -805,8 +814,6 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
             );
           },
         );
-      },
-    );
   }
 
   bool _isDavaActive() {

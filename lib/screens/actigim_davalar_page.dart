@@ -12,7 +12,6 @@ import '../services/hive_database_service.dart';
 import '../services/dava_seed_service.dart';
 import '../utils/dialog_utils.dart';
 import '../models/dava.dart' as dava_model;
-import '../providers/auth_provider.dart';
 import '../providers/dava_provider.dart';
 
 import 'dava_ac_page.dart' hide Dava, FiveCardCaseInformation, TreeMenuPageheadlines;
@@ -50,6 +49,7 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
 
   // Provider senkronizasyonu için: Son yüklenen hüküm versiyonu
   int _lastHukumUpdateVersion = -1;
+  DavaProvider? _hukumProvider;
   // Performans optimizasyonu: Son refresh zamanı
   DateTime? _lastListRefreshTime;
   static const Duration _listRefreshCooldown = Duration(seconds: 2); // 2 saniye cooldown
@@ -78,7 +78,40 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final DavaProvider next = Provider.of<DavaProvider>(context, listen: false);
+    if (identical(_hukumProvider, next)) return;
+    _hukumProvider?.removeListener(_onHukumProviderSignal);
+    _hukumProvider = next;
+    next.addListener(_onHukumProviderSignal);
+    _onHukumProviderSignal();
+  }
+
+  void _onHukumProviderSignal() {
+    if (!mounted || _hukumProvider == null) return;
+    final int currentVersion = _hukumProvider!.hukumUpdateVersion;
+    if (_lastHukumUpdateVersion != currentVersion) {
+      final DateTime now = DateTime.now();
+      if (_lastListRefreshTime == null ||
+          now.difference(_lastListRefreshTime!) >= _listRefreshCooldown) {
+        print('🔄 [ActigimDavalarPage] Provider versiyonu değişti: $_lastHukumUpdateVersion -> $currentVersion');
+        _lastHukumUpdateVersion = currentVersion;
+        _lastListRefreshTime = now;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            print('✅ [ActigimDavalarPage] Liste yeniden yüklenecek (versiyon: $currentVersion)');
+            _loadOpenedDavalar();
+            _calculateStatistics();
+          }
+        });
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    _hukumProvider?.removeListener(_onHukumProviderSignal);
     _saveIconBlinkTimer?.cancel();
     super.dispose();
   }
@@ -440,31 +473,6 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<AuthProvider, DavaProvider>(
-      builder: (context, authProvider, davaProvider, child) {
-        // Provider değişikliklerini dinle - liste otomatik senkronizasyonu için
-        final currentVersion = davaProvider.hukumUpdateVersion;
-        
-        // Eğer versiyon değiştiyse ve cooldown geçtiyse, listeyi yeniden yükle
-        if (_lastHukumUpdateVersion != currentVersion) {
-          final now = DateTime.now();
-          if (_lastListRefreshTime == null || 
-              now.difference(_lastListRefreshTime!) >= _listRefreshCooldown) {
-            print('🔄 [ActigimDavalarPage] Provider versiyonu değişti: $_lastHukumUpdateVersion -> $currentVersion');
-            _lastHukumUpdateVersion = currentVersion;
-            _lastListRefreshTime = now;
-            
-            // Widget build tamamlandıktan sonra listeyi yeniden yükle (performans için)
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                print('✅ [ActigimDavalarPage] Liste yeniden yüklenecek (versiyon: $currentVersion)');
-                _loadOpenedDavalar();
-                _calculateStatistics();
-              }
-            });
-          }
-        }
-        
         return Scaffold(
       backgroundColor: Colors.white,
       body: ActigimPageChrome(
@@ -574,8 +582,6 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
           ],
         ),
       ),
-    );
-      },
     );
   }
 }

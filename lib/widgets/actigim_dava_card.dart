@@ -90,6 +90,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
   
   // Provider senkronizasyonu için: Son yüklenen hüküm versiyonu (Provider değişikliklerini takip etmek için)
   int _lastHukumUpdateVersion = -1;
+  DavaProvider? _hukumProvider;
 
   /// Açılış tarihi önbelleği. `build` Hive kutusunun tamamını taramaz.
   DateTime? _kunyeOpenedAt;
@@ -208,7 +209,39 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final DavaProvider next = Provider.of<DavaProvider>(context, listen: false);
+    if (identical(_hukumProvider, next)) return;
+    _hukumProvider?.removeListener(_onHukumProviderSignal);
+    _hukumProvider = next;
+    next.addListener(_onHukumProviderSignal);
+    _onHukumProviderSignal();
+  }
+
+  void _onHukumProviderSignal() {
+    if (!mounted || _hukumProvider == null) return;
+    final int currentVersion = _hukumProvider!.hukumUpdateVersion;
+    if (_lastHukumUpdateVersion != currentVersion) {
+      print('🔄 [ActigimDavaCard] Provider versiyonu değişti: $_lastHukumUpdateVersion -> $currentVersion');
+    }
+    if (_lastHukumUpdateVersion != currentVersion && mounted) {
+      _lastHukumUpdateVersion = currentVersion;
+      print('✅ [ActigimDavaCard] Hükümler yeniden yüklenecek (versiyon: $currentVersion)');
+      Future.microtask(() async {
+        if (mounted) {
+          print('🔄 [ActigimDavaCard] Veriler yükleniyor... (versiyon: $currentVersion)');
+          await _loadExistingHukumler();
+          await _loadYargicCezaVeMasraf();
+          print('✅ [ActigimDavaCard] Veriler yüklendi, widget rebuild olacak');
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _hukumProvider?.removeListener(_onHukumProviderSignal);
     WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
     _cezaPulseController?.dispose();
@@ -435,34 +468,6 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
 
   @override
   Widget build(BuildContext context) {
-    // Provider'ı dinle - hüküm verileri güncellendiğinde otomatik yenile
-    return Consumer<DavaProvider>(
-      builder: (context, davaProvider, child) {
-        // Provider değiştiğinde hüküm verilerini yeniden yükle
-        // Performans için: Sadece hüküm versiyonu değiştiğinde yükle
-        final currentVersion = davaProvider.hukumUpdateVersion;
-        
-        // Debug: Versiyon değişikliğini logla
-        if (_lastHukumUpdateVersion != currentVersion) {
-          print('🔄 [ActigimDavaCard] Provider versiyonu değişti: $_lastHukumUpdateVersion -> $currentVersion');
-        }
-        
-        if (_lastHukumUpdateVersion != currentVersion && mounted) {
-          _lastHukumUpdateVersion = currentVersion;
-          print('✅ [ActigimDavaCard] Hükümler yeniden yüklenecek (versiyon: $currentVersion)');
-          
-          // Async olarak yükle - build metodunu bloklamamak için
-          // ÖNEMLİ: Bu callback içinde setState() çağrılacak, bu yüzden widget rebuild olacak
-          Future.microtask(() async {
-            if (mounted) {
-              print('🔄 [ActigimDavaCard] Veriler yükleniyor... (versiyon: $currentVersion)');
-              await _loadExistingHukumler();
-              await _loadYargicCezaVeMasraf(); // Ceza ve masraf bilgilerini de yeniden yükle
-              print('✅ [ActigimDavaCard] Veriler yüklendi, widget rebuild olacak');
-            }
-          });
-        }
-        
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -773,8 +778,6 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
         );
       }, // AnimatedBuilder builder callback kapanışı
     ); // AnimatedBuilder widget kapanışı
-      }, // Consumer builder callback kapanışı
-    ); // Consumer widget kapanışı
   }
 
   /// [ModernHukumCard._buildDavaInfo] ile aynı çizgi: dava künyesi kutusu.
