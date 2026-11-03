@@ -19,7 +19,7 @@ Denetim `lib/` altındaki elle yazılmış Dart dosyaları üzerinde yapıldı. 
 | `lib/screens/haykir_page.dart` | 2568 | 22 | 44 `SnackBar` |
 | `lib/screens/admin_page.dart` | 2327 | 14 | 9 `showDialog`, 3 `CircleAvatar` |
 | `lib/widgets/modern_hukum_card.dart` | 2296 | 22 | |
-| `lib/screens/friendship_management_page.dart` | 2273 | 23 | |
+| `lib/screens/friendship_management_page.dart` | ~1950 | 23 | Tur 8: kategori diyaloğu ayrı widget |
 | `lib/screens/statistics_dashboard_page.dart` | ~1838 | 14 | Tur 2: ortak krom + `ListView.builder` |
 | `lib/screens/davetler_page.dart` | ~1286 | 22 | Tur 7: `DavetCard` ve `ModernDavaCard` ayrıldı. 48 snack duruyor |
 | `lib/screens/gelen_davalar_page.dart` | ~490 | 13 | Tur 6: dış `Consumer` kalktı. Kart `gelen_dava_card.dart` |
@@ -299,9 +299,9 @@ Ortak kabuk `lib/widgets/shared/dava_count_headline_page.dart`. İki sayfa kendi
 
 `DavetCard` → `lib/widgets/davet_card.dart`. `ModernDavaCard` → `lib/widgets/modern_dava_card.dart`. Gövde aynı. Sayfa her iki adı yeniden dışa aktarır; `home_page.dart` içindeki `show ModernDavaCard` importu durur. Snack'ler yerinde: arka plan kırmızı, turuncu, yeşil, mavi ve gri; süre 2 veya 3 saniye. `showAppSnack` bu farkları tek varsayılanla ezmez. `ModernInvitationCard` ile birleştirilmedi.
 
-### Tur 8 — `friendship_management_page.dart`
+### Tur 8 — `friendship_management_page.dart` (diyalog ayrıldı)
 
-23 `setState`, 30 snack, 3 diyalog. Liste zaten builder kullanıyor (2 çağrı). Önce diyalog ve satır widget'ını ayır, sonra snack helper.
+Kategori seçme penceresi `lib/widgets/friendship_category_dialog.dart`. Sayfa mevcut kategoriyi, limiti, sayacı ve kaydı callback ile verir. Dolu kategoride yüzen kırmızı snack duruyor. Gelen istek `AlertDialog`'u, kullanıcı kartı ve snack'ler yerinde. Kullanılmayan `_sendFriendshipRequest` uyarısı duruyor.
 
 ### Tur 9 — `statistics` sonrası küçük liste ekranları
 
@@ -365,4 +365,4 @@ Hive taraması build dışına alındı. Kalan iş yapısal:
 
 ## 7. Sıradaki tek tur
 
-**Tur 8, küçük parça:** `friendship_management_page.dart` içinden tek bir diyalog veya satır widget'ı ayrı dosyaya çıksın. Snack'ler ve `setState` aynı turda toplu değişmesin. Görünüm ve callback aynı kalsın.
+**Sıradaki:** kalan `FiveCardCaseInformation` kopyaları tek tek kendi dosyasına çıksın. Sözleşmeler birleşmez. İlk parça en küçük olanı: `masraflar_page.dart`. Sayfa sınıfı yeniden dışa aktarır. Ardından büyük sayfa bölmeleri (`GroupSelectionDialog`, `ActigimDavaCard`) aynı kuralla.
