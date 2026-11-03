@@ -202,6 +202,8 @@ Kullanan ekranlar (hedef):
 | `AppStatBadge` | Kaydedilen haykır kartı | Yeni rozet ihtiyacı. `_StatChip` (trend) ayrı kalır |
 | `AppRefreshTitleBar` | İki kaydedilenler sayfası | İstatistik başlığı farklı kurulduğu için zorlanmaz |
 | `DavaCountHeadlinePage` | Gelen ve katıldığım "kaç tane" sayfaları | Başlık satırı parametre. Izgara, profil ve sol ikonlar ortak |
+| `showAppSnack` | `delil_detay_page.dart` (12 çağrı) | Süre verilmezse 4 saniye. Renk ve süre çağrıda | `home_page` bu seride en son |
+| `AppDialogFrame` | `dialog_utils.dart` kayıtlı dava diyaloğu | 24 köşe, gradient başlık, kapat, gövde `child` | Başka gradient diyalog ancak ölçü ve başlık aynıysa |
 
 ### 3.2 Sonraki sınıflar (henüz yazılmadı)
 
@@ -209,9 +211,7 @@ Her biri kendi adımında, ilk kullanımındaki piksel ölçüsüne kilitlenerek
 
 | Sınıf | Konum | Ne işe yarar | İlk taşınacak yer |
 | --- | --- | --- | --- |
-| `AppSnack` | `shared/app_snack.dart` | `showAppSnack(context, message, {color, duration})`. Varsayılanlar çağrıdaki değerlere eşit olmalı | Önce `saved_*` içindeki tek mor kayıt snack'i, sonra `delil_detay_page` |
-| `AppDialogFrame` | `shared/app_dialog_frame.dart` | 24 köşe, başlık gradient'i, kapat. Gövde `child` | `dialog_utils.dart` kayıtlı dava diyaloğu |
-| `AppCachedAvatar` | mevcut `cached_avatar_widget.dart` sarmalayıcısı | `CircleAvatar` + ağ URL'si için tek giriş | `chat_page`, `chat_detail_page`, `admin_page` |
+| `AppCachedAvatar` | mevcut `cached_avatar_widget.dart` sarmalayıcısı | `CircleAvatar` + ağ URL'si için tek giriş | Sohbet yerleşimi kişi ikonu çizdiği için bu turda atlandı |
 | `AppOutlinedCard` | `shared/app_outlined_card.dart` | Yükseklik 0, 16 köşe, `grey[200]` kenar, 16 padding. İçerik `child` | İstatistik `_CaseTile` / `_HaykirTile` kabuğu, kaydedilen kartların dış kabuğu |
 | Dava kartı ailesi | `widgets/dava/` | `FiveCard*` birleştirilmez. Önce ortak alt parçalar: künye satırı, süre şeridi, rol seçimi | Her ekrandan tek alt parça |
 
@@ -227,7 +227,7 @@ Her biri kendi adımında, ilk kullanımındaki piksel ölçüsüne kilitlenerek
 
 2. **`build` içinde yan etki.** `ActigimDavaCard` ve katıldığım dava kartı `Consumer<DavaProvider>` kuruyor, sürüm değişince `Future.microtask` ile yükleme ve ardından `setState` planlıyor. Provider her bildirildiğinde kart yeniden kurulur, yükleme yeniden tetiklenebilir. Dinlemeyi `hukumUpdateVersion` için `Selector` ile sınırlamak ve yüklemeyi `didChangeDependencies` / sürüm karşılaştırmasının tek yerine almak aynı veriyi daha az turda gösterir.
 
-3. **Sayfanın tamamını dinleyen `Consumer`.** `gelen_davalar_page.dart` `build` metodu doğrudan `Consumer<DavaProvider>` döndürür. `notifyListeners` üst şeridi, profil satırını ve listeyi birlikte kurar. `home_page.dart` provider'ı çoğunlukla `listen: false` okur; asıl maliyet orada `setState`. Gelen davalar sayfası önce daraltılmalı.
+3. **Sayfanın tamamını dinleyen `Consumer` — gelen davalar sayfasında kapatıldı.** Üst şerit artık `DavaProvider` bildirimiyle kurulmuyor. Sayı rozeti kendi `Consumer`'ında. `home_page.dart` provider'ı çoğunlukla `listen: false` okur; asıl maliyet orada `setState`.
 
 4. **Dev durum sınıfları.** `actigim` (35), `dava_ac` (34), `katildigim` (30), `seyir defteri` (31), `haykir` (22), `davetler` (22), `modern_hukum_card` (22) `setState` çağrısı, binlerce satırlık `build` ağacını işaretler. Bir anahtar veya sayaç değişince başlık, liste ve diyalog kurulumu aynı turda çalışır. Çözüm, sayfayı küçük `StatefulWidget` parçalarına bölmek. Bu, davranış değiştirmeden yapılabilir: aynı callback, aynı koşullu ağaç, daha dar `State`.
 
@@ -279,18 +279,21 @@ Liste hâlâ `ListView` + yayılım. Kayıt sayısı kullanıcıya ait ve bu tur
 
 Ortak kabuk `lib/widgets/shared/dava_count_headline_page.dart`. İki sayfa kendi başlık satırını `headline` olarak verir. Gelen sayfadaki `MyCheckboxWidget` dışa açık kaldı; `sekiz_hukum_page.dart` onu import eder. Izgara sayısı her iki sayfada 13.
 
-### Tur 4 — snack ve diyalog çerçevesi, tek ekran
+### Tur 4 — snack ve diyalog çerçevesi (yapıldı)
 
-`AppSnack` ve `AppDialogFrame` eklenir. İlk tüketici `delil_detay_page.dart` (24 `SnackBar`, 3 `showDialog`, 1069 satır) veya `dialog_utils.dart` içindeki kayıtlı dava diyaloğu. `home_page` 68 snack ile bu tura alınmaz; helper oturduktan sonra ayrı tur.
+- `showAppSnack` (`lib/widgets/shared/app_snack.dart`): metin, isteğe bağlı `backgroundColor` ve `duration`. Süre verilmezse 4 saniye. Kuyruk `showSnackBar` ile aynı.
+- Kanıt: `delil_detay_page.dart` içindeki 12 snack. Kırmızı ve yeşil renkler, 2 saniyelik başarı süresi duruyor. `AlertDialog` bilgi pencereleri çerçeveye alınmadı; onlar Material diyalog.
+- `AppDialogFrame`: 24 köşe, gradient başlık, kapat, gövde `child`. Kanıt: `dialog_utils.dart` kayıtlı dava diyaloğu. Başlık "Dava Düzenle", alt yazı `"$n dava "`, ikon `gavel_rounded`, ölçü 0.88 × 0.78.
+- `home_page` snack'leri bu turda bağlanmadı.
 
 ### Tur 5 — avatar
 
 `chat_page.dart`, `chat_detail_page.dart`, sonra `admin_page.dart` içindeki `CircleAvatar` çağrıları `CachedAvatarWidget` olur. Yarıçap, renk ve harf yedeği çağrıdaki değerdir. `home_page` ve `haykir_page` birer çağrı ile daha sonra gelir.
 
-### Tur 6 — `gelen_davalar_page.dart`
+### Tur 6 — `gelen_davalar_page.dart` (kısmen)
 
-1. `Consumer` yalnız dava listesini sarsın; `ZeroWhoboomSearchMessage` ve profil satırı dışarıda kalsın.
-2. `FiveCardCaseInformation` bu dosyadan `lib/widgets/gelen_dava_card.dart` dosyasına taşınsın. İsim çakışması bitsin. Diğer yedi kopyaya dokunulmasın.
+1. Sayfanın tamamını saran `Consumer<DavaProvider>` kalktı. Liste `_davaList` ve `setState` ile güncelleniyor; sayı rozeti kendi `Consumer`'ında (`incomingDavaCount`). Üst şerit artık her provider bildiriminde kurulmuyor.
+2. `FiveCardCaseInformation` hâlâ bu dosyada. Taşıma ayrı tur; diğer yedi kopyaya dokunulmaz.
 
 ### Tur 7 — `davetler_page.dart`
 
@@ -357,8 +360,9 @@ Hive taraması build dışına alındı. Kalan iş yapısal:
 - `AppTheme` renkleri arşiv kromuna uygulanmadı. İstatistik başlığı tema ana rengini parametre olarak alır.
 - Kullanılmayan `CommonDavaCardWidget`, `AnimatedPrimaryButton`, `ModernSectionHeader` silinmedi.
 - `ActigimDavaCard` dosyası ayrılmadı. Yalnız açılış tarihi taraması `build` dışına çıktı.
+- Sohbet avatarları `CachedAvatarWidget` olmadı. Mevcut `CircleAvatar` bazı adreslerde fotoğrafın üstüne kişi ikonu çiziyor; ortak widget bu yerleşimi üretmez.
 - `*.g.dart` üretilen modeller aynı.
 
 ## 7. Sıradaki tek tur
 
-**Tur 4: snack ve diyalog çerçevesi, tek ekran.** `AppSnack` ve `AppDialogFrame` eklenir. İlk tüketici `delil_detay_page.dart` veya `dialog_utils.dart` içindeki kayıtlı dava diyaloğu. Renk, süre ve başlık metni çağrıdaki değer olarak kalır. `home_page` bu tura alınmaz.
+**Tur 6'nın kalanı, küçük parça:** `gelen_davalar_page.dart` içindeki `FiveCardCaseInformation` `lib/widgets/gelen_dava_card.dart` dosyasına taşınsın. Sözleşme ve piksel aynı kalsın. Diğer `FiveCard*` kopyalarına dokunulmasın. Ardından Tur 7'de `DavetCard` ayrı dosyaya çıksın; snack'leri ancak renk ve süre aynı kalıyorsa `showAppSnack` olsun.

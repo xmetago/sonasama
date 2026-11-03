@@ -176,9 +176,7 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DavaProvider>(
-      builder: (context, davaProvider, child) {
-        return Scaffold(
+    return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
@@ -274,8 +272,6 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
           ],
         ),
       ),
-    );
-      },
     );
   }
 }
