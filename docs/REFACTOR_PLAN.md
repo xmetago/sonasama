@@ -10,7 +10,7 @@ Denetim `lib/` altındaki elle yazılmış Dart dosyaları üzerinde yapıldı. 
 
 | Dosya | Satır | `setState` | Not |
 | --- | ---: | ---: | --- |
-| `lib/screens/actigim_davalar_page.dart` | 4857 | 35 | Kart `build` içinde Hive taraması ve `Consumer` |
+| `lib/screens/actigim_davalar_page.dart` | 4857 | 35 | Kart `build` içindeki Hive taraması Tur 2'de önbelleğe alındı. `Consumer` duruyor |
 | `lib/screens/home_page.dart` | 4674 | 16 | Akış `PagedListView` (tembel). Başlık ve gövde aynı `setState` |
 | `lib/widgets/ilgililerin_seyir_defteri_widgeti.dart` | 4510 | 31 | Ekran kadar büyük widget |
 | `lib/screens/katildigim_davalar_page.dart` | 3824 | 30 | Kart `build` içinde `Consumer<DavaProvider>` |
@@ -20,25 +20,25 @@ Denetim `lib/` altındaki elle yazılmış Dart dosyaları üzerinde yapıldı. 
 | `lib/screens/admin_page.dart` | 2327 | 14 | 9 `showDialog`, 3 `CircleAvatar` |
 | `lib/widgets/modern_hukum_card.dart` | 2296 | 22 | |
 | `lib/screens/friendship_management_page.dart` | 2273 | 23 | |
-| `lib/screens/statistics_dashboard_page.dart` | 2086 | 14 | Arşiv kromunun üçüncü kopyası; `ListView` + `.map` |
+| `lib/screens/statistics_dashboard_page.dart` | ~1838 | 14 | Tur 2: ortak krom + `ListView.builder` |
 | `lib/screens/davetler_page.dart` | 2084 | 22 | 48 `SnackBar` |
 | `lib/screens/gelen_davalar_page.dart` | 1732 | 13 | Sayfanın tamamı `Consumer<DavaProvider>` |
 | `lib/widgets/twitter_post_composer.dart` | 1632 | 18 | |
 | `lib/screens/delil_ekle_page.dart` | 1577 | 6 | 40 `SnackBar` |
 
-Daha küçük ama neredeyse aynı olan çift: `gelen_davalar_kactane.dart` (296 satır) ve `katildigim_davalar_kactane.dart` (312 satır). Metin benzerliği yaklaşık %92.
+`gelen_davalar_kactane.dart` ve `katildigim_davalar_kactane.dart` yaklaşık %92 aynıydı. Ortak iskelet `DavaCountHeadlinePage` oldu. Her sayfada yalnız başlık satırı (`MyCheckboxWidget`) kaldı. `sekiz_hukum_page.dart` gelen sayfadaki `MyCheckboxWidget` sınıfını kullanmaya devam eder.
 
 ## 2. Tekrar eden arayüz kalıpları
 
 Aynı isim, aynı widget anlamına gelmez. Aşağıdaki gruplar gerçek kopya ile yalnızca ada benzeyen parçaları ayırır.
 
-### 2.1 Birebir kopyalanan arşiv kromu (bu adımın konusu)
+### 2.1 Birebir kopyalanan arşiv kromu
 
-Üç dosya aynı özel sınıfları yeniden yazmış:
+Üç dosya aynı özel sınıfları yeniden yazmıştı. Üçü de ortak sınıflara bağlandı:
 
 - `lib/screens/saved_haykirlar_page.dart`
 - `lib/screens/saved_widgets_page.dart`
-- `lib/screens/statistics_dashboard_page.dart` (`_SearchField`, `_SectionHeader`, `_EmptySearchResultCard`, yükleme ve hata gövdesi)
+- `lib/screens/statistics_dashboard_page.dart` (eski `_SearchField`, `_HaykirSearchField`, `_SectionHeader`, `_EmptySearchResultCard`, `_InfoBanner`, yükleme ve hata gövdesi)
 
 Aynı ağaç, küçük parametre farklarıyla:
 
@@ -102,7 +102,7 @@ Ortak bir `AppEmptyState` ancak her çağrı mevcut ikon, metin, renk ve yerleş
 
 ### 2.6 Sayfa çiftleri
 
-`gelen_davalar_kactane.dart` ile `katildigim_davalar_kactane.dart` yaklaşık %92 aynı. Ortak bir sayfa kabuğu (başlık, menü, sayı rozeti, checkbox satırı) iki dosyanın farkını (hangi sayı, hangi liste) parametreye indirger.
+`gelen_davalar_kactane.dart` ile `katildigim_davalar_kactane.dart` yaklaşık %92 aynıydı. Ortak kabuk `DavaCountHeadlinePage`. Fark, başlık satırında.
 
 `saved_haykirlar_page.dart` ile `saved_widgets_page.dart` sayfa iskeleti aynı, kart içeriği farklı. İskelet bu adımda ortaklandı; kartlar yerinde kaldı.
 
@@ -193,13 +193,15 @@ Kullanan ekranlar (hedef):
 
 | Sınıf | Şimdi | Sıradaki aynı ağaç |
 | --- | --- | --- |
-| `AppSearchField` | İki kaydedilenler sayfası | `statistics_dashboard_page` (`suffixIcon` ile) ve `_HaykirSearchField` |
-| `AppAccentSectionHeader` | İki kaydedilenler sayfası (mor varsayılan) | İstatistik panosu `accentColor: Theme.of(context).primaryColor` ile |
-| `AppEmptyResultCard` | İki kaydedilenler sayfası | İstatistikteki `_EmptySearchResultCard` (`Icons.search_off_rounded`, "Kayıt bulunamadı") |
-| `AppLoadingMessage` | İki kaydedilenler sayfası | İstatistik panosunun yükleme gövdesi |
-| `AppErrorRetryView` | İki kaydedilenler sayfası | İstatistik panosunun hata gövdesi |
+| `AppSearchField` | İki kaydedilenler sayfası ve istatistik panosu | İstatistikte dava araması `suffixIcon: Icons.tune_rounded`. Haykır aramasında sonek yok |
+| `AppAccentSectionHeader` | İki kaydedilenler sayfası (mor varsayılan) ve istatistik panosu | İstatistik `accentColor: Theme.primaryColor` geçirir |
+| `AppEmptyResultCard` | İki kaydedilenler sayfası ve istatistik panosu | İstatistik ikonu `Icons.search_off_rounded`, boş metin "Kayıt bulunamadı" |
+| `AppLoadingMessage` | İki kaydedilenler sayfası ve istatistik panosu | |
+| `AppErrorRetryView` | İki kaydedilenler sayfası ve istatistik panosu | |
+| `AppInfoBanner` | İstatistik panosu | "Bugün açılan … bulunamadı" şeridi |
 | `AppStatBadge` | Kaydedilen haykır kartı | Yeni rozet ihtiyacı. `_StatChip` (trend) ayrı kalır |
 | `AppRefreshTitleBar` | İki kaydedilenler sayfası | İstatistik başlığı farklı kurulduğu için zorlanmaz |
+| `DavaCountHeadlinePage` | Gelen ve katıldığım "kaç tane" sayfaları | Başlık satırı parametre. Izgara, profil ve sol ikonlar ortak |
 
 ### 3.2 Sonraki sınıflar (henüz yazılmadı)
 
@@ -207,11 +209,9 @@ Her biri kendi adımında, ilk kullanımındaki piksel ölçüsüne kilitlenerek
 
 | Sınıf | Konum | Ne işe yarar | İlk taşınacak yer |
 | --- | --- | --- | --- |
-| `AppInfoBanner` | `shared/app_info_banner.dart` | İstatistikteki mavi bilgi şeridi: ikon, metin, zemin, kenar | `statistics_dashboard_page` `_InfoBanner` |
 | `AppSnack` | `shared/app_snack.dart` | `showAppSnack(context, message, {color, duration})`. Varsayılanlar çağrıdaki değerlere eşit olmalı | Önce `saved_*` içindeki tek mor kayıt snack'i, sonra `delil_detay_page` |
 | `AppDialogFrame` | `shared/app_dialog_frame.dart` | 24 köşe, başlık gradient'i, kapat. Gövde `child` | `dialog_utils.dart` kayıtlı dava diyaloğu |
 | `AppCachedAvatar` | mevcut `cached_avatar_widget.dart` sarmalayıcısı | `CircleAvatar` + ağ URL'si için tek giriş | `chat_page`, `chat_detail_page`, `admin_page` |
-| `CountHeadlinePage` | `shared/count_headline_page.dart` veya `screens/` altında ortak kabuk | %92 aynı "kaç tane" sayfaları | `gelen_davalar_kactane`, `katildigim_davalar_kactane` |
 | `AppOutlinedCard` | `shared/app_outlined_card.dart` | Yükseklik 0, 16 köşe, `grey[200]` kenar, 16 padding. İçerik `child` | İstatistik `_CaseTile` / `_HaykirTile` kabuğu, kaydedilen kartların dış kabuğu |
 | Dava kartı ailesi | `widgets/dava/` | `FiveCard*` birleştirilmez. Önce ortak alt parçalar: künye satırı, süre şeridi, rol seçimi | Her ekrandan tek alt parça |
 
@@ -223,7 +223,7 @@ Her biri kendi adımında, ilk kullanımındaki piksel ölçüsüne kilitlenerek
 
 ### 4.1 Yüksek
 
-1. **Kart `build` içinde Hive taraması.** `ActigimDavaCard.build`, `_getOpenedAtForKunye()` çağırıyor. Bu metot her çizimde `HiveDatabaseService.getOpenedDavalar()` ile tüm açılmış davaları geziyor (`actigim_davalar_page.dart`, künye satırı). Görünen her kart tüm kutuyu okur. Düzeltme: açılış tarihini kart kurulurken veya liste yüklenirken bir kez hesaplayıp alana yazmak. Görünüm aynı kalır.
+1. **Kart `build` içinde Hive taraması — bu turda kapatıldı.** `ActigimDavaCard` açılış tarihini `_kunyeOpenedAt` alanında tutar. Kutu `initState`, `didUpdateWidget`, `setState` ve hediye diyaloğu açılırken bir kez okunur. Giriş animasyonunun kareleri ve `build` artık kutuyu tarama. Künye metni ve 72 saatlik UZLAŞMA hesabı aynı tarihi kullanır. Kart dosyası henüz ayrılmadı (Tur 14).
 
 2. **`build` içinde yan etki.** `ActigimDavaCard` ve katıldığım dava kartı `Consumer<DavaProvider>` kuruyor, sürüm değişince `Future.microtask` ile yükleme ve ardından `setState` planlıyor. Provider her bildirildiğinde kart yeniden kurulur, yükleme yeniden tetiklenebilir. Dinlemeyi `hukumUpdateVersion` için `Selector` ile sınırlamak ve yüklemeyi `didChangeDependencies` / sürüm karşılaştırmasının tek yerine almak aynı veriyi daha az turda gösterir.
 
@@ -233,7 +233,7 @@ Her biri kendi adımında, ilk kullanımındaki piksel ölçüsüne kilitlenerek
 
 ### 4.2 Orta
 
-5. **Tembel olmayan listeler.** `ListView(children: [...map])` şunlarda var: istatistik panosu (dört yayılım), iki kaydedilenler sayfası, `trend_insights_page` içinde dört düz `ListView`, `albumler_liste_page` içinde iki düz `ListView`. Kayıt sayısı küçükken maliyeti düşük. İstatistik ve trend listeleri büyüyebilir; `ListView.builder` / `separated` aynı hücre widget'ını koruyarak geçirilmeli. `home_page` akışı zaten `PagedListView`. `admin_page` ve `chat_page` builder kullanıyor.
+5. **Tembel olmayan listeler.** İstatistik panosundaki dört yayılım `ListView.builder` oldu. Kalanlar: iki kaydedilenler sayfası, `trend_insights_page` içinde dört düz `ListView`, `albumler_liste_page` içinde iki düz `ListView`. Kayıt sayısı küçükken maliyeti düşük. `home_page` akışı zaten `PagedListView`. `admin_page` ve `chat_page` builder kullanıyor.
 
 6. **Gradient ve gölgenin her build'de yeniden kurulması.** `LinearGradient(` sayıları: seyir defteri 18, açtığım davalar 12, katıldığım 8, ana sayfa 7, haykır 5. Kart parçası `const` olamıyorsa dekorasyonu `static final` yapmak ayıracı küçültür. Asıl kazanç 4. maddedeki dar `State`.
 
@@ -264,19 +264,20 @@ Ortak arşiv kromu (`lib/widgets/shared/`) ve iki küçük sayfa:
 
 Liste hâlâ `ListView` + yayılım. Kayıt sayısı kullanıcıya ait ve bu turda kaydırma fiziği (`AlwaysScrollableScrollPhysics`, `RefreshIndicator`) aynı kalsın diye builder'a çevrilmedi. Kart sınıfları (`_SavedHaykirTile`, `_SavedWidgetTile`) dosyada kaldı.
 
-### Tur 2 — istatistik panosu
+### Tur 2 — istatistik panosu (yapıldı)
 
-`statistics_dashboard_page.dart` içindeki `_SearchField`, `_HaykirSearchField`, `_SectionHeader`, `_EmptySearchResultCard`, yükleme ve hata gövdesi Tur 1 sınıflarına bağlanır.
+`statistics_dashboard_page.dart` ortak kromu kullanır.
 
-- Arama: `suffixIcon` istatistikteki `Icons.tune_rounded` / `Colors.grey[400]` olarak kalır. Haykır araması aynı sınıf, farklı `hintText`.
-- Başlık: `accentColor` tema ana rengi. Varsayılan mor kullanılmaz.
+- Dava araması `suffixIcon` olarak `Icons.tune_rounded` / `Colors.grey[400]` taşır. Haykır araması aynı sınıf, sonek yok, farklı `hintText`.
+- Başlık `accentColor` tema ana rengidir. Varsayılan mor kullanılmaz.
 - Boş kart: ikon `Icons.search_off_rounded`, boş metin "Kayıt bulunamadı".
-- Aynı turda `_InfoBanner` `AppInfoBanner` olur.
-- Liste yayılımları `ListView.builder` yapılır. Hücre hâlâ `_CaseTile` / `_HaykirTile`. Bu, kaydırmayı yalnızca uzun listede iyileştirir; kısa listede aynı hücreler çizilir.
+- `_InfoBanner` `AppInfoBanner` oldu.
+- Dört yayılım `ListView.builder` oldu. Hücre hâlâ `_CaseTile` / `_HaykirTile`. Üst şerit, özet kartları ve diyaloglar duruyor.
+- "Veri bulunamadı" boş hali (kutu ikonu, 80 px) bu kromdan farklı olduğu için yerinde kaldı.
 
-### Tur 3 — "kaç tane" çifti
+### Tur 3 — "kaç tane" çifti (yapıldı)
 
-`gelen_davalar_kactane.dart` ve `katildigim_davalar_kactane.dart`. Ortak kabuk + `MyCheckboxWidget` tek tanıma iner. İki sayfanın sayı kaynağı ve başlık metni parametre kalır. Dosyalar kısa olduğu için farkı incelemek kolay.
+Ortak kabuk `lib/widgets/shared/dava_count_headline_page.dart`. İki sayfa kendi başlık satırını `headline` olarak verir. Gelen sayfadaki `MyCheckboxWidget` dışa açık kaldı; `sekiz_hukum_page.dart` onu import eder. Izgara sayısı her iki sayfada 13.
 
 ### Tur 4 — snack ve diyalog çerçevesi, tek ekran
 
@@ -323,11 +324,12 @@ Sıra: `GroupSelectionDialog`, `TreeMenuPageheadlines`, form alanları (`ModernT
 
 ### Tur 14 — `actigim_davalar_page.dart`
 
-En riskli dosya, en sonda değil; performans maddesi 4.1 yüzünden kart ayrımı erken ama tek başına:
+Hive taraması build dışına alındı. Kalan iş yapısal:
 
-1. Yalnız `ActigimDavaCard` yeni dosyaya. Hive taraması build dışına.
+1. `ActigimDavaCard` yeni dosyaya. Önbellek davranışı aynı kalsın.
 2. `InactiveDavaCard` ve `TreeMenuPageheadlines` ayrı tur.
 3. Sayfa iskeleti (`ActigimDavalarPage`) en son, kartlar oturduktan sonra.
+4. `Consumer` içindeki `Future.microtask` yüklemesi ayrı tur (madde 4.1.2).
 
 ### Tur 15 — `home_page.dart`
 
@@ -347,15 +349,16 @@ En riskli dosya, en sonda değil; performans maddesi 4.1 yüzünden kart ayrım�
 
 `AppTheme.cardDecoration`, `primaryButtonStyle` ve metin stilleri ortak sınıfların varsayılanı olur. Mor çubuk, gri kart ve yeşil tema tek palete çekilir. Bu faz başlamadan Tur 1–6 oturmuş olmalı; aksi halde hem yapı hem renk aynı turda değişir ve inceleme körleşir.
 
-## 6. Bu turda bilinçli yapılmayanlar
+## 6. Bu turlarda bilinçli yapılmayanlar
 
 - `FiveCardCaseInformation` birleştirilmedi.
-- İstatistik panosu, tema rengi ve sonek ikonu yüzünden bu tura alınmadı. API buna hazır (`suffixIcon`, `accentColor`).
-- `ListView.builder` dönüşümü yok.
-- `AppTheme` renkleri arşiv kromuna uygulanmadı.
+- İstatistikteki "Veri bulunamadı" gövdesi (80 px kutu ikonu) `AppEmptyResultCard` ile değiştirilmedi. Piksel farklı.
+- Kaydedilenler listeleri hâlâ `ListView` + yayılım. Kayıt sayısı kullanıcıya ait.
+- `AppTheme` renkleri arşiv kromuna uygulanmadı. İstatistik başlığı tema ana rengini parametre olarak alır.
 - Kullanılmayan `CommonDavaCardWidget`, `AnimatedPrimaryButton`, `ModernSectionHeader` silinmedi.
+- `ActigimDavaCard` dosyası ayrılmadı. Yalnız açılış tarihi taraması `build` dışına çıktı.
 - `*.g.dart` üretilen modeller aynı.
 
 ## 7. Sıradaki tek tur
 
-**Tur 2: `statistics_dashboard_page.dart`.** Aynı yedi sınıfı, yukarıdaki parametrelerle bağla. `_CaseTile` / `_HaykirTile` ve iş kuralları dosyada kalsın. Ardından düz `ListView` yayılımlarını builder yap. Başka ekrana dokunma.
+**Tur 4: snack ve diyalog çerçevesi, tek ekran.** `AppSnack` ve `AppDialogFrame` eklenir. İlk tüketici `delil_detay_page.dart` veya `dialog_utils.dart` içindeki kayıtlı dava diyaloğu. Renk, süre ve başlık metni çağrıdaki değer olarak kalır. `home_page` bu tura alınmaz.

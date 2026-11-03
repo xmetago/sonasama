@@ -1072,9 +1072,46 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
   // Provider senkronizasyonu için: Son yüklenen hüküm versiyonu (Provider değişikliklerini takip etmek için)
   int _lastHukumUpdateVersion = -1;
 
+  /// Açılış tarihi önbelleği. `build` Hive kutusunun tamamını taramaz.
+  DateTime? _kunyeOpenedAt;
+  String? _kunyeOpenedAtDavaId;
+
+  void _refreshKunyeOpenedAt() {
+    final String id = widget.dava.id;
+    _kunyeOpenedAtDavaId = id;
+    if (id.isEmpty) {
+      _kunyeOpenedAt = null;
+      return;
+    }
+    try {
+      final List<Map<String, dynamic>> openedDavalar =
+          HiveDatabaseService.getOpenedDavalar();
+      final Map<String, dynamic> davaData = openedDavalar.firstWhere(
+        (Map<String, dynamic> d) => d['id'] == id,
+        orElse: () => <String, dynamic>{},
+      );
+      final String? openedAtStr = davaData['openedAt'] as String?;
+      if (openedAtStr == null || openedAtStr.isEmpty) {
+        _kunyeOpenedAt = null;
+        return;
+      }
+      _kunyeOpenedAt = DateTime.tryParse(openedAtStr);
+    } catch (e) {
+      print('⚠️ [ActigimDavaCard] Açılış tarihi okunamadı: $e');
+      _kunyeOpenedAt = null;
+    }
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    _refreshKunyeOpenedAt();
+    super.setState(fn);
+  }
+
   @override
   void initState() {
     super.initState();
+    _refreshKunyeOpenedAt();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -1146,6 +1183,12 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
   }
 
   @override
+  void didUpdateWidget(covariant ActigimDavaCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _refreshKunyeOpenedAt();
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
@@ -1195,23 +1238,14 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
     });
 
     try {
-      // openedAt tarihini al
-      final openedDavalar = HiveDatabaseService.getOpenedDavalar();
-      final davaData = openedDavalar.firstWhere(
-        (d) => d['id'] == widget.dava.id,
-        orElse: () => {},
-      );
-
-      final openedAtStr = davaData['openedAt'] as String?;
-      DateTime? openedAt;
-      if (openedAtStr != null && openedAtStr.isNotEmpty) {
-        openedAt = DateTime.tryParse(openedAtStr);
-      }
+      // openedAt, setState başında önbelleğe alındı. Kutu burada yeniden taranmaz.
+      _refreshKunyeOpenedAt();
+      final DateTime? openedAt = _kunyeOpenedAt;
 
       // Debug: Konsensus yükleme bilgilerini yazdır
       print('🔍 [ActigimDavaCard] Konsensus yükleniyor...');
       print('   - Dava ID: ${widget.dava.id}');
-      print('   - OpenedAt: $openedAtStr');
+      print('   - OpenedAt: $openedAt');
       print('   - Parsed DateTime: $openedAt');
 
       final evaluation = await DavaConsensusService.evaluateConsensus(
@@ -1345,28 +1379,17 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
     // Ceza veya masraf/hediye onaylanmışsa UZLAŞMA değil
     if (_cezaOnaylandi || _masrafOnaylandi || _hediyeOnaylandi) return false;
     
-    // 72 saat geçmiş mi kontrol et
+    // 72 saat geçmiş mi kontrol et. Tarih önbellekten okunur.
     try {
-      final openedDavalar = HiveDatabaseService.getOpenedDavalar();
-      final davaData = openedDavalar.firstWhere(
-        (d) => d['id'] == widget.dava.id,
-        orElse: () => {},
-      );
-      
-      final openedAtStr = davaData['openedAt'] as String?;
-      if (openedAtStr == null || openedAtStr.isEmpty) {
-        return false; // Tarih yoksa UZLAŞMA gösterme
-      }
-      
-      final openedAt = DateTime.tryParse(openedAtStr);
+      final DateTime? openedAt = _getOpenedAtForKunye();
       if (openedAt == null) {
-        return false; // Parse edilemezse UZLAŞMA gösterme
+        return false;
       }
-      
+
       final now = DateTime.now();
       final elapsed = now.difference(openedAt);
       const seventyTwoHours = Duration(hours: 72);
-      
+
       // 72 saat geçmişse UZLAŞMA göster
       return elapsed >= seventyTwoHours;
     } catch (e) {
@@ -1936,17 +1959,10 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
   }
 
   DateTime? _getOpenedAtForKunye() {
-    final List<Map<String, dynamic>> openedDavalar =
-        HiveDatabaseService.getOpenedDavalar();
-    final Map<String, dynamic> davaData = openedDavalar.firstWhere(
-      (Map<String, dynamic> d) => d['id'] == widget.dava.id,
-      orElse: () => <String, dynamic>{},
-    );
-    final String? openedAtStr = davaData['openedAt'] as String?;
-    if (openedAtStr == null || openedAtStr.isEmpty) {
-      return null;
+    if (_kunyeOpenedAtDavaId != widget.dava.id) {
+      _refreshKunyeOpenedAt();
     }
-    return DateTime.tryParse(openedAtStr);
+    return _kunyeOpenedAt;
   }
 
   String _formatKunyeDateTime(DateTime dateTime) {
@@ -3615,19 +3631,12 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
     // Hediye alınacak kişi bilgilerini al
     final hediyeAlinacakKisiRol = hediyeAlinacakKisiDavaci ? 'Davacı' : 'Davalı';
     
-    // Dava tarihini al
-    final openedDavalar = HiveDatabaseService.getOpenedDavalar();
-    final davaData = openedDavalar.firstWhere(
-      (d) => d['id'] == widget.dava.id,
-      orElse: () => {},
-    );
-    final openedAtStr = davaData['openedAt'] as String?;
+    // Dava tarihini al. Dokunma anında bir kez okunur, build sırasında değil.
+    _refreshKunyeOpenedAt();
+    final DateTime? openedAt = _kunyeOpenedAt;
     String davaTarihi = 'Bilinmeyen Tarih';
-    if (openedAtStr != null && openedAtStr.isNotEmpty) {
-      final openedAt = DateTime.tryParse(openedAtStr);
-      if (openedAt != null) {
-        davaTarihi = '${openedAt.day.toString().padLeft(2, '0')}.${openedAt.month.toString().padLeft(2, '0')}.${openedAt.year}';
-      }
+    if (openedAt != null) {
+      davaTarihi = '${openedAt.day.toString().padLeft(2, '0')}.${openedAt.month.toString().padLeft(2, '0')}.${openedAt.year}';
     }
     
     showDialog(
