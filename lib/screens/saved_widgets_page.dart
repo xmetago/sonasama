@@ -113,36 +113,53 @@ class _SavedWidgetsPageState extends State<SavedWidgetsPage> {
 
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
+      child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          const AppAccentSectionHeader(title: 'Kaydedilen Widget\'lar'),
-          const SizedBox(height: 12),
-          AppSearchField(
-            hintText: 'Widget ara...',
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          if (filtered.isEmpty)
-            AppEmptyResultCard(
-              query: _searchQuery,
-              emptyMessage: 'Henüz kaydedilen widget yok',
-              icon: Icons.widgets_outlined,
-            )
-          else
-            ...filtered.map(
-              (widgetData) => _SavedWidgetTile(
-                widget: widgetData,
-                userEmail: widget.userEmail,
-                onRefresh: _loadData,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(
+                [
+                  const AppAccentSectionHeader(title: 'Kaydedilen Widget\'lar'),
+                  const SizedBox(height: 12),
+                  AppSearchField(
+                    hintText: 'Widget ara...',
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  if (filtered.isEmpty)
+                    AppEmptyResultCard(
+                      query: _searchQuery,
+                      emptyMessage: 'Henüz kaydedilen widget yok',
+                      icon: Icons.widgets_outlined,
+                    ),
+                ],
               ),
             ),
-          const SizedBox(height: 32),
+          ),
+          if (filtered.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (BuildContext context, int index) {
+                    final Map<String, dynamic> widgetData = filtered[index];
+                    return _SavedWidgetTile(
+                      widget: widgetData,
+                      userEmail: widget.userEmail,
+                      onRefresh: _loadData,
+                    );
+                  },
+                  childCount: filtered.length,
+                ),
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
     );

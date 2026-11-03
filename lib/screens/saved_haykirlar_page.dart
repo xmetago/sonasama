@@ -112,36 +112,53 @@ class _SavedHaykirlarPageState extends State<SavedHaykirlarPage> {
 
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
+      child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          const AppAccentSectionHeader(title: 'Kaydedilen Haykırlar'),
-          const SizedBox(height: 12),
-          AppSearchField(
-            hintText: 'Haykır ara...',
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          if (filtered.isEmpty)
-            AppEmptyResultCard(
-              query: _searchQuery,
-              emptyMessage: 'Henüz kaydedilen haykır yok',
-              icon: Icons.bookmark_border_rounded,
-            )
-          else
-            ...filtered.map(
-              (haykir) => _SavedHaykirTile(
-                haykir: haykir,
-                userEmail: widget.userEmail,
-                onRefresh: _loadData,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(
+                [
+                  const AppAccentSectionHeader(title: 'Kaydedilen Haykırlar'),
+                  const SizedBox(height: 12),
+                  AppSearchField(
+                    hintText: 'Haykır ara...',
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  if (filtered.isEmpty)
+                    AppEmptyResultCard(
+                      query: _searchQuery,
+                      emptyMessage: 'Henüz kaydedilen haykır yok',
+                      icon: Icons.bookmark_border_rounded,
+                    ),
+                ],
               ),
             ),
-          const SizedBox(height: 32),
+          ),
+          if (filtered.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (BuildContext context, int index) {
+                    final Map<String, dynamic> haykir = filtered[index];
+                    return _SavedHaykirTile(
+                      haykir: haykir,
+                      userEmail: widget.userEmail,
+                      onRefresh: _loadData,
+                    );
+                  },
+                  childCount: filtered.length,
+                ),
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
     );

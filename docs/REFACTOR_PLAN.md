@@ -212,7 +212,7 @@ Her biri kendi adımında, ilk kullanımındaki piksel ölçüsüne kilitlenerek
 | Sınıf | Konum | Ne işe yarar | İlk taşınacak yer |
 | --- | --- | --- | --- |
 | `AppCachedAvatar` | mevcut `cached_avatar_widget.dart` sarmalayıcısı | `CircleAvatar` + ağ URL'si için tek giriş | Sohbet yerleşimi kişi ikonu çizdiği için bu turda atlandı |
-| `AppOutlinedCard` | `shared/app_outlined_card.dart` | Yükseklik 0, 16 köşe, `grey[200]` kenar, 16 padding. İçerik `child` | İstatistik `_CaseTile` / `_HaykirTile` kabuğu, kaydedilen kartların dış kabuğu |
+| `AppOutlinedCard` | `shared/app_outlined_card.dart` | Yazıldı. İstatistik `_CaseTile` ve `_HaykirTile` kabuğu bu sınıf. Kaydedilen kartların kabuğu farklı olduğu için oraya uygulanmadı |
 | Dava kartı ailesi | `widgets/dava/` | `FiveCard*` birleştirilmez. Önce ortak alt parçalar: künye satırı, süre şeridi, rol seçimi | Her ekrandan tek alt parça |
 
 `EmptySearchResult` kategori araması için yerinde kalır. Estetik faz onu `AppEmptyResultCard` ile birleştirmeye karar verirse ikon ve metin parametreleri yeter; renk şimdi yeşil, arşiv kartı gri.
@@ -353,7 +353,7 @@ Sekmeler veya bölümler ayrı widget. Üç `ListView.builder` korunur. Diyalogl
 
 - `FiveCardCaseInformation` birleştirilmedi.
 - İstatistikteki "Veri bulunamadı" gövdesi (80 px kutu ikonu) `AppEmptyResultCard` ile değiştirilmedi. Piksel farklı.
-- Kaydedilenler listeleri hâlâ `ListView` + yayılım. Kayıt sayısı kullanıcıya ait.
+- Kaydedilenler listelerinin kartları `SliverChildBuilderDelegate`. Başlık ve arama alanı eager kalır.
 - `AppTheme` renkleri arşiv kromuna uygulanmadı. İstatistik başlığı tema ana rengini parametre olarak alır.
 - Kullanılmayan `CommonDavaCardWidget`, `AnimatedPrimaryButton`, `ModernSectionHeader` silinmedi.
 - `ActigimDavaCard` `lib/widgets/actigim_dava_card.dart` dosyasında. Açılış tarihi önbelleği aynı.
@@ -364,15 +364,24 @@ Sekmeler veya bölümler ayrı widget. Üç `ListView.builder` korunur. Diyalogl
 - Sohbet avatarları `CachedAvatarWidget` olmadı. Mevcut `CircleAvatar` bazı adreslerde fotoğrafın üstüne kişi ikonu çiziyor; ortak widget bu yerleşimi üretmez.
 - `*.g.dart` üretilen modeller aynı.
 
-## 7. Sıradaki tek tur
+## 7. Yapısal liste
 
-**Sıradaki:** Tur 16. İlk dosya `twitter_post_composer.dart`: `TwitterPostCard` ve `PollPostPage` ayrı dosyaya, gövde aynı. Ardından seyir defteri, ceza paneli ve `modern_hukum_card` dosya bölünür. State daraltması her dosyada ayrı tur.
+İstenen yapısal liste kapandı. Estetik faz (Tur 17) başlayabilir.
 
-Yapısal plan bitmiş değildir. Estetik faz (Tur 17) bu liste kapanmadan başlamaz. Kalan yapısal iş:
+Bu turda kapananlar:
 
-- Tur 16 dev widget dosyaları (`ilgililerin_seyir_defteri_widgeti.dart`, `cezalar_ceza_unified_panel.dart`, `modern_hukum_card.dart`, `twitter_post_composer.dart`)
-- Madde 4.1.2: `Selector` ve build içindeki microtask (`ActigimDavaCard`, katıldığım kart, `ActigimDavalarPage` `Consumer2`)
-- Snack göçleri, her çağrının rengi ve süresi korunarak (`home_page`, `haykir_page`, `davetler_page`, arkadaşlık, `delil_ekle_page`, `admin_page`)
-- Tur 9 küçük listeler, Tur 10 admin bölümleri
-- Dava aç form alanları, arkadaşlık kullanıcı satırı ve gelen istek diyaloğu
-- `AppOutlinedCard` yazılmadı. `AppCachedAvatar` atlandı (görünüm değişir). Kullanılmayan widget'lar silinmedi. Kaydedilenler listeleri hâlâ yayılım.
+- Tur 16: `TwitterPostCard`, anket alanı ve `PollPostPage` ayrı dosya. Hüküm kaydırıcısı, seyir demetleri ve `CezalarUnifiedDava` ayrı dosya. Ana `State` gövdeleri tek parça duruyor; yan sınıflar ayrıldı.
+- Madde 4.1.2: hüküm sürümü dinleyicisi `didChangeDependencies` içinde. Yükleme yalnız `hukumUpdateVersion` değişince. Aynı microtask, cooldown ve post-frame. İlgisiz provider bildirimi kartı yeniden kurmaz.
+- Snack: ana sayfa, haykır, davet, arkadaşlık, delil ekle ve admin `showAppSnack`. Renk, süre, `behavior`, `shape` ve `action` aynen geçer. İkonlu satır içeriği ve ikinci `Text` argümanı olan bir delil snack'i duruyor.
+- Tur 9: trend dava listesi zaten `ListView.separated`. Albüm, uyarılar ve haykırışlarım listeleri zaten `ListView.builder`. Boş ve hata halleri tek çocuklu yenileme kabuğu.
+- Tur 10: `AdminStatCard`. Sayfada sekme yok. Diyaloglar gradient çerçeveye uymadığı için `AppDialogFrame` olmadı.
+- Arkadaşlık satırı `FriendshipUserCard`. Gelen istek penceresi `FriendshipIncomingRequestsDialog`.
+- `AppOutlinedCard` istatistik dava ve haykır kartlarının kabuğu.
+- Kaydedilen haykır ve widget listeleri `SliverChildBuilderDelegate`. Arama alanı listenin dışında kalır. Fizik `AlwaysScrollableScrollPhysics`.
+
+Bilinçli olarak duranlar (estetik fazın parçası değiller):
+
+- `AppCachedAvatar` atlandı. Sohbet yerleşimi kişi ikonu çiziyor.
+- `CommonDavaCardWidget`, `AnimatedPrimaryButton`, `ModernSectionHeader` silinmedi.
+- `ModernTextField` dava aç formuna bağlanmadı. O widget sıcak renkli ayrı bir tasarım; sayfadaki alanlar ona uymuyor.
+- Seyir defteri, ceza paneli ve hüküm kartının ana `State` sınıflarını daha küçük `setState` parçalarına bölmek isteğe bağlı bir sonraki yapı turu. Piksel işi değil.

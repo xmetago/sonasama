@@ -6,6 +6,7 @@ import 'package:its19/models/registration_model.dart';
 import 'package:its19/models/category_model.dart';
 import 'database_debug_page.dart';
 import 'reklam_yonetim_page.dart';
+import '../widgets/admin_stat_card.dart';
 import '../widgets/shared/app_snack.dart';
 
 /// Admin sayfası - Sadece admin yetkisine sahip kullanıcılar erişebilir
@@ -1204,33 +1205,7 @@ class _AdminPageState extends State<AdminPage> {
   /// İstatistik kartı widget'ı oluşturur
   /// Başlık, değer ve icon parametreleri alır
   Widget _buildStatCard(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: const Color(0xFF059669)),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF059669),
-            ),
-          ),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
+    return AdminStatCard(title: title, value: value, icon: icon);
   }
 
   /// Kullanıcı düzenleme modalını açar

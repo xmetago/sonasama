@@ -12,6 +12,8 @@ import 'user_gamified_score_page.dart';
 import 'chat_detail_page.dart';
 import '../widgets/common_header_widgets.dart';
 import '../widgets/friendship_category_dialog.dart';
+import '../widgets/friendship_incoming_requests_dialog.dart';
+import '../widgets/friendship_user_card.dart';
 import '../utils/app_theme.dart';
 import '../widgets/shared/app_snack.dart';
 
@@ -928,71 +930,37 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     final isBlockedSection = _selectedCategory == 'Engellenenler';
     final isAdmin = HiveDatabaseService.isAdmin(widget.userEmail);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: AppTheme.cardDecoration(borderRadius: 14, bordered: true),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildProfileImage(profileImageUrl, user.judgeName),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _openChatPage(user),
-                    behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.judgeName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTheme.bodyMedium.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        _buildCategoryBadge(category, blocked: isBlockedSection),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                _buildCompactIconButton(
-                  icon: Icons.star_rounded,
-                  color: AppTheme.warningColor,
-                  backgroundColor: AppTheme.warningUltraLight,
-                  tooltip: 'Puan',
-                  onTap: () => _openUserScorePage(user),
-                ),
-                const SizedBox(width: 4),
-                _buildCompactIconButton(
-                  icon: isAdmin ? Icons.delete_outline : Icons.block_outlined,
-                  color: isAdmin ? AppTheme.errorColor : AppTheme.warningColor,
-                  backgroundColor: isAdmin ? AppTheme.errorUltraLight : AppTheme.warningUltraLight,
-                  tooltip: isAdmin ? 'Kullanıcıyı Sil' : 'Kullanıcıyı Engelle',
-                  onTap: () => _removeUser(user),
-                ),
-                if (_selectedCategory != 'Tümü' && !isBlockedSection) ...[
-                  const SizedBox(width: 4),
-                  _buildCompactIconButton(
-                    icon: Icons.more_horiz,
-                    color: AppTheme.textSecondary,
-                    tooltip: 'Kategori değiştir',
-                    onTap: () => _showFriendshipDialog(user),
-                  ),
-                ],
-              ],
-            ),
-            if (isBlockedSection) ...[
-              const SizedBox(height: 10),
-              SizedBox(
+    return FriendshipUserCard(
+      avatar: _buildProfileImage(profileImageUrl, user.judgeName),
+      judgeName: user.judgeName,
+      categoryBadge: _buildCategoryBadge(category, blocked: isBlockedSection),
+      onOpenChat: () => _openChatPage(user),
+      scoreButton: _buildCompactIconButton(
+        icon: Icons.star_rounded,
+        color: AppTheme.warningColor,
+        backgroundColor: AppTheme.warningUltraLight,
+        tooltip: 'Puan',
+        onTap: () => _openUserScorePage(user),
+      ),
+      removeButton: _buildCompactIconButton(
+        icon: isAdmin ? Icons.delete_outline : Icons.block_outlined,
+        color: isAdmin ? AppTheme.errorColor : AppTheme.warningColor,
+        backgroundColor: isAdmin ? AppTheme.errorUltraLight : AppTheme.warningUltraLight,
+        tooltip: isAdmin ? 'Kullanıcıyı Sil' : 'Kullanıcıyı Engelle',
+        onTap: () => _removeUser(user),
+      ),
+      moreButton: _selectedCategory != 'Tümü' && !isBlockedSection
+          ? _buildCompactIconButton(
+              icon: Icons.more_horiz,
+              color: AppTheme.textSecondary,
+              tooltip: 'Kategori değiştir',
+              onTap: () => _showFriendshipDialog(user),
+            )
+          : null,
+      footer: isBlockedSection
+          ? Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => _unblockUser(user),
@@ -1006,26 +974,26 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                   ),
                 ),
               ),
-            ] else if (_selectedCategory == 'Tümü') ...[
-              const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildQuickCategoryButton('Arkadaş', AppTheme.successColor, user, 'Arkadaş'),
-                    const SizedBox(width: 6),
-                    _buildQuickCategoryButton('Grup-19', const Color(0xFFD97706), user, 'Grup-19'),
-                    const SizedBox(width: 6),
-                    _buildQuickCategoryButton('Takipçi', AppTheme.infoColor, user, 'Takipçi'),
-                    const SizedBox(width: 6),
-                    _buildQuickCategoryButton('Herkes', AppTheme.primaryColor, user, 'Herkes'),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+            )
+          : _selectedCategory == 'Tümü'
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildQuickCategoryButton('Arkadaş', AppTheme.successColor, user, 'Arkadaş'),
+                        const SizedBox(width: 6),
+                        _buildQuickCategoryButton('Grup-19', const Color(0xFFD97706), user, 'Grup-19'),
+                        const SizedBox(width: 6),
+                        _buildQuickCategoryButton('Takipçi', AppTheme.infoColor, user, 'Takipçi'),
+                        const SizedBox(width: 6),
+                        _buildQuickCategoryButton('Herkes', AppTheme.primaryColor, user, 'Herkes'),
+                      ],
+                    ),
+                  ),
+                )
+              : null,
     );
   }
 
@@ -1500,23 +1468,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'Gelen Arkadaşlık İstekleri',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _pendingRequests.length,
-              itemBuilder: (context, index) {
+        return FriendshipIncomingRequestsDialog(
+          itemCount: _pendingRequests.length,
+          itemBuilder: (context, index) {
                 final request = _pendingRequests[index];
                 
                 return Container(
@@ -1562,17 +1516,6 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                   ),
                 );
               },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Kapat',
-                style: TextStyle(fontSize: 16),
-              ),
-            ),
-          ],
         );
       },
     );
