@@ -360,11 +360,19 @@ Sekmeler veya bölümler ayrı widget. Üç `ListView.builder` korunur. Diyalogl
 - İki `TreeMenuPageheadlines` birleştirilmedi. Açtığım davalar kopyası `tree_menu_page_headlines.dart`, dava aç kopyası `dava_ac_page_headline.dart`.
 - Ana sayfa haykır kartı `lib/widgets/home_haykir_card.dart`. `WaveClipper` ve `WavePainter` kartla birlikte durur.
 - Ana sayfa başlığı `lib/widgets/home_page_chrome.dart`. Boş kayıt durumu ve snack'ler sayfada.
+- `ModernYargilaCard` ve `DashedLinePainter` `lib/widgets/modern_yargila_card.dart`. Sayfa her iki adı dışa aktarır. `buildYargilaCountdownRow` aynı.
 - Sohbet avatarları `CachedAvatarWidget` olmadı. Mevcut `CircleAvatar` bazı adreslerde fotoğrafın üstüne kişi ikonu çiziyor; ortak widget bu yerleşimi üretmez.
 - `*.g.dart` üretilen modeller aynı.
 
 ## 7. Sıradaki tek tur
 
-**Sıradaki:** `yargila_page.dart` içindeki `ModernYargilaCard` ve `DashedLinePainter` ayrı dosyaya çıksın. Geri sayım satırı `buildYargilaCountdownRow` olarak kalır. Kartın gövdesi değişmez.
+**Sıradaki:** Tur 16. İlk dosya `twitter_post_composer.dart`: `TwitterPostCard` ve `PollPostPage` ayrı dosyaya, gövde aynı. Ardından seyir defteri, ceza paneli ve `modern_hukum_card` dosya bölünür. State daraltması her dosyada ayrı tur.
 
-Yapısal plan bitmiş değildir. Estetik faz (Tur 17) bu liste kapanmadan başlamaz. Kalan yapısal iş: Tur 16 dev widget dosyaları, madde 4.1.2 Selector ve microtask, snack göçleri (renk ve süre korunarak), Tur 9 küçük listeler, Tur 10 admin bölümleri, dava aç form alanları, arkadaşlık kullanıcı satırı.
+Yapısal plan bitmiş değildir. Estetik faz (Tur 17) bu liste kapanmadan başlamaz. Kalan yapısal iş:
+
+- Tur 16 dev widget dosyaları (`ilgililerin_seyir_defteri_widgeti.dart`, `cezalar_ceza_unified_panel.dart`, `modern_hukum_card.dart`, `twitter_post_composer.dart`)
+- Madde 4.1.2: `Selector` ve build içindeki microtask (`ActigimDavaCard`, katıldığım kart, `ActigimDavalarPage` `Consumer2`)
+- Snack göçleri, her çağrının rengi ve süresi korunarak (`home_page`, `haykir_page`, `davetler_page`, arkadaşlık, `delil_ekle_page`, `admin_page`)
+- Tur 9 küçük listeler, Tur 10 admin bölümleri
+- Dava aç form alanları, arkadaşlık kullanıcı satırı ve gelen istek diyaloğu
+- `AppOutlinedCard` yazılmadı. `AppCachedAvatar` atlandı (görünüm değişir). Kullanılmayan widget'lar silinmedi. Kaydedilenler listeleri hâlâ yayılım.
