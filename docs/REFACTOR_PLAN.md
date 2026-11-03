@@ -365,6 +365,6 @@ Hive taraması build dışına alındı. Kalan iş yapısal:
 
 ## 7. Sıradaki tek tur
 
-**Sıradaki:** `katildigim_davalar_page.dart` içindeki `FiveCardCaseInformation` kendi dosyasına çıksın. `davaData` map sözleşmesi durur. `Consumer` içindeki microtask bu turda değişmez. Sonra `actigim_davalar_page.dart` kartı.
+**Sıradaki:** `actigim_davalar_page.dart` içindeki `FiveCardCaseInformation` kendi dosyasına çıksın. `ActigimDavaCard` ve Hive önbelleği ayrı tur. Microtask yüklemesi bu turda değişmez.
 
-Taşınan kartlar: `masraflar_case_card.dart`, `delil_case_card.dart`, `yargila_case_card.dart`, `haykir_case_card.dart`, `dava_ac_case_card.dart`. `GroupSelectionDialog` ve `GroupOption` `group_selection_dialog.dart` içinde. Sayfalar adları yeniden dışa aktarır.
+Taşınan kartlar: `masraflar_case_card.dart`, `delil_case_card.dart`, `yargila_case_card.dart`, `haykir_case_card.dart`, `dava_ac_case_card.dart`, `katildigim_case_card.dart`. Katıldığım kart `davaData` map sözleşmesini korur. `GroupSelectionDialog` `group_selection_dialog.dart` içinde.
