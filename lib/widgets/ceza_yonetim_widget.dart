@@ -5,6 +5,7 @@ import '../screens/delilleri_incele_page.dart';
 import 'cezalar_ceza_unified_panel.dart';
 import 'cezalar_page_layout_rails.dart';
 import 'common_header_widgets.dart';
+import 'shared/app_expandable_icon_menu.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Ceza Yönetimi — tam ekran / sheet: kabuk + [CezalarCezaUnifiedPanel]
@@ -37,7 +38,6 @@ class CezaYonetimPage extends StatefulWidget {
 }
 
 class _CezaYonetimPageState extends State<CezaYonetimPage> {
-  bool _showLeftIcons = false;
   bool _isHeaderCollapsed = true;
 
   /// Hot reload / yanlış element eşleşmesinde `late` patlamasını önlemek için her build'da türetilir.
@@ -54,17 +54,25 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            AnimatedContainer(
+        child: AppExpandableIconMenu(
+          expandBody: true,
+          inset: const EdgeInsets.all(8),
+          rowCrossAxisAlignment: CrossAxisAlignment.stretch,
+          items: [
+            AppExpandableIconMenuItem(
+              onTap: () {},
+              customChild: CezalarLeftIconScrollColumn(userEmail: widget.userEmail),
+            ),
+          ],
+          headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+            return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               height: _isHeaderCollapsed ? 40 : null,
               child: _isHeaderCollapsed
                   ? CollapsedWbHeaderRow(
                       title: 'CEZA YÖNETİMİ ',
                       onExpandHeader: () => setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
-                      onToggleLeftNav: () => setState(() => _showLeftIcons = !_showLeftIcons),
+                      onToggleLeftNav: toggle,
                     )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -83,29 +91,18 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
                           ),
                         ),
                         CezalarMenuTitleRow(
-                          onToggleLeftNav: () => setState(() => _showLeftIcons = !_showLeftIcons),
+                          onToggleLeftNav: toggle,
                           title: 'CEZA YÖNETİMİ ',
                           isHeaderCollapsed: _isHeaderCollapsed,
                           onToggleCollapse: () => setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
                         ),
                       ],
                     ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: _showLeftIcons ? 60 : 0,
-                      child: _showLeftIcons
-                          ? SingleChildScrollView(
-                              child: CezalarLeftIconScrollColumn(userEmail: widget.userEmail),
-                            )
-                          : const SizedBox.shrink(),
-                    ),
+            );
+          },
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
                     CezalarMiddleVerticalIconRail(
                       onDelilleriIncele: () {
                         Navigator.push(
@@ -148,11 +145,8 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

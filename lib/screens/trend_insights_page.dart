@@ -11,6 +11,7 @@ import 'katildigim_davalar_page.dart';
 import 'statistics_dashboard_page.dart';
 import 'yargila_page.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 
 /// Trend davalar ve haykırışlar ekranı.
 class TrendInsightsPage extends StatefulWidget {
@@ -31,7 +32,6 @@ class _TrendInsightsPageState extends State<TrendInsightsPage>
   TrendingInsights? _insights;
   bool _isLoading = false;
   String? _error;
-  bool _showNavMenu = false;
 
   @override
   void initState() {
@@ -77,8 +77,20 @@ class _TrendInsightsPageState extends State<TrendInsightsPage>
       length: 2,
       child: Scaffold(
         body: SafeArea(
-          child: Column(
-            children: [
+          child: AppExpandableIconMenu(
+            expandBody: true,
+            panelWidth: 72,
+            duration: const Duration(milliseconds: 250),
+            items: [
+              AppExpandableIconMenuItem(
+                onTap: () {},
+                customChild: _SideNavigationMenu(userEmail: widget.userEmail),
+              ),
+            ],
+            headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
               // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
               ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
               // Başlık, Menü ve Yenile butonu
@@ -88,14 +100,10 @@ class _TrendInsightsPageState extends State<TrendInsightsPage>
                   children: [
                     IconButton(
                       icon: Icon(
-                        _showNavMenu ? MdiIcons.close : MdiIcons.menuOpen,
+                        isOpen ? MdiIcons.close : MdiIcons.menuOpen,
                         color: Colors.red,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _showNavMenu = !_showNavMenu;
-                        });
-                      },
+                      onPressed: toggle,
                     ),
                     const SizedBox(width: 8),
                     const Expanded(
@@ -129,20 +137,10 @@ class _TrendInsightsPageState extends State<TrendInsightsPage>
                   Tab(text: 'Trend Haykırışlar'),
                 ],
               ),
-              // İçerik
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      width: _showNavMenu ? 72 : 0,
-                      child: _showNavMenu
-                          ? _SideNavigationMenu(userEmail: widget.userEmail)
-                          : null,
-                    ),
-                    Expanded(
-                      child: RefreshIndicator(
+              ],
+              );
+            },
+            body: RefreshIndicator(
                         onRefresh: _loadData,
                         child: TabBarView(
                           controller: _tabController,
@@ -166,11 +164,6 @@ class _TrendInsightsPageState extends State<TrendInsightsPage>
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
         ),
       ),

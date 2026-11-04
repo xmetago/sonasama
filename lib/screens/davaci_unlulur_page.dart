@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import 'gelen_davalar_page.dart';
 import 'katildigim_davalar_page.dart' as katildigim;
 import 'yargila_page.dart';
@@ -28,7 +29,6 @@ class DavaciUnlulurPage extends StatefulWidget {
 class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
   /// true → Davacı Ünlü sekmesi, false → Davalı Ünlü sekmesi
   bool _isDavaciUnluTab = true;
-  bool showLeftIcons = false;
   List<Map<String, dynamic>> _davaList = [];
   int _davaciUnluCount = 0;
   int _davaliUnluCount = 0;
@@ -482,6 +482,19 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               children: [
+                AppExpandableIconMenu(
+                  scrollPanel: false,
+                  bodyPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  items: [
+                    AppExpandableIconMenuItem(
+                      onTap: () {},
+                      customChild: _buildLeftIconMenu(),
+                    ),
+                  ],
+                  headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                 ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -502,12 +515,7 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4),
                   child: Row(
                     children: [
-                      IconButton(
-                        icon: Icon(MdiIcons.menuOpen, size: 34, color: Colors.red),
-                        onPressed: () {
-                          setState(() => showLeftIcons = !showLeftIcons);
-                        },
-                      ),
+                      menuButton,
                       const SizedBox(width: 8),
                       Expanded(
                         child: Container(
@@ -547,18 +555,10 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
                 ),
                 _buildPageHeadline(),
                 _buildInfoBanner(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: showLeftIcons ? 60 : 0,
-                        child: showLeftIcons ? _buildLeftIconMenu() : const SizedBox.shrink(),
-                      ),
-                      Expanded(
-                        child: _davaList.isEmpty
+                    ],
+                    );
+                  },
+                  body: _davaList.isEmpty
                             ? _buildEmptyState()
                             : ListView.builder(
                                 shrinkWrap: true,
@@ -568,9 +568,6 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
                                   return _buildUnluSeyirDefteriCard(_davaList[index]);
                                 },
                               ),
-                      ),
-                    ],
-                  ),
                 ),
                 const SizedBox(height: 16),
               ],

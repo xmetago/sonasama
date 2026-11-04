@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../services/hive_database_service.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/shared.dart';
 
 /// ✅ Step-2: Kaydedilen haykırları gösteren sayfa
 /// StatisticsDashboardPage benzeri yapı
@@ -71,28 +72,10 @@ class _SavedHaykirlarPageState extends State<SavedHaykirlarPage> {
             // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
             ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
             // Başlık ve Yenile butonu
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                children: [
-                  const Text(
-                    'Kaydedilenler Arşivi',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(
-                      Icons.refresh_rounded,
-                      color: _isLoading ? Colors.grey : Theme.of(context).primaryColor,
-                    ),
-                    onPressed: _isLoading ? null : _loadData,
-                    tooltip: 'Yenile',
-                  ),
-                ],
-              ),
+            AppRefreshTitleBar(
+              title: 'Kaydedilenler Arşivi',
+              isLoading: _isLoading,
+              onRefresh: _loadData,
             ),
             // İçerik
             Expanded(
@@ -106,77 +89,15 @@ class _SavedHaykirlarPageState extends State<SavedHaykirlarPage> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).primaryColor,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Kaydedilen haykırlar yükleniyor...',
-              style: TextStyle(
-                color: Colors.grey[700],
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
+      return const AppLoadingMessage(
+        message: 'Kaydedilen haykırlar yükleniyor...',
       );
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.error_outline_rounded,
-                  size: 64,
-                  color: Colors.red[400],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.grey[900],
-                ),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton.icon(
-                onPressed: _loadData,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Tekrar Dene'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
-                ),
-              ),
-            ],
-          ),
-        ),
+      return AppErrorRetryView(
+        message: _error!,
+        onRetry: _loadData,
       );
     }
 
@@ -191,181 +112,53 @@ class _SavedHaykirlarPageState extends State<SavedHaykirlarPage> {
 
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
+      child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          const _SectionHeader(title: 'Kaydedilen Haykırlar'),
-          const SizedBox(height: 12),
-          _SearchField(onChanged: (value) {
-            setState(() {
-              _searchQuery = value;
-            });
-          }),
-          const SizedBox(height: 16),
-          if (filtered.isEmpty)
-            _EmptyResultCard(query: _searchQuery)
-          else
-            ...filtered.map(
-              (haykir) => _SavedHaykirTile(
-                haykir: haykir,
-                userEmail: widget.userEmail,
-                onRefresh: _loadData,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(
+                [
+                  const AppAccentSectionHeader(title: 'Kaydedilen Haykırlar'),
+                  const SizedBox(height: 12),
+                  AppSearchField(
+                    hintText: 'Haykır ara...',
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  if (filtered.isEmpty)
+                    AppEmptyResultCard(
+                      query: _searchQuery,
+                      emptyMessage: 'Henüz kaydedilen haykır yok',
+                      icon: Icons.bookmark_border_rounded,
+                    ),
+                ],
               ),
             ),
-          const SizedBox(height: 32),
-        ],
-      ),
-    );
-  }
-}
-
-/// Arama alanı widget'ı
-class _SearchField extends StatelessWidget {
-  const _SearchField({required this.onChanged});
-
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
           ),
-        ],
-      ),
-      child: TextField(
-        decoration: InputDecoration(
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: Colors.grey[600],
-          ),
-          hintText: 'Haykır ara...',
-          hintStyle: TextStyle(color: Colors.grey[500]),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: Theme.of(context).primaryColor,
-              width: 2,
-            ),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        ),
-        onChanged: onChanged,
-      ),
-    );
-  }
-}
-
-/// Bölüm başlığı
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 20,
-            decoration: BoxDecoration(
-              color: Colors.purple,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.grey[800],
+          if (filtered.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (BuildContext context, int index) {
+                    final Map<String, dynamic> haykir = filtered[index];
+                    return _SavedHaykirTile(
+                      haykir: haykir,
+                      userEmail: widget.userEmail,
+                      onRefresh: _loadData,
+                    );
+                  },
+                  childCount: filtered.length,
                 ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Boş sonuç kartı
-class _EmptyResultCard extends StatelessWidget {
-  const _EmptyResultCard({required this.query});
-
-  final String query;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasQuery = query.isNotEmpty;
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 24),
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Icon(
-              Icons.bookmark_border_rounded,
-              size: 48,
-              color: Colors.grey[400],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            hasQuery ? 'Arama sonucuna ulaşılamadı' : 'Henüz kaydedilen haykır yok',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey[800],
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          if (hasQuery) ...[
-            const SizedBox(height: 8),
-            Text(
-              '"$query" için eşleşme yok',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
               ),
             ),
-          ],
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
     );
@@ -495,22 +288,22 @@ class _SavedHaykirTile extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _StatBadge(
+                  AppStatBadge(
                     icon: Icons.thumb_up_rounded,
                     count: likeCount,
                     color: Colors.green,
                   ),
-                  _StatBadge(
+                  AppStatBadge(
                     icon: Icons.thumb_down_rounded,
                     count: kinaCount,
                     color: Colors.grey[600]!,
                   ),
-                  _StatBadge(
+                  AppStatBadge(
                     icon: Icons.comment_rounded,
                     count: commentCount,
                     color: Colors.blue,
                   ),
-                  _StatBadge(
+                  AppStatBadge(
                     icon: Icons.share_rounded,
                     count: shareCount,
                     color: Colors.orange,
@@ -546,43 +339,3 @@ class _SavedHaykirTile extends StatelessWidget {
     }
   }
 }
-
-/// İstatistik rozeti
-class _StatBadge extends StatelessWidget {
-  const _StatBadge({
-    required this.icon,
-    required this.count,
-    required this.color,
-  });
-
-  final IconData icon;
-  final int count;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 4),
-          Text(
-            '$count',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: color,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-

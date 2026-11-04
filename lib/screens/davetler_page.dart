@@ -4,11 +4,14 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../services/hive_database_service.dart';
 import '../providers/dava_provider.dart';
 import '../widgets/modern_invitation_card.dart';
-import '../widgets/comment_section.dart';
 import '../utils/comment_utils.dart';
-import './delil_listesi_ekrani.dart';
 import '../widgets/common_header_widgets.dart';
 import './haykir_page.dart'; // ✅ HAYKIR sayfasına yönlendirme için
+import '../widgets/modern_dava_card.dart';
+import '../widgets/shared/app_snack.dart';
+export '../widgets/davet_card.dart';
+export '../widgets/modern_dava_card.dart';
+
 
 class DavetlerPage extends StatefulWidget {
   final String? userEmail;
@@ -255,13 +258,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
           (e['id']?.toString() ?? '') == targetId);
     });
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('✅ Davet bitirildi: ${davet['davaAdi']}'),
-        backgroundColor: const Color(0xFF10B981), // Yeşil
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '✅ Davet bitirildi: ${davet['davaAdi']}', backgroundColor: const Color(0xFF10B981), duration: const Duration(seconds: 2));
 
     // Listeyi tazele (aktifleri yeniden yükle)
     _loadAktifDavetler();
@@ -294,13 +291,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
         _loadAktifDavetler();
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('📢 HAYKIR açıldı: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}'),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      showAppSnack(context, '📢 HAYKIR açıldı: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}', backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
       return;
     }
     
@@ -341,23 +332,11 @@ class _DavetlerPageState extends State<DavetlerPage> {
 
     if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('👁️ Dava izlenmeye alındı: ${davet['davaAdi'] ?? 'Dava'}'),
-          backgroundColor: const Color(0xFF10B981), // Yeşil
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      showAppSnack(context, '👁️ Dava izlenmeye alındı: ${davet['davaAdi'] ?? 'Dava'}', backgroundColor: const Color(0xFF10B981), duration: const Duration(seconds: 2));
   }
 
   void _onDelilEkleInvitation(Map<String, dynamic> davet) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('📋 Delil ekleme: ${davet['davaAdi']}'),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '📋 Delil ekleme: ${davet['davaAdi']}', backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
   }
 
   Future<void> _onYorumInvitation(
@@ -429,13 +408,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
     }
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('💬 Yorum eklendi: "$yorumMetni"'),
-        backgroundColor: const Color(0xFF10B981), // Yeşil
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '💬 Yorum eklendi: "$yorumMetni"', backgroundColor: const Color(0xFF10B981), duration: const Duration(seconds: 2));
   }
 
   void _onRetweetInvitation(Map<String, dynamic> davet) async {
@@ -483,13 +456,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
               // ✅ Katıldığım HAYKIR'lar sayfasından da kaldır
               await HiveDatabaseService.removeKatildigimHaykir(widget.userEmail!, haykirId);
               
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('🔄 HAYKIR paylaşımı geri alındı: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}'),
-                  backgroundColor: Colors.grey,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              showAppSnack(context, '🔄 HAYKIR paylaşımı geri alındı: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}', backgroundColor: Colors.grey, duration: const Duration(seconds: 2));
             } catch (e) {
               print('⚠️ HAYKIR retweet geri alma hatası: $e');
             }
@@ -519,24 +486,12 @@ class _DavetlerPageState extends State<DavetlerPage> {
             // ✅ HAYKIR için Katıldığım HAYKIR'lar sayfasına ekle
             await _addToKatildigimHaykirler(davet);
             
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('🔄 HAYKIR daveti Seyir Defteri\'nde paylaşıldı ve Katıldığım HAYKIR\'lar\'a eklendi: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}'),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 3),
-              ),
-            );
+            showAppSnack(context, '🔄 HAYKIR daveti Seyir Defteri\'nde paylaşıldı ve Katıldığım HAYKIR\'lar\'a eklendi: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}', backgroundColor: Colors.orange, duration: const Duration(seconds: 3));
           }
         }
       } catch (e) {
         print('❌ HAYKIR retweet hatası: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ HAYKIR paylaşım hatası: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        showAppSnack(context, '❌ HAYKIR paylaşım hatası: $e', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
       }
       return;
     }
@@ -559,13 +514,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
           // ✅ Katıldığım Davalar sayfasından da kaldır
           await HiveDatabaseService.removeKatildigimDava(widget.userEmail!, davaId);
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('🔄 Davet paylaşımı geri alındı: ${davet['davaAdi']}'),
-              backgroundColor: Colors.grey,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          showAppSnack(context, '🔄 Davet paylaşımı geri alındı: ${davet['davaAdi']}', backgroundColor: Colors.grey, duration: const Duration(seconds: 2));
         } else {
           // ✅ Retweet yapılıyor - Seyir Defteri'ne ekle
           final nowIso = DateTime.now().toIso8601String();
@@ -591,33 +540,15 @@ class _DavetlerPageState extends State<DavetlerPage> {
           // ✅ YENİ: Katıldığım Davalar sayfasına da ekle
           await _addToKatildigimDavalar(davet);
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('🔄 Davet Seyir Defteri\'nde paylaşıldı ve Katıldığım Davalar\'a eklendi: ${davet['davaAdi']}'),
-              backgroundColor: const Color(0xFF10B981), // Yeşil
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          showAppSnack(context, '🔄 Davet Seyir Defteri\'nde paylaşıldı ve Katıldığım Davalar\'a eklendi: ${davet['davaAdi']}', backgroundColor: const Color(0xFF10B981), duration: const Duration(seconds: 3));
         }
       } else {
         print('⚠️ Dava ID bulunamadı, Seyir Defteri\'ne eklenemedi');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('⚠️ Dava ID bulunamadı, paylaşılamadı'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showAppSnack(context, '⚠️ Dava ID bulunamadı, paylaşılamadı', backgroundColor: Colors.orange, duration: Duration(seconds: 2));
       }
     } catch (e) {
       print('❌ Seyir Defteri paylaşım hatası: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Paylaşım hatası: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      showAppSnack(context, '❌ Paylaşım hatası: $e', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
     }
   }
 
@@ -738,13 +669,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
       print('⚠️ Seyir defteri güncelleme hatası: $e');
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('👍 Davet beğenildi: ${davet['davaAdi']}'),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '👍 Davet beğenildi: ${davet['davaAdi']}', backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
   }
 
   void _onBegenmemeInvitation(Map<String, dynamic> davet) {
@@ -789,13 +714,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
       print('⚠️ Seyir defteri güncelleme hatası: $e');
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('👎 Davet beğenilmedi: ${davet['davaAdi']}'),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '👎 Davet beğenilmedi: ${davet['davaAdi']}', backgroundColor: Colors.red, duration: const Duration(seconds: 2));
   }
 
   @override
@@ -971,189 +890,6 @@ class _DavetlerPageState extends State<DavetlerPage> {
   }
 }
 
-class DavetCard extends StatelessWidget {
-  final Map<String, dynamic> davet;
-  final VoidCallback onMarkAsRead;
-
-  const DavetCard({
-    super.key,
-    required this.davet,
-    required this.onMarkAsRead,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isRead = davet['isRead'] ?? false;
-    
-    return Card(
-      elevation: 4,
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: isRead ? Colors.grey[50] : Colors.blue[50],
-          border: isRead ? null : Border.all(color: Colors.blue[200]!, width: 2),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[600],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      davet['groupName'] ?? 'Davet',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  if (!isRead)
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              
-              // Dava Bilgileri
-              Text(
-                davet['davaAdi'] ?? 'Dava Adı Belirtilmemiş',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              
-              if (davet['kategori'] != null && davet['kategori'].toString().isNotEmpty) ...[
-                Row(
-                  children: [
-                    const Icon(Icons.category, size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Kategori: ${davet['kategori']}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
-              
-              if (davet['davaKonusu'] != null && davet['davaKonusu'].toString().isNotEmpty) ...[
-                const Text(
-                  'Dava Konusu:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  davet['davaKonusu'],
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-              ],
-              
-              // Davacı ve Davalı
-              if (davet['davaci'] != null && davet['davaci'].toString().isNotEmpty) ...[
-                Row(
-                  children: [
-                    const Icon(Icons.person, size: 16, color: Colors.green),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Davacı: ${davet['davaci']}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-              ],
-              
-              if (davet['davali'] != null && davet['davali'].toString().isNotEmpty) ...[
-                Row(
-                  children: [
-                    const Icon(Icons.person_outline, size: 16, color: Colors.red),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Davalı: ${davet['davali']}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
-              
-              // Tarih
-              Row(
-                children: [
-                  const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    _formatDate(davet['invitedAt']),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (!isRead)
-                    TextButton(
-                      onPressed: onMarkAsRead,
-                      child: const Text('Okundu İşaretle'),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return 'Tarih belirtilmemiş';
-    try {
-      final date = DateTime.parse(dateStr);
-      return '${date.day}.${date.month}.${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return 'Geçersiz tarih';
-    }
-  }
-}
 
 class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
   // Örnek dava verileri
@@ -1222,36 +958,18 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
     setState(() {
       davalar[index]['isOpened'] = true;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('✅ Dava kaydedildi: ${davalar[index]['davaAdi']}'),
-        backgroundColor: Colors.greenAccent,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '✅ Dava kaydedildi: ${davalar[index]['davaAdi']}', backgroundColor: Colors.greenAccent, duration: const Duration(seconds: 2));
   }
 
   void _onOpen(int index) {
     setState(() {
       davalar[index]['isOpened'] = true;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('⚖️ Dava başlatıldı: ${davalar[index]['davaAdi']}'),
-        backgroundColor: Colors.blue,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '⚖️ Dava başlatıldı: ${davalar[index]['davaAdi']}', backgroundColor: Colors.blue, duration: const Duration(seconds: 2));
   }
 
   void _onDelilEkle(int index) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('📋 Delil ekleme sayfası açılıyor: ${davalar[index]['davaAdi']}'),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '📋 Delil ekleme sayfası açılıyor: ${davalar[index]['davaAdi']}', backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
   }
 
   Future<void> _onYorum(
@@ -1293,13 +1011,7 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
           CommentUtils.countAllComments(davalar[index]['yorumlar']);
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('💬 Yorum eklendi: ${davalar[index]['davaAdi']}'),
-        backgroundColor: Colors.blue,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, '💬 Yorum eklendi: ${davalar[index]['davaAdi']}', backgroundColor: Colors.blue, duration: const Duration(seconds: 2));
   }
 
   void _onRetweet(int index) {
@@ -1322,13 +1034,7 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
         ? '🔄 Dava paylaşıldı: ${davalar[index]['davaAdi']}'
         : '🔄 Paylaşım kaldırıldı: ${davalar[index]['davaAdi']}';
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, message, backgroundColor: Colors.green, duration: const Duration(seconds: 2));
   }
 
   void _onBegeni(int index) {
@@ -1356,13 +1062,7 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
         ? '👍 Beğenildi: ${davalar[index]['davaAdi']}'
         : '👍 Beğeni kaldırıldı: ${davalar[index]['davaAdi']}';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, message, backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
   }
 
   void _onBegenmeme(int index) {
@@ -1390,13 +1090,7 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
         ? '👎 Beğenilmedi: ${davalar[index]['davaAdi']}'
         : '👎 Beğenmeme kaldırıldı: ${davalar[index]['davaAdi']}';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnack(context, message, backgroundColor: Colors.red, duration: const Duration(seconds: 2));
   }
 
   @override
@@ -1459,622 +1153,6 @@ class _DavetEtListesiSayfasiState extends State<DavetEtListesiSayfasi> {
               onBegenmeme: () => _onBegenmeme(index),
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-class ModernDavaCard extends StatefulWidget {
-  final String userEmail;
-  final String displayName;
-  final String davaAdi;
-  final String davaKategori;
-  final String davaKonusu;
-  final String? davaci; // Davacı alanı eklendi
-  final String? davali;
-  final String? davaId;
-  final bool isOpened;
-  final int yorumSayisi;
-  final int retweetSayisi;
-  final int begeniSayisi;
-  final int begenmemeSayisi;
-  final bool userLiked;
-  final bool userDisliked;
-  final bool? userRetweeted; // Retweet state eklendi
-  final List<Map<String, dynamic>> yorumlar;
-  final VoidCallback onSave;
-  final VoidCallback onOpen;
-  final VoidCallback onDelilEkle;
-  final CommentSubmitCallback? onYorum;
-  final VoidCallback? onRetweet;
-  final VoidCallback? onBegeni;
-  final VoidCallback? onBegenmeme;
-
-  const ModernDavaCard({
-    super.key,
-    required this.userEmail,
-    required this.displayName,
-    required this.davaAdi,
-    required this.davaKategori,
-    required this.davaKonusu,
-    this.davaci,
-    this.davali,
-    this.davaId,
-    required this.isOpened,
-    required this.yorumSayisi,
-    required this.retweetSayisi,
-    required this.begeniSayisi,
-    required this.begenmemeSayisi,
-    required this.userLiked,
-    required this.userDisliked,
-    this.userRetweeted,
-    required this.yorumlar,
-    required this.onSave,
-    required this.onOpen,
-    required this.onDelilEkle,
-    this.onYorum,
-    this.onRetweet,
-    this.onBegeni,
-    this.onBegenmeme,
-  });
-
-  @override
-  State<ModernDavaCard> createState() => _ModernDavaCardState();
-}
-
-class _ModernDavaCardState extends State<ModernDavaCard> {
-  bool isExpanded = false;
-  bool isSaved = false;
-  bool isLiked = false;
-  bool isDisliked = false;
-  bool isRetweeted = false;
-  final GlobalKey<CommentSectionState> _commentSectionKey =
-      GlobalKey<CommentSectionState>();
-
-  @override
-  void initState() {
-    super.initState();
-    // Widget'tan gelen state'leri local state'e kopyala
-    isLiked = widget.userLiked;
-    isDisliked = widget.userDisliked;
-    isRetweeted = widget.userRetweeted ?? false;
-  }
-
-  void _focusComments() {
-    setState(() => isExpanded = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _commentSectionKey.currentState?.focusInput();
-    });
-  }
-
-  Widget _buildInfoRow(String label, String value, {bool bold = false}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "$label: ",
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-              color: Colors.black87,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEngagementButton({
-    required IconData icon,
-    required String count,
-    required Color color,
-    required VoidCallback? onPressed,
-    bool isActive = false,
-  }) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? color.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: isActive ? Border.all(color: color, width: 1) : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isActive ? color : color.withOpacity(0.7),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              count,
-              style: TextStyle(
-                fontSize: 13,
-                color: isActive ? color : color.withOpacity(0.7),
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ignore: unused_element
-  void _showCommentDialog() {
-    final TextEditingController commentController = TextEditingController();
-    bool isGizliTanik = false;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: Row(
-                children: [
-                  Builder(
-                    builder: (context) {
-                      // Kullanıcının profil resmi URL'sini Hive'dan al
-                      final settings = HiveDatabaseService.getSettings(widget.userEmail);
-                      final profileImageUrl = settings?.profileImageUrl;
-                      
-                      return CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.grey[200],
-                        backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
-                            ? NetworkImage(profileImageUrl) as ImageProvider<Object>
-                            : const AssetImage('lib/icons/07_profil_picture_davaci.png') as ImageProvider<Object>,
-                        onBackgroundImageError: profileImageUrl != null && profileImageUrl.isNotEmpty
-                            ? (exception, stackTrace) {
-                                // Resim yüklenemezse varsayılan ikonu göster
-                              }
-                            : null,
-                        child: profileImageUrl != null && profileImageUrl.isNotEmpty
-                            ? null
-                            : const Icon(Icons.account_circle, size: 32, color: Colors.grey),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Yorum Yap',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Dava: ${widget.davaAdi}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.grey[100],
-                      shape: const CircleBorder(),
-                    ),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: TextField(
-                      controller: commentController,
-                      maxLines: 4,
-                      maxLength: 280,
-                      onChanged: (value) {
-                        setDialogState(() {});
-                      },
-                      decoration: const InputDecoration(
-                        hintText: 'Davanız hakkında yorumunuzu yazın...',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(16),
-                        counterText: '',
-                      ),
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${commentController.text.length}/280',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: commentController.text.length > 250
-                              ? Colors.orange
-                              : Colors.grey[600],
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('📷 Fotoğraf ekleme özelliği yakında!'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                            icon: Icon(Icons.photo_camera, color: Colors.green[600]),
-                            tooltip: 'Fotoğraf Ekle',
-                          ),
-                        ],
-                      ),
-                    ],
-                    ),
-                    const SizedBox(height: 16),
-                    // Gizli Tanık checkbox'ı
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: isGizliTanik,
-                            onChanged: (bool? value) {
-                              setDialogState(() {
-                                isGizliTanik = value ?? false;
-                              });
-                            },
-                            activeColor: Colors.green,
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setDialogState(() {
-                                  isGizliTanik = !isGizliTanik;
-                                });
-                              },
-                              child: const Text(
-                                'Gizli Tanık olarak yorum yap',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isGizliTanik) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Yorumunuz "${HiveDatabaseService.gizliTanikDisplayName}" adıyla görünecektir.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text(
-                    'İptal',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: commentController.text.trim().isEmpty ? null : () async {
-                    if (commentController.text.trim().isNotEmpty) {
-                      final yorumMetni = commentController.text.trim();
-                      
-                      // Gizli tanık seçildiyse, yorumu HiveDatabaseService ile kaydet
-                      if (widget.davaId != null && widget.userEmail.isNotEmpty && isGizliTanik) {
-                        await HiveDatabaseService.addDavaComment(
-                          widget.davaId!,
-                          widget.userEmail,
-                          yorumMetni: yorumMetni,
-                          isGizliTanik: true,
-                        );
-                      }
-                      
-                      widget.onYorum?.call(yorumMetni);
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('💬 Yorum eklendi: "$yorumMetni"${isGizliTanik ? ' (Gizli Tanık olarak)' : ''}'),
-                          backgroundColor: Colors.green[600],
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue[600],
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                  child: const Text('OK'),
-                ),
-              ],
-              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildActionButton({
-    required String text,
-    required IconData icon,
-    required VoidCallback onPressed,
-    required Color color,
-  }) {
-    return Expanded(
-      child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18),
-        label: Text(text),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          elevation: 2,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header Row
-            Row(
-              children: [
-                Builder(
-                  builder: (context) {
-                    // Kullanıcının profil resmi URL'sini Hive'dan al
-                    final settings = HiveDatabaseService.getSettings(widget.userEmail);
-                    final profileImageUrl = settings?.profileImageUrl;
-                    
-                    return CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.grey[200],
-                      backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? NetworkImage(profileImageUrl) as ImageProvider<Object>
-                          : const AssetImage('lib/icons/07_profil_picture_davaci.png') as ImageProvider<Object>,
-                      onBackgroundImageError: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? (exception, stackTrace) {
-                              // Resim yüklenemezse varsayılan ikonu göster
-                            }
-                          : null,
-                      child: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? null
-                          : const Icon(Icons.account_circle, size: 40, color: Colors.grey),
-                    );
-                  },
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    "Davacı: ${widget.davaci?.isNotEmpty == true ? widget.davaci : widget.displayName}",
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    isExpanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    color: Colors.grey[600],
-                  ),
-                  onPressed: () {
-                    setState(() => isExpanded = !isExpanded);
-                  },
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // Dava Bilgileri
-            _buildInfoRow("Dava Adı", widget.davaAdi, bold: true),
-            if (widget.davaKategori.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              _buildInfoRow("Kategori", widget.davaKategori),
-            ],
-            if (widget.davali != null && widget.davali!.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              _buildInfoRow("Davalı", widget.davali!),
-            ],
-
-            if (isExpanded) ...[
-              const SizedBox(height: 12),
-              _buildInfoRow("Dava Konusu", widget.davaKonusu),
-              const SizedBox(height: 16),
-
-              // Action Buttons
-              Row(
-                children: [
-                  _buildActionButton(
-                    text: "Arşivle",
-                    icon: isSaved ? Icons.check_circle : Icons.check_circle_outline,
-                    onPressed: () {
-                      setState(() {
-                        isSaved = !isSaved;
-                      });
-                      widget.onSave();
-                    },
-                    color: isSaved ? Colors.green : Colors.grey[600]!,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildActionButton(
-                    text: "İzle",
-                    icon: Icons.open_in_new,
-                    onPressed: widget.onOpen,
-                    color: Colors.green[600]!,
-                  ),
-
-
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const SizedBox(width: 8),
-                  _buildActionButton(
-                    text: "Delil Listesine Gözat",
-                    icon: Icons.account_tree_outlined,
-                    onPressed: () {
-                      final id = widget.davaId;
-                      if (id == null || id.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Bu dava için davaId bulunamadı.')),
-                        );
-                        return;
-                      }
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DelilListesiEkrani(davaId: id),
-                        ),
-                      );
-                    },
-                    color: Colors.grey[600]!,
-                  ),
-                ],
-              ),
-            ],
-
-            const SizedBox(height: 16),
-
-            // Engagement buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildEngagementButton(
-                  icon: Icons.comment_outlined,
-                  count: widget.yorumSayisi.toString(),
-                  color: Colors.blue,
-                  onPressed: _focusComments,
-                ),
-                _buildEngagementButton(
-                  icon: Icons.repeat,
-                  count: widget.retweetSayisi.toString(),
-                  color: Colors.green,
-                  onPressed: () {
-                    setState(() {
-                      isRetweeted = !isRetweeted;
-                    });
-                    widget.onRetweet?.call();
-                  },
-                  isActive: isRetweeted || (widget.userRetweeted ?? false),
-                ),
-                _buildEngagementButton(
-                  icon: Icons.thumb_up_outlined,
-                  count: widget.begeniSayisi.toString(),
-                  color: Colors.orange,
-                  onPressed: () {
-                    setState(() {
-                      isLiked = !isLiked;
-                      if (isLiked && isDisliked) {
-                        isDisliked = false;
-                      }
-                    });
-                    widget.onBegeni?.call();
-                  },
-                  isActive: isLiked,
-                ),
-                _buildEngagementButton(
-                  icon: Icons.thumb_down_outlined,
-                  count: widget.begenmemeSayisi.toString(),
-                  color: Colors.red,
-                  onPressed: () {
-                    setState(() {
-                      isDisliked = !isDisliked;
-                      if (isDisliked && isLiked) {
-                        isLiked = false;
-                      }
-                    });
-                    widget.onBegenmeme?.call();
-                  },
-                  isActive: isDisliked,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-            CommentSection(
-              key: _commentSectionKey,
-              comments: widget.yorumlar,
-              onSubmit: widget.onYorum == null
-                  ? null
-                  : (text, {parentCommentId, bool isGizliTanik = false}) async {
-                      await widget.onYorum!(
-                        text,
-                        parentCommentId: parentCommentId,
-                        isGizliTanik: isGizliTanik,
-                      );
-                    },
-              currentUserName: widget.displayName,
-            ),
-          ],
         ),
       ),
     );

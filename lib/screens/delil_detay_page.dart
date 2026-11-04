@@ -7,6 +7,7 @@ import '../widgets/common_header_widgets.dart';
 import '../widgets/video_player_widget.dart';
 import '../widgets/pdf_viewer_widget.dart';
 import '../widgets/evidence_comment_widget.dart';
+import '../widgets/shared/app_snack.dart';
 import '../services/hive_database_service.dart';
 import '../services/evidence_service.dart';
 
@@ -797,11 +798,10 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       
       if (_evidence.filePath.isEmpty) {
         print('❌ Video dosyası bulunamadı');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Video dosyası bulunamadı'),
-            backgroundColor: Colors.red,
-          ),
+        showAppSnack(
+          context,
+          '❌ Video dosyası bulunamadı',
+          backgroundColor: Colors.red,
         );
         return;
       }
@@ -810,11 +810,10 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       final videoFile = File(_evidence.filePath);
       if (!videoFile.existsSync()) {
         print('❌ Video dosyası mevcut değil: ${_evidence.filePath}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Video dosyası bulunamadı'),
-            backgroundColor: Colors.red,
-          ),
+        showAppSnack(
+          context,
+          '❌ Video dosyası bulunamadı',
+          backgroundColor: Colors.red,
         );
         return;
       }
@@ -832,12 +831,11 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       print('✅ Video player açıldı');
     } catch (e) {
       print('❌ Video player açılırken hata: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Video açılırken hata: $e'),
+      showAppSnack(
+          context,
+          '❌ Video açılırken hata: $e',
           backgroundColor: Colors.red,
-        ),
-      );
+        );
     }
   }
 
@@ -913,11 +911,10 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       
       if (_evidence.filePath.isEmpty) {
         print('❌ PDF dosyası bulunamadı');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ PDF dosyası bulunamadı'),
-            backgroundColor: Colors.red,
-          ),
+        showAppSnack(
+          context,
+          '❌ PDF dosyası bulunamadı',
+          backgroundColor: Colors.red,
         );
         return;
       }
@@ -926,11 +923,10 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       final pdfFile = File(_evidence.filePath);
       if (!pdfFile.existsSync()) {
         print('❌ PDF dosyası mevcut değil: ${_evidence.filePath}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ PDF dosyası bulunamadı'),
-            backgroundColor: Colors.red,
-          ),
+        showAppSnack(
+          context,
+          '❌ PDF dosyası bulunamadı',
+          backgroundColor: Colors.red,
         );
         return;
       }
@@ -948,12 +944,11 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       print('✅ PDF viewer açıldı');
     } catch (e) {
       print('❌ PDF viewer açılırken hata: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ PDF açılırken hata: $e'),
+      showAppSnack(
+          context,
+          '❌ PDF açılırken hata: $e',
           backgroundColor: Colors.red,
-        ),
-      );
+        );
     }
   }
 
@@ -989,11 +984,10 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       // URL'nin boş olup olmadığını kontrol et
       if (_evidence.url.isEmpty) {
         print('❌ URL boş');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Link bulunamadı'),
-            backgroundColor: Colors.red,
-          ),
+        showAppSnack(
+          context,
+          '❌ Link bulunamadı',
+          backgroundColor: Colors.red,
         );
         return;
       }
@@ -1011,11 +1005,10 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       // URL'nin geçerli olup olmadığını kontrol et
       if (!url.hasScheme || !url.hasAuthority) {
         print('❌ Geçersiz URL formatı');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Geçersiz link formatı'),
-            backgroundColor: Colors.red,
-          ),
+        showAppSnack(
+          context,
+          '❌ Geçersiz link formatı',
+          backgroundColor: Colors.red,
         );
         return;
       }
@@ -1030,39 +1023,35 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
         
         if (result) {
           print('✅ Link başarıyla açıldı');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Link açıldı'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          showAppSnack(
+          context,
+          '✅ Link açıldı',
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        );
         } else {
           print('❌ Link açılamadı');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('❌ Link açılamadı'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          showAppSnack(
+          context,
+          '❌ Link açılamadı',
+          backgroundColor: Colors.red,
+        );
         }
       } else {
         print('❌ URL açılamaz');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Bu link açılamaz: ${_evidence.url}'),
-            backgroundColor: Colors.red,
-          ),
+        showAppSnack(
+          context,
+          '❌ Bu link açılamaz: ${_evidence.url}',
+          backgroundColor: Colors.red,
         );
       }
     } catch (e) {
       print('❌ Link açılırken hata: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Link açılırken hata: $e'),
+      showAppSnack(
+          context,
+          '❌ Link açılırken hata: $e',
           backgroundColor: Colors.red,
-        ),
-      );
+        );
     }
   }
 }

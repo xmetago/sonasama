@@ -3,6 +3,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import '../models/dava.dart' as dava_model;
 import '../services/hive_database_service.dart';
 import '../screens/dava_ac_page.dart';
+import '../widgets/shared/app_dialog_frame.dart';
 
 // Uygulama yeşil tonu paleti (#169371 ana yeşil)
 const _kPrimaryDark = Color(0xFF169371);   // Ana yeşil
@@ -23,95 +24,14 @@ Future<void> showSavedDavalarDialog(BuildContext context, String userEmail) asyn
     context: context,
     barrierDismissible: true,
     builder: (BuildContext context) {
-      return Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.88,
-          height: MediaQuery.of(context).size.height * 0.78,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: _kPrimaryDark.withOpacity(0.15),
-                blurRadius: 32,
-                offset: const Offset(0, 12),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Header — mahkeme teması
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
-                  ),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [_kPrimaryDark, _kPrimaryLight],
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.gavel_rounded, color: Colors.white, size: 26),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Dava Düzenle',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${savedDavalar.length} dava ',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.white.withOpacity(0.85),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.9), size: 22),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: savedDavalar.isEmpty
-                    ? _buildEmptyState()
-                    : _buildSavedDavalarList(context, savedDavalar, userEmail),
-              ),
-            ],
-          ),
-        ),
+      return AppDialogFrame(
+        title: 'Dava Düzenle',
+        subtitle: '${savedDavalar.length} dava ',
+        icon: Icons.gavel_rounded,
+        gradientColors: const [_kPrimaryDark, _kPrimaryLight],
+        child: savedDavalar.isEmpty
+            ? _buildEmptyState()
+            : _buildSavedDavalarList(context, savedDavalar, userEmail),
       );
     },
   );

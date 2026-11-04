@@ -11,7 +11,11 @@ import '../models/friendship_model.dart';
 import 'user_gamified_score_page.dart';
 import 'chat_detail_page.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/friendship_category_dialog.dart';
+import '../widgets/friendship_incoming_requests_dialog.dart';
+import '../widgets/friendship_user_card.dart';
 import '../utils/app_theme.dart';
+import '../widgets/shared/app_snack.dart';
 
 class FriendshipManagementPage extends StatefulWidget {
   final String userEmail;
@@ -368,139 +372,13 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.8,
-              maxWidth: MediaQuery.of(context).size.width * 0.9,
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header bölümü
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppTheme.successColor, AppTheme.successDarkColor],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(
-                            Icons.person_add,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                targetUser.judgeName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Açıklama metni
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.calmGreenUltraLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: AppTheme.successColor,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Kategori seçin',
-                            style: AppTheme.bodySmall.copyWith(
-                              color: AppTheme.textSecondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  _buildModernCategoryGrid(targetUser),
-
-                  const SizedBox(height: 16),
-
-                  // İptal butonu
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: AppTheme.textButtonStyle.copyWith(
-                        padding: MaterialStateProperty.all(
-                          const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                      child: Text(
-                        'İptal',
-                        style: AppTheme.bodyMedium.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        return FriendshipCategoryDialog(
+          targetUser: targetUser,
+          currentCategory: () => _getUserCategory(targetUser),
+          canMoveTo: (categoryName) => _canMoveToCategory(targetUser, categoryName),
+          categoryCount: _getCategoryCount,
+          categoryLimit: _getCategoryLimit,
+          onApply: (categoryName) => _applyCategoryChange(targetUser, categoryName),
         );
       },
     );
@@ -537,209 +415,6 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
           },
         ),
       ),
-    );
-  }
-
-  // Modern kategori grid widget'ı
-  Widget _buildModernCategoryGrid(RegistrationModel targetUser) {
-    final categories = <Map<String, dynamic>>[
-      {
-        'title': 'Grup-19',
-        'color': AppTheme.warningColor,
-        'icon': Icons.group,
-        'description': 'Sırdaşlar',
-        'category': 'Grup-19',
-      },
-      {
-        'title': 'Arkadaş',
-        'color': AppTheme.successColor,
-        'icon': Icons.favorite,
-        'description': 'Güvenilir',
-        'category': 'Arkadaş',
-      },
-      {
-        'title': 'Takipçi',
-        'color': AppTheme.infoColor,
-        'icon': Icons.visibility,
-        'description': 'Değer verdiğim',
-        'category': 'Takipçi',
-      },
-      {
-        'title': 'Herkes',
-        'color': AppTheme.primaryColor,
-        'icon': Icons.public,
-        'description': 'Samimiyete Değer',
-        'category': 'Herkes',
-      },
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 1.1,
-      ),
-      itemCount: categories.length,
-      itemBuilder: (context, index) {
-        final category = categories[index];
-        final categoryName = category['category'] as String;
-        final categoryColor = category['color'] as Color;
-        final isCurrentCategory = _getUserCategory(targetUser) == categoryName;
-        final canSelect = _canMoveToCategory(targetUser, categoryName);
-        final currentCount = _getCategoryCount(categoryName);
-        final limit = _getCategoryLimit(categoryName);
-        final limitText = limit == -1 ? '∞' : '$currentCount/$limit';
-        
-        return GestureDetector(
-          onTap: () {
-            if (!canSelect) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$categoryName kategorisi dolu! Limit: $limit'),
-                  backgroundColor: AppTheme.errorColor,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-              return;
-            }
-            Navigator.of(context).pop();
-            _applyCategoryChange(targetUser, categoryName);
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: canSelect 
-                ? LinearGradient(
-                    colors: [
-                      categoryColor,
-                      categoryColor.withOpacity(0.8),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-              color: canSelect ? null : AppTheme.dividerColor,
-              borderRadius: BorderRadius.circular(16),
-              border: isCurrentCategory
-                  ? Border.all(color: Colors.white, width: 2)
-                  : null,
-              boxShadow: canSelect ? [
-                BoxShadow(
-                  color: categoryColor.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ] : null,
-            ),
-            child: Stack(
-              children: [
-                 if (canSelect)
-                   Positioned(
-                     right: -8,
-                     bottom: -8,
-                     child: Icon(
-                       category['icon'] as IconData,
-                       size: 40,
-                       color: Colors.white.withOpacity(0.1),
-                     ),
-                   ),
-                 if (isCurrentCategory)
-                   Positioned(
-                     top: 8,
-                     right: 8,
-                     child: Icon(Icons.check_circle, color: Colors.white, size: 18),
-                   ),
-
-                                 // İçerik
-                 Padding(
-                   padding: const EdgeInsets.all(12),
-                   child: Column(
-                     crossAxisAlignment: CrossAxisAlignment.start,
-                     children: [
-                       // İkon ve limit
-                       Row(
-                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                         children: [
-                           Container(
-                             padding: const EdgeInsets.all(6),
-                             decoration: BoxDecoration(
-                               color: Colors.white.withOpacity(0.2),
-                               borderRadius: BorderRadius.circular(6),
-                             ),
-                             child: Icon(
-                               category['icon'] as IconData,
-                               color: Colors.white,
-                               size: 16,
-                             ),
-                           ),
-                           Container(
-                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                             decoration: BoxDecoration(
-                               color: Colors.white.withOpacity(0.2),
-                               borderRadius: BorderRadius.circular(8),
-                             ),
-                             child: Text(
-                               limitText,
-                               style: const TextStyle(
-                                 color: Colors.white,
-                                 fontSize: 10,
-                                 fontWeight: FontWeight.bold,
-                               ),
-                             ),
-                           ),
-                         ],
-                       ),
-
-                       const Spacer(),
-
-                       // Başlık
-                       Text(
-                         category['title'] as String,
-                         style: const TextStyle(
-                           color: Colors.white,
-                           fontSize: 14,
-                           fontWeight: FontWeight.bold,
-                         ),
-                       ),
-
-                       const SizedBox(height: 2),
-
-                       // Açıklama
-                       Text(
-                         category['description'] as String,
-                         style: TextStyle(
-                           color: Colors.white.withOpacity(0.8),
-                           fontSize: 10,
-                         ),
-                         maxLines: 1,
-                         overflow: TextOverflow.ellipsis,
-                       ),
-                     ],
-                   ),
-                 ),
-
-                // Dolu kategori overlay'i
-                if (!canSelect)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.lock,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -795,16 +470,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     if (currentUser == null) return;
 
     if (!_canAddToCategory(category)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}'),
-          backgroundColor: const Color(0xFFF44336),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, '$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}', backgroundColor: const Color(0xFFF44336), behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
       return;
     }
 
@@ -827,16 +495,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         icon: Icons.person_add,
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Arkadaşlık isteği gönderilirken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Arkadaşlık isteği gönderilirken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 
@@ -905,16 +566,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
   // Arkadaşlık kabul etme
   Future<void> _acceptFriendship(Map<String, dynamic> request, String category) async {
     if (!_canAddToCategory(category)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}'),
-          backgroundColor: const Color(0xFFF44336),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, '$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}', backgroundColor: const Color(0xFFF44336), behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
       return;
     }
 
@@ -975,16 +629,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         icon: Icons.check_circle_outline,
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Arkadaşlık kabul edilirken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Arkadaşlık kabul edilirken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 
@@ -1005,27 +652,13 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         FriendshipStatus.rejected
       );
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Arkadaşlık reddedildi'),
-          backgroundColor: AppTheme.warningColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Arkadaşlık reddedildi', backgroundColor: AppTheme.warningColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Arkadaşlık reddedilirken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Arkadaşlık reddedilirken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 
@@ -1297,71 +930,37 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     final isBlockedSection = _selectedCategory == 'Engellenenler';
     final isAdmin = HiveDatabaseService.isAdmin(widget.userEmail);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: AppTheme.cardDecoration(borderRadius: 14, bordered: true),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildProfileImage(profileImageUrl, user.judgeName),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _openChatPage(user),
-                    behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.judgeName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTheme.bodyMedium.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        _buildCategoryBadge(category, blocked: isBlockedSection),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                _buildCompactIconButton(
-                  icon: Icons.star_rounded,
-                  color: AppTheme.warningColor,
-                  backgroundColor: AppTheme.warningUltraLight,
-                  tooltip: 'Puan',
-                  onTap: () => _openUserScorePage(user),
-                ),
-                const SizedBox(width: 4),
-                _buildCompactIconButton(
-                  icon: isAdmin ? Icons.delete_outline : Icons.block_outlined,
-                  color: isAdmin ? AppTheme.errorColor : AppTheme.warningColor,
-                  backgroundColor: isAdmin ? AppTheme.errorUltraLight : AppTheme.warningUltraLight,
-                  tooltip: isAdmin ? 'Kullanıcıyı Sil' : 'Kullanıcıyı Engelle',
-                  onTap: () => _removeUser(user),
-                ),
-                if (_selectedCategory != 'Tümü' && !isBlockedSection) ...[
-                  const SizedBox(width: 4),
-                  _buildCompactIconButton(
-                    icon: Icons.more_horiz,
-                    color: AppTheme.textSecondary,
-                    tooltip: 'Kategori değiştir',
-                    onTap: () => _showFriendshipDialog(user),
-                  ),
-                ],
-              ],
-            ),
-            if (isBlockedSection) ...[
-              const SizedBox(height: 10),
-              SizedBox(
+    return FriendshipUserCard(
+      avatar: _buildProfileImage(profileImageUrl, user.judgeName),
+      judgeName: user.judgeName,
+      categoryBadge: _buildCategoryBadge(category, blocked: isBlockedSection),
+      onOpenChat: () => _openChatPage(user),
+      scoreButton: _buildCompactIconButton(
+        icon: Icons.star_rounded,
+        color: AppTheme.warningColor,
+        backgroundColor: AppTheme.warningUltraLight,
+        tooltip: 'Puan',
+        onTap: () => _openUserScorePage(user),
+      ),
+      removeButton: _buildCompactIconButton(
+        icon: isAdmin ? Icons.delete_outline : Icons.block_outlined,
+        color: isAdmin ? AppTheme.errorColor : AppTheme.warningColor,
+        backgroundColor: isAdmin ? AppTheme.errorUltraLight : AppTheme.warningUltraLight,
+        tooltip: isAdmin ? 'Kullanıcıyı Sil' : 'Kullanıcıyı Engelle',
+        onTap: () => _removeUser(user),
+      ),
+      moreButton: _selectedCategory != 'Tümü' && !isBlockedSection
+          ? _buildCompactIconButton(
+              icon: Icons.more_horiz,
+              color: AppTheme.textSecondary,
+              tooltip: 'Kategori değiştir',
+              onTap: () => _showFriendshipDialog(user),
+            )
+          : null,
+      footer: isBlockedSection
+          ? Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => _unblockUser(user),
@@ -1375,26 +974,26 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                   ),
                 ),
               ),
-            ] else if (_selectedCategory == 'Tümü') ...[
-              const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildQuickCategoryButton('Arkadaş', AppTheme.successColor, user, 'Arkadaş'),
-                    const SizedBox(width: 6),
-                    _buildQuickCategoryButton('Grup-19', const Color(0xFFD97706), user, 'Grup-19'),
-                    const SizedBox(width: 6),
-                    _buildQuickCategoryButton('Takipçi', AppTheme.infoColor, user, 'Takipçi'),
-                    const SizedBox(width: 6),
-                    _buildQuickCategoryButton('Herkes', AppTheme.primaryColor, user, 'Herkes'),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+            )
+          : _selectedCategory == 'Tümü'
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildQuickCategoryButton('Arkadaş', AppTheme.successColor, user, 'Arkadaş'),
+                        const SizedBox(width: 6),
+                        _buildQuickCategoryButton('Grup-19', const Color(0xFFD97706), user, 'Grup-19'),
+                        const SizedBox(width: 6),
+                        _buildQuickCategoryButton('Takipçi', AppTheme.infoColor, user, 'Takipçi'),
+                        const SizedBox(width: 6),
+                        _buildQuickCategoryButton('Herkes', AppTheme.primaryColor, user, 'Herkes'),
+                      ],
+                    ),
+                  ),
+                )
+              : null,
     );
   }
 
@@ -1450,16 +1049,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                                   if (_pendingRequests.isNotEmpty) {
                                     _showIncomingRequestsList();
                                   } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: const Text('Bekleyen arkadaşlık isteği yok'),
-                                        backgroundColor: AppTheme.infoColor,
-                                        behavior: SnackBarBehavior.floating,
-                                        shape: RoundedRectangleBorder(
+                                    showAppSnack(context, 'Bekleyen arkadaşlık isteği yok', backgroundColor: AppTheme.infoColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(10),
-                                        ),
-                                      ),
-                                    );
+                                        ));
                                   }
                                 },
                               ),
@@ -1674,16 +1266,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
           _addUserToCategory(user, category);
         } else {
           // Limit dolu uyarısı
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}'),
-              backgroundColor: AppTheme.errorColor,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
+          showAppSnack(context, '$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          );
+              ));
         }
       },
       child: Container(
@@ -1883,23 +1468,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'Gelen Arkadaşlık İstekleri',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _pendingRequests.length,
-              itemBuilder: (context, index) {
+        return FriendshipIncomingRequestsDialog(
+          itemCount: _pendingRequests.length,
+          itemBuilder: (context, index) {
                 final request = _pendingRequests[index];
                 
                 return Container(
@@ -1945,17 +1516,6 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                   ),
                 );
               },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Kapat',
-                style: TextStyle(fontSize: 16),
-              ),
-            ),
-          ],
         );
       },
     );
@@ -2049,31 +1609,17 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${user.judgeName} başarıyla silindi'),
-          backgroundColor: AppTheme.successColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, '${user.judgeName} başarıyla silindi', backgroundColor: AppTheme.successColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Kullanıcı silinirken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Kullanıcı silinirken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 
@@ -2188,36 +1734,21 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${user.judgeName} başarıyla engellendi'),
-          backgroundColor: AppTheme.warningColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, '${user.judgeName} başarıyla engellendi', backgroundColor: AppTheme.warningColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-          action: SnackBarAction(
+          ), action: SnackBarAction(
             label: 'Engeli Kaldır',
             textColor: Colors.white,
             onPressed: () => _unblockUser(user),
-          ),
-        ),
-      );
+          ));
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Kullanıcı engellenirken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Kullanıcı engellenirken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 
@@ -2242,31 +1773,17 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${user.judgeName} engeli kaldırıldı'),
-          backgroundColor: AppTheme.successColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, '${user.judgeName} engeli kaldırıldı', backgroundColor: AppTheme.successColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Engel kaldırılırken hata oluştu: $e'),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
+      showAppSnack(context, 'Engel kaldırılırken hata oluştu: $e', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+          ));
     }
   }
 }
