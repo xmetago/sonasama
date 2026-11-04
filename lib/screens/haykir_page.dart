@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../services/hive_database_service.dart';
 import '../services/itibar_endeksi_service.dart';
 import '../utils/dialog_utils.dart';
@@ -31,7 +32,6 @@ class HaykirPage extends StatefulWidget {
 
 class _HaykirPageState extends State<HaykirPage> {
   int? expandedCardIndex;
-  bool showLeftIcons = false; // Sol ikonları gösterme durumu
   
   // Yeni haykırış oluşturma formu için state değişkenleri
   bool showCreateForm = false;
@@ -250,8 +250,41 @@ class _HaykirPageState extends State<HaykirPage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: SafeArea(
-        child: Column(
-          children: [
+        child: AppExpandableIconMenu(
+          expandBody: true,
+          inset: const EdgeInsets.all(16),
+          openGap: 16,
+          keepGapWhenClosed: !isSmallScreen,
+          items: [
+            AppExpandableIconMenuItem(
+              onTap: () {},
+              customChild: IconButton(
+                icon: Icon(Icons.campaign, size: 24, color: Colors.black54),
+                onPressed: () {
+                  setState(() {
+                    showCreateForm = !showCreateForm;
+                  });
+                },
+              ),
+            ),
+            AppExpandableIconMenuItem(
+              onTap: () {},
+              customChild: const Column(
+                children: [
+                  SizedBox(height: 76),
+                  Image(
+                    image: AssetImage('lib/icons/06_left_row_ahizelitelefon_icon.png'),
+                    width: 24,
+                    height: 24,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
             // Header Section
             Container(
               color: Colors.white,
@@ -301,41 +334,10 @@ class _HaykirPageState extends State<HaykirPage> {
               ),
             ),
 
-            // Content Section
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left Icons (Gösterilme durumu kontrol ediliyor)
-                    if (showLeftIcons || !isSmallScreen) ...[
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: showLeftIcons ? 60 : 0,
-                        child: SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              IconButton(
-                                icon: Icon(Icons.campaign, size: 24, color: Colors.black54),
-                                onPressed: () {
-                                  setState(() {
-                                    showCreateForm = !showCreateForm;
-                                  });
-                                },
-                              ),
-                              const SizedBox(height: 76),
-                              Image.asset('lib/icons/06_left_row_ahizelitelefon_icon.png', width: 24, height: 24),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                    ],
-
-                    // Cards Section
-                    Expanded(
-                      child: SingleChildScrollView(
+              ],
+            );
+          },
+          body: SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -846,12 +848,6 @@ class _HaykirPageState extends State<HaykirPage> {
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

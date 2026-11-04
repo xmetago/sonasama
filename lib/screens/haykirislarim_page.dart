@@ -2,6 +2,7 @@
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../services/hive_database_service.dart';
 import '../utils/dialog_utils.dart';
 import '../utils/map_safety.dart'; // âœ… asStringDynamicMap iÃ§in
@@ -20,7 +21,6 @@ class HaykirislarimPage extends StatefulWidget {
 
 class _HaykirislarimPageState extends State<HaykirislarimPage> {
   bool isHaykirislarim = true;
-  bool showLeftIcons = false;
 
   /// KatÄ±ldÄ±ÄŸÄ±m haykÄ±r verisini seyir defteri post formatÄ±na dÃ¶nÃ¼ÅŸtÃ¼rÃ¼r
   Map<String, dynamic> _katildigimHaykirToPost(Map<String, dynamic> haykir) {
@@ -107,8 +107,37 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: SafeArea(
-        child: Column(
-          children: [
+        child: AppExpandableIconMenu(
+          expandBody: true,
+          inset: const EdgeInsets.all(16),
+          openGap: 16,
+          keepGapWhenClosed: !isSmallScreen,
+          items: [
+            AppExpandableIconMenuItem(
+              onTap: () {},
+              customChild: IconButton(
+                icon: const Icon(Icons.campaign, size: 24, color: Colors.black54),
+                onPressed: () {},
+              ),
+            ),
+            AppExpandableIconMenuItem(
+              onTap: () {},
+              customChild: Column(
+                children: [
+                  const SizedBox(height: 76),
+                  const Icon(Icons.save_as_outlined, size: 24, color: Colors.black54),
+                  const SizedBox(height: 76),
+                  const Icon(Icons.edit_document, size: 24, color: Colors.black54),
+                  const SizedBox(height: 76),
+                  Image.asset('lib/icons/06_left_row_ahizelitelefon_icon.png', width: 24, height: 24),
+                ],
+              ),
+            ),
+          ],
+          headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
             // Header Section
             Container(
               color: Colors.white,
@@ -137,11 +166,7 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                 children: [
                   // MenÃ¼ ikonu - tÄ±klanabilir
                   GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        showLeftIcons = !showLeftIcons;
-                      });
-                    },
+                    onTap: toggle,
                     child: Icon(
                       MdiIcons.menuOpen,
                       size: 34,
@@ -279,43 +304,10 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
               ),
             ),
 
-            // Content Section
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left Icons (GÃ¶sterilme durumu kontrol ediliyor)
-                    if (showLeftIcons || !isSmallScreen) ...[
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: showLeftIcons ? 60 : 0,
-                        child: SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              IconButton(
-                                icon: Icon(Icons.campaign, size: 24, color: Colors.black54),
-                                onPressed: () {
-                                  // Megafon/ses iÅŸlevselliÄŸi
-                                },
-                              ),
-                              const SizedBox(height: 76),
-                              Icon(Icons.save_as_outlined, size: 24, color: Colors.black54),
-                              const SizedBox(height: 76),
-                              Icon(Icons.edit_document, size: 24, color: Colors.black54),
-                              const SizedBox(height: 76),
-                              Image.asset('lib/icons/06_left_row_ahizelitelefon_icon.png', width: 24, height: 24),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                    ],
-
-                    // Cards Section
-                    Expanded(
-                      child: isEmpty
+                          ],
+            );
+          },
+          body: isEmpty
                           ? Center(
                               child: Container(
                                 padding: const EdgeInsets.all(32),
@@ -441,12 +433,6 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                                     );
                                   },
                                 ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

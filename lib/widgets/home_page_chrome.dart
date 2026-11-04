@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../providers/dava_provider.dart';
 import '../utils/dialog_utils.dart';
 import 'common_header_widgets.dart';
+import 'shared/app_expandable_icon_menu.dart';
 import '../screens/actigim_davalar_page.dart';
 import '../screens/chat_page.dart';
 import '../screens/davaci_unlulur_page.dart';
@@ -42,8 +43,6 @@ class HomePageChrome extends StatefulWidget {
 }
 
 class _HomePageChromeState extends State<HomePageChrome> {
-  bool showLeftIcons =
-      false; // Sol ikonların gösterilip gösterilmeyeceğini kontrol eder
   bool isHeaderCollapsed =
       false; // Üst arayüzün küçültülüp küçültülmediğini kontrol eder
   bool _highlightIncomingIcon = false; // Gelen davalar ikonu için yanıp sönme efekti
@@ -98,10 +97,11 @@ class _HomePageChromeState extends State<HomePageChrome> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-            child: Column(
-              children: [
-                // Üst Arayüz Bölümü - Ok kapalıyken tek satır halinde küçülür
-                AnimatedContainer(
+      child: AppExpandableIconMenu(
+        expandBody: true,
+        items: _seyirMenuItems(),
+        headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+          return AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   height: isHeaderCollapsed ? 40 : null,
                   child: isHeaderCollapsed
@@ -171,11 +171,7 @@ class _HomePageChromeState extends State<HomePageChrome> {
                               const SizedBox(width: 8),
                               // Kompakt menü ikonu
                               GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    showLeftIcons = !showLeftIcons;
-                                  });
-                                },
+                                onTap: toggle,
                                 child: Icon(
                                   MdiIcons.menuOpen,
                                   size: 16,
@@ -259,365 +255,219 @@ class _HomePageChromeState extends State<HomePageChrome> {
                                     isHeaderCollapsed = !isHeaderCollapsed;
                                   });
                                 },
-                                onMenuPressed: () {
-                                  setState(() {
-                                    showLeftIcons = !showLeftIcons;
-                                  });
-                                },
+                                menuButton: menuButton,
                               ),
                             ),
                           ],
                         ),
-                ),
-                // ROW 5: 6 Icon Solda, Sağda Text Yazma Alanı (Scrollable with ListTile)
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: showLeftIcons ? 60 : 0,
-                        child: showLeftIcons
-                            ? SingleChildScrollView(
-                                child: Column(
-                                  children: [
-                                    // Adım 5: Sol menü ikonlarının padding'leri optimize edildi
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                              builder: (context) =>
-                                                  GelenDavalarPage(
-                                                      userEmail:
-                                                          widget.userEmail)),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 8.0, 8.0, 8.0),
-                                        child: Consumer<DavaProvider>(
-                                          builder: (context, davaProvider, child) {
-                                            final shouldBlink =
-                                                davaProvider.incomingDavaCount > 0;
-                                            if (_hasIncomingDavaForBlink !=
-                                                shouldBlink) {
-                                              WidgetsBinding.instance
-                                                  .addPostFrameCallback((_) {
-                                                if (!mounted) return;
-                                                _updateIncomingIconBlinkState(
-                                                    shouldBlink);
-                                              });
-                                            }
+                );
+        },
+        body: widget.feed,
+      ),
+    );
+  }
 
-                                            return AnimatedContainer(
-                                              duration: const Duration(
-                                                  milliseconds: 300),
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: BoxDecoration(
-                                                color: _highlightIncomingIcon ||
-                                                        _hasIncomingDavaForBlink
-                                                    ? Colors.blue.withOpacity(0.08)
-                                                    : Colors.transparent,
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                border: Border.all(
-                                                  color: _highlightIncomingIcon ||
-                                                          _hasIncomingDavaForBlink
-                                                      ? Colors.blueAccent
-                                                      : Colors.transparent,
-                                                  width: _highlightIncomingIcon
-                                                      ? 3
-                                                      : (_hasIncomingDavaForBlink
-                                                          ? 1.5
-                                                          : 0),
-                                                ),
-                                                boxShadow: _highlightIncomingIcon
-                                                    ? [
-                                                        BoxShadow(
-                                                          color: Colors.blue
-                                                              .withOpacity(0.45),
-                                                          blurRadius: 10,
-                                                          spreadRadius: 2,
-                                                        ),
-                                                      ]
-                                                    : [],
-                                              ),
-                                              child: Icon(
-                                                MdiIcons.briefcaseArrowLeftRight,
-                                                size: 24,
-                                                color: Colors.black54,
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                              builder: (context) => YargilaPage(
-                                                  userEmail: widget.userEmail)),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 48.0, 8.0, 8.0),
-                                        child: Image.asset(
-                                            'lib/icons/06_yargila_left_row_icon.png',
-                                            width: 24,
-                                            height: 24),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                              builder: (context) =>
-                                                  katildigim_page
-                                                      .KatildigimDavalarPage(
-                                                          userEmail: widget
-                                                              .userEmail)),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 48.0, 8.0, 8.0),
-                                        child: Image.asset(
-                                            'lib/icons/06_left_row_katildigim_davalar_icon.png',
-                                            width: 24,
-                                            height: 24),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                              builder: (context) =>
-                                                  ActigimDavalarPage(
-                                                      userEmail:
-                                                          widget.userEmail)),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 48.0, 8.0, 8.0),
-                                        child: Image.asset(
-                                            'lib/icons/06_left_row_actigim_davalar_icon.png',
-                                            width: 24,
-                                            height: 24),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                DavaciUnlulurPage(
-                                                    userEmail:
-                                                        widget.userEmail),
-                                          ),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 48.0, 8.0, 8.0),
-                                        child: Image.asset(
-                                            'lib/icons/06_left_row_unlulerin_actigi_davalar_iconu.png',
-                                            width: 24,
-                                            height: 24),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                HaykirislarimPage(
-                                                    userEmail:
-                                                        widget.userEmail),
-                                          ),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 48.0, 8.0, 8.0),
-                                        child: Image.asset(
-                                            'lib/icons/06_left_row_haykirislarim.png',
-                                            width: 24,
-                                            height: 24),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                TrendInsightsPage(
-                                                    userEmail:
-                                                        widget.userEmail),
-                                          ),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 48.0, 8.0, 8.0),
-                                        child: Icon(
-                                          MdiIcons.trendingUp,
-                                          size: 24,
-                                          color: Colors.black54,
-                                        ),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                SavedHaykirlarPage(
-                                                    userEmail:
-                                                        widget.userEmail),
-                                          ),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 48.0, 8.0, 8.0),
-                                        child: Icon(
-                                          MdiIcons.bookmarkMultipleOutline,
-                                          size: 24,
-                                          color: Colors.black54,
-                                        ),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                StatisticsDashboardPage(
-                                                    userEmail:
-                                                        widget.userEmail),
-                                          ),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 48.0, 8.0, 8.0),
-                                        child: Icon(
-                                          MdiIcons.chartBar,
-                                          size: 24,
-                                          color: Colors.black54,
-                                        ),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                HesapGizlilikAyarlariPage(
-                                                    userEmail:
-                                                        widget.userEmail),
-                                          ),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 48.0, 8.0, 8.0),
-                                        child: Icon(
-                                          MdiIcons.cog,
-                                          size: 24,
-                                          color: Colors.black54,
-                                        ),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () async {
-                                        final shouldLogout =
-                                            await showDialog<bool>(
-                                          context: context,
-                                          builder: (dialogContext) {
-                                            return AlertDialog(
-                                              title: const Text(
-                                                  'Uygulamadan Çıkış'),
-                                              content: const Text(
-                                                  'Çıkış yapmak istediğinize emin misiniz?'),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.of(
-                                                          dialogContext)
-                                                      .pop(false),
-                                                  child: const Text('İptal'),
-                                                ),
-                                                ElevatedButton(
-                                                  onPressed: () => Navigator.of(
-                                                          dialogContext)
-                                                      .pop(true),
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                    backgroundColor: Colors.red,
-                                                    foregroundColor:
-                                                        Colors.white,
-                                                  ),
-                                                  child: const Text('Çıkış'),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        );
+  List<AppExpandableIconMenuItem> _seyirMenuItems() {
+    return [
+      AppExpandableIconMenuItem(
+        onTap: () {},
+        customChild: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) =>
+                      GelenDavalarPage(userEmail: widget.userEmail)),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 8.0),
+            child: Consumer<DavaProvider>(
+              builder: (context, davaProvider, child) {
+                final shouldBlink = davaProvider.incomingDavaCount > 0;
+                if (_hasIncomingDavaForBlink != shouldBlink) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    _updateIncomingIconBlinkState(shouldBlink);
+                  });
+                }
 
-                                        if (shouldLogout != true) return;
-
-                                        Provider.of<AuthProvider>(context,
-                                                listen: false)
-                                            .logout();
-
-                                        if (!context.mounted) return;
-                                        Navigator.of(context)
-                                            .pushNamedAndRemoveUntil(
-                                                '/login', (route) => false);
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            8.0, 48.0, 8.0, 8.0),
-                                        child: Icon(
-                                          MdiIcons.logout,
-                                          size: 24,
-                                          color: Colors.black54,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            // Home feed içerikleri
-                            Expanded(
-                              child: widget.feed,
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: _highlightIncomingIcon || _hasIncomingDavaForBlink
+                        ? Colors.blue.withOpacity(0.08)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _highlightIncomingIcon || _hasIncomingDavaForBlink
+                          ? Colors.blueAccent
+                          : Colors.transparent,
+                      width: _highlightIncomingIcon
+                          ? 3
+                          : (_hasIncomingDavaForBlink ? 1.5 : 0),
+                    ),
+                    boxShadow: _highlightIncomingIcon
+                        ? [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.45),
+                              blurRadius: 10,
+                              spreadRadius: 2,
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
+                          ]
+                        : [],
                   ),
-                ),
-              ],
+                  child: Icon(
+                    MdiIcons.briefcaseArrowLeftRight,
+                    size: 24,
+                    color: Colors.black54,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+      AppExpandableIconMenuItem(
+        assetIcon: 'lib/icons/06_yargila_left_row_icon.png',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => YargilaPage(userEmail: widget.userEmail)),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        assetIcon: 'lib/icons/06_left_row_katildigim_davalar_icon.png',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => katildigim_page.KatildigimDavalarPage(
+                    userEmail: widget.userEmail)),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        assetIcon: 'lib/icons/06_left_row_actigim_davalar_icon.png',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) =>
+                    ActigimDavalarPage(userEmail: widget.userEmail)),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        assetIcon: 'lib/icons/06_left_row_unlulerin_actigi_davalar_iconu.png',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  DavaciUnlulurPage(userEmail: widget.userEmail),
             ),
           );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        assetIcon: 'lib/icons/06_left_row_haykirislarim.png',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  HaykirislarimPage(userEmail: widget.userEmail),
+            ),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        icon: MdiIcons.trendingUp,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  TrendInsightsPage(userEmail: widget.userEmail),
+            ),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        icon: MdiIcons.bookmarkMultipleOutline,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  SavedHaykirlarPage(userEmail: widget.userEmail),
+            ),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        icon: MdiIcons.chartBar,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  StatisticsDashboardPage(userEmail: widget.userEmail),
+            ),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        icon: MdiIcons.cog,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  HesapGizlilikAyarlariPage(userEmail: widget.userEmail),
+            ),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        icon: MdiIcons.logout,
+        onTap: () async {
+          final shouldLogout = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) {
+              return AlertDialog(
+                title: const Text('Uygulamadan Çıkış'),
+                content: const Text('Çıkış yapmak istediğinize emin misiniz?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('İptal'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Çıkış'),
+                  ),
+                ],
+              );
+            },
+          );
+
+          if (shouldLogout != true) return;
+
+          Provider.of<AuthProvider>(context, listen: false).logout();
+
+          if (!context.mounted) return;
+          Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        },
+      ),
+    ];
   }
 }

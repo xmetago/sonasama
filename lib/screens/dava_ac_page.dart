@@ -4,6 +4,7 @@ import 'package:flutter/services.dart'; // TextInputFormatter için
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../widgets/dava_ac_case_card.dart';
 import '../widgets/group_selection_dialog.dart';
 import '../widgets/dava_ac_page_headline.dart';
@@ -53,7 +54,7 @@ class _DavaAcPageState extends State<DavaAcPage> {
   int likeCount = 0;
   int dislikeCount = 0;
   int? expandedCardIndex = 0; // 0 = dava konusu kartı başlangıçta açık (expanded)
-  bool showLeftIcons = false; // Sol ikonları gösterme durumu
+  int _menuOpenRequest = 0;
   late bool isHeaderCollapsed; // Üst arayüzün küçültülüp küçültülmediği (Dava Aç sayfası)
   bool _highlightSaveIcon = false; // Kaydet ikonunu vurgulamak için (yanıp sönme)
   bool _hasPendingSavedDava = false; // En az bir düzenlenebilir/kaydedilmiş dava var mı?
@@ -742,7 +743,7 @@ class _DavaAcPageState extends State<DavaAcPage> {
     // - Kaydedilen davalar ikonunu, düzenlenecek dava olduğu sürece yanıp söndür
     setState(() {
       isHeaderCollapsed = false;
-      showLeftIcons = true;
+      _menuOpenRequest++;
     });
 
     _startSaveIconBlinkTimerIfNeeded();
@@ -1803,11 +1804,11 @@ class _DavaAcPageState extends State<DavaAcPage> {
   }
 
   /// Collapsed (tek satır) üst başlık satırı - Dava Aç sayfası
-  Widget _buildCollapsedHeaderRow() {
+  Widget _buildCollapsedHeaderRow(VoidCallback toggle) {
     return CollapsedWbHeaderRow(
       title: 'Dava  Aç ',
       onExpandHeader: () => setState(() => isHeaderCollapsed = !isHeaderCollapsed),
-      onToggleLeftNav: () => setState(() => showLeftIcons = !showLeftIcons),
+      onToggleLeftNav: toggle,
     );
   }
 
@@ -1816,14 +1817,16 @@ class _DavaAcPageState extends State<DavaAcPage> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Üst Arayüz Bölümü - Kategori seçilince başlangıçta collapsed açılır
-              AnimatedContainer(
+          child: AppExpandableIconMenu(
+            openRequest: _menuOpenRequest,
+            bodyPadding: const EdgeInsets.all(8),
+            items: _davaAcMenuItems(),
+            headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+              return AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 height: isHeaderCollapsed ? 40 : null,
                 child: isHeaderCollapsed
-                    ? _buildCollapsedHeaderRow()
+                    ? _buildCollapsedHeaderRow(toggle)
                     : Column(
                   children: [
                     ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
@@ -1861,115 +1864,15 @@ class _DavaAcPageState extends State<DavaAcPage> {
                         onToggleCollapse: () {
                           setState(() => isHeaderCollapsed = !isHeaderCollapsed);
                         },
-                        onMenuPressed: () {
-                          setState(() => showLeftIcons = !showLeftIcons);
-                        },
+                        menuButton: menuButton,
                       ),
                     ),
                   ],
                 ),
-              ),
-              // ROW 5: 6 Icon Solda, Sağda Text Yazma Alanı (Scrollable with ListTile)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: showLeftIcons ? 60 : 0,
-                      child: showLeftIcons
-                          ? SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            // Adım 1: Sol menü ikonlarının padding'leri UI uygun olarak optimize edildi ve MdiIcons kullanımı eklendi
-                            GestureDetector(
-                              onTap: () {
-                                _showSavedDavalarDialog();
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 8.0),
-                                child: Tooltip(
-                                  message: 'Kaydedilen Davalar - Düzenlemek için tıklayın',
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 300),
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: _highlightSaveIcon || _hasPendingSavedDava
-                                          ? Colors.blue.withOpacity(0.08)
-                                          : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: _highlightSaveIcon || _hasPendingSavedDava
-                                            ? Colors.blueAccent
-                                            : Colors.transparent,
-                                        width: _highlightSaveIcon ? 3 : (_hasPendingSavedDava ? 1.5 : 0),
-                                      ),
-                                      boxShadow: _highlightSaveIcon
-                                          ? [
-                                              BoxShadow(
-                                                color: Colors.blue.withOpacity(0.45),
-                                                blurRadius: 10,
-                                                spreadRadius: 2,
-                                              ),
-                                            ]
-                                          : [],
-                                    ),
-                                    child: Icon(
-                                      MdiIcons.contentSaveOutline, // Dava Aç page de bu icon tıklanıldığında düzenlenmek üzere kaydedilen davalar için dialog kutusu açılır. Davala butonuna basılıp dava gönderilecek grup seçilirse artık o dava dialog kutusunda görünmez.
-                                      size: 24,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // Adım 2: İkinci icon padding'i optimize edildi ve MdiIcons kullanımı eklendi
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => ActigimDavalarPage(userEmail: widget.userEmail)),
-                                );
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                child: Icon(
-                                  MdiIcons.briefcaseOutline,
-                                  size: 24,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ),
-                            // Adım 3: Üçüncü icon padding'i optimize edildi ve MdiIcons kullanımı eklendi
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const DelilleriIncelePage(),
-                                  ),
-                                );
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                child: Icon(
-                                  MdiIcons.fileSearchOutline,
-                                  size: 24,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ),
-
-                          ],
-                        ),
-                      )
-                          : const SizedBox.shrink(),
-                    ),
-
-                    Expanded(
-                      child: Column(
-                        children: [
+              );
+            },
+            body: Column(
+              children: [
 
                           // Dava listesi
                           ListView.builder(
@@ -2027,16 +1930,69 @@ class _DavaAcPageState extends State<DavaAcPage> {
                               );
                             },
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  List<AppExpandableIconMenuItem> _davaAcMenuItems() {
+    return [
+      AppExpandableIconMenuItem(
+        onTap: _showSavedDavalarDialog,
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        tooltip: 'Kaydedilen Davalar - Düzenlemek için tıklayın',
+        iconWidget: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: _highlightSaveIcon || _hasPendingSavedDava
+                ? Colors.blue.withOpacity(0.08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _highlightSaveIcon || _hasPendingSavedDava
+                  ? Colors.blueAccent
+                  : Colors.transparent,
+              width: _highlightSaveIcon ? 3 : (_hasPendingSavedDava ? 1.5 : 0),
+            ),
+            boxShadow: _highlightSaveIcon
+                ? [
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.45),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : [],
+          ),
+          child: Icon(
+            MdiIcons.contentSaveOutline,
+            size: 24,
+            color: Colors.black54,
+          ),
+        ),
+      ),
+      AppExpandableIconMenuItem(
+        icon: MdiIcons.briefcaseOutline,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ActigimDavalarPage(userEmail: widget.userEmail)),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        icon: MdiIcons.fileSearchOutline,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const DelilleriIncelePage()),
+          );
+        },
+      ),
+    ];
   }
 }

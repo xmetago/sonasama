@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../widgets/cezalar_ceza_unified_panel.dart';
 import '../widgets/cezalar_page_layout_rails.dart';
 import 'delilleri_incele_page.dart';
@@ -37,7 +38,6 @@ class CezalarPage extends StatefulWidget {
 }
 
 class _CezalarPageState extends State<CezalarPage> {
-  bool _showLeftIcons = false;
   bool _isHeaderCollapsed = true;
 
   CezalarUnifiedDava get _panelDava => CezalarUnifiedDava(
@@ -53,17 +53,25 @@ class _CezalarPageState extends State<CezalarPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            AnimatedContainer(
+        child: AppExpandableIconMenu(
+          expandBody: true,
+          inset: const EdgeInsets.all(8),
+          rowCrossAxisAlignment: CrossAxisAlignment.stretch,
+          items: [
+            AppExpandableIconMenuItem(
+              onTap: () {},
+              customChild: CezalarLeftIconScrollColumn(userEmail: widget.userEmail),
+            ),
+          ],
+          headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+            return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               height: _isHeaderCollapsed ? 40 : null,
               child: _isHeaderCollapsed
                   ? CollapsedWbHeaderRow(
                       title: 'CEZALAR ',
                       onExpandHeader: () => setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
-                      onToggleLeftNav: () => setState(() => _showLeftIcons = !_showLeftIcons),
+                      onToggleLeftNav: toggle,
                     )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -82,29 +90,18 @@ class _CezalarPageState extends State<CezalarPage> {
                           ),
                         ),
                         CezalarMenuTitleRow(
-                          onToggleLeftNav: () => setState(() => _showLeftIcons = !_showLeftIcons),
+                          onToggleLeftNav: toggle,
                           title: 'CEZALAR ',
                           isHeaderCollapsed: _isHeaderCollapsed,
                           onToggleCollapse: () => setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
                         ),
                       ],
                     ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: _showLeftIcons ? 60 : 0,
-                      child: _showLeftIcons
-                          ? SingleChildScrollView(
-                              child: CezalarLeftIconScrollColumn(userEmail: widget.userEmail),
-                            )
-                          : const SizedBox.shrink(),
-                    ),
+            );
+          },
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
                     CezalarMiddleVerticalIconRail(
                       onDelilleriIncele: () {
                         Navigator.push(
@@ -147,11 +144,8 @@ class _CezalarPageState extends State<CezalarPage> {
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

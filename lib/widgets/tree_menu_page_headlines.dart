@@ -3,6 +3,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 
 class TreeMenuPageheadlines extends StatelessWidget {
   final VoidCallback? onMenuPressed;
+  final Widget? menuButton;
   final VoidCallback? onShowSavedDavalar;
   final bool highlightSaveIcon;
   final bool hasPendingSavedDava;
@@ -27,6 +28,7 @@ class TreeMenuPageheadlines extends StatelessWidget {
   const TreeMenuPageheadlines({
     super.key,
     this.onMenuPressed,
+    this.menuButton,
     this.onShowSavedDavalar,
     this.highlightSaveIcon = false,
     this.hasPendingSavedDava = false,
@@ -44,17 +46,18 @@ class TreeMenuPageheadlines extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
         children: [
-          IconButton(
-            icon: Icon(
-              MdiIcons.menuOpen,
-              size: 34,
-              color: Colors.red,
-            ),
-            onPressed: onMenuPressed ?? () {
-              print("Menu button pressed");
-            },
-            tooltip: 'Sol menü',
-          ),
+          menuButton ??
+              IconButton(
+                icon: Icon(
+                  MdiIcons.menuOpen,
+                  size: 34,
+                  color: Colors.red,
+                ),
+                onPressed: onMenuPressed ?? () {
+                  debugPrint('Menu button pressed');
+                },
+                tooltip: 'Sol menü',
+              ),
           Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,

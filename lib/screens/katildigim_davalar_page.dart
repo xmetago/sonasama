@@ -3,6 +3,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import 'package:provider/provider.dart';
 import 'dart:async';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import 'gelen_davalar_page.dart' hide FiveCardCaseInformation;
 import 'yargila_page.dart' hide Dava, FiveCardCaseInformation;
 import 'actigim_davalar_page.dart' hide Dava, FiveCardCaseInformation;
@@ -49,7 +50,6 @@ class KatildigimDavalarPage extends StatefulWidget {
 }
 
 class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
-  bool showLeftIcons = false; // Sol ikonların gösterilip gösterilmeyeceğini kontrol eder
   List<Map<String, dynamic>> _katildigimDavalar = []; // Gerçek veriler için
   final Map<String, bool> _seyirDefteriCollapsedByDavaId = <String, bool>{};
   int _lastSyncedProviderKatildigimLen = 0;
@@ -226,9 +226,12 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
           backgroundColor: Colors.white,
           body: SafeArea(
             child: SingleChildScrollView(
-              child: Column(
-                children: <Widget>[
-                  AnimatedContainer(
+              child: AppExpandableIconMenu(
+                toggleTooltip: 'Sol menü',
+                bodyPadding: const EdgeInsets.all(8),
+                items: _katildigimMenuItems(),
+                headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+                  return AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     height: isHeaderCollapsed ? 40 : null,
                     child: isHeaderCollapsed
@@ -244,11 +247,7 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
                                     size: 18,
                                     color: Colors.black54,
                                   ),
-                                  onPressed: () {
-                                    setState(() {
-                                      showLeftIcons = !showLeftIcons;
-                                    });
-                                  },
+                                  onPressed: toggle,
                                 ),
                                 const SizedBox(width: 8),
                                 const Expanded(
@@ -295,11 +294,7 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
                                 ),
                               ),
                               TreeMenuPageheadlines(
-                                onMenuPressed: () {
-                                  setState(() {
-                                    showLeftIcons = !showLeftIcons;
-                                  });
-                                },
+                                menuButton: menuButton,
                                 onToggleCollapse: () {
                                   setState(() {
                                     isHeaderCollapsed = !isHeaderCollapsed;
@@ -313,132 +308,9 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
                               ),
                             ],
                           ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          width: showLeftIcons ? 60 : 0,
-                          child: showLeftIcons
-                              ? SingleChildScrollView(
-                                  child: Column(
-                                    children: <Widget>[
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => GelenDavalarPage(userEmail: widget.userEmail),
-                                            ),
-                                          );
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
-                                          child: Icon(
-                                            MdiIcons.briefcaseArrowLeftRight,
-                                            size: 24,
-                                            color: Colors.black54,
-                                          ),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => YargilaPage(userEmail: widget.userEmail),
-                                            ),
-                                          );
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                          child: Image.asset('lib/icons/06_yargila_left_row_icon.png', width: 24, height: 24),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => KatildigimDavalarPage(userEmail: widget.userEmail),
-                                            ),
-                                          );
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                          child: Image.asset('lib/icons/06_left_row_katildigim_davalar_icon.png', width: 24, height: 24),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => ActigimDavalarPage(userEmail: widget.userEmail),
-                                            ),
-                                          );
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                          child: Image.asset('lib/icons/06_left_row_actigim_davalar_icon.png', width: 24, height: 24),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => DavaciUnlulurPage(userEmail: widget.userEmail),
-                                            ),
-                                          );
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                          child: Image.asset('lib/icons/06_left_row_unlulerin_actigi_davalar_iconu.png', width: 24, height: 24),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => HaykirislarimPage(userEmail: widget.userEmail),
-                                            ),
-                                          );
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                          child: Image.asset('lib/icons/06_left_row_haykirislarim.png', width: 24, height: 24),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => TrendInsightsPage(userEmail: widget.userEmail),
-                                            ),
-                                          );
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                                          child: Icon(
-                                            MdiIcons.trendingUp,
-                                            size: 24,
-                                            color: Colors.black54,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                        Expanded(
-                          child: Column(
+                  );
+                },
+                body: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: <Widget>[
                               Padding(
@@ -493,11 +365,6 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
                                 ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ),
           ),
@@ -505,5 +372,73 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
       },
     );
   }
-}
 
+  List<AppExpandableIconMenuItem> _katildigimMenuItems() {
+    return [
+      AppExpandableIconMenuItem(
+        icon: MdiIcons.briefcaseArrowLeftRight,
+        padding: const EdgeInsets.fromLTRB(8, 18, 8, 8),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => GelenDavalarPage(userEmail: widget.userEmail)),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        assetIcon: 'lib/icons/06_yargila_left_row_icon.png',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => YargilaPage(userEmail: widget.userEmail)),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        assetIcon: 'lib/icons/06_left_row_katildigim_davalar_icon.png',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => KatildigimDavalarPage(userEmail: widget.userEmail)),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        assetIcon: 'lib/icons/06_left_row_actigim_davalar_icon.png',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ActigimDavalarPage(userEmail: widget.userEmail)),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        assetIcon: 'lib/icons/06_left_row_unlulerin_actigi_davalar_iconu.png',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => DavaciUnlulurPage(userEmail: widget.userEmail)),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        assetIcon: 'lib/icons/06_left_row_haykirislarim.png',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => HaykirislarimPage(userEmail: widget.userEmail)),
+          );
+        },
+      ),
+      AppExpandableIconMenuItem(
+        icon: MdiIcons.trendingUp,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => TrendInsightsPage(userEmail: widget.userEmail)),
+          );
+        },
+      ),
+    ];
+  }
+}

@@ -3,6 +3,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 
 class TreeMenuPageheadlines extends StatelessWidget {
   final VoidCallback? onMenuPressed;
+  final Widget? menuButton;
   final String? title; // Başlık parametresi eklendi
   final bool isCollapsed; // Arayüzün küçültülüp küçültülmediğini kontrol eder
   final VoidCallback? onToggleCollapse; // Aç/kapa ok butonu için callback
@@ -10,6 +11,7 @@ class TreeMenuPageheadlines extends StatelessWidget {
   const TreeMenuPageheadlines({
     super.key,
     this.onMenuPressed,
+    this.menuButton,
     this.title, // Başlık parametresi
     this.isCollapsed = false, // Varsayılan olarak açık
     this.onToggleCollapse, // Aç/kapa ok callback'i
@@ -19,16 +21,17 @@ class TreeMenuPageheadlines extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        IconButton(
-          icon: Icon(
-            MdiIcons.menuOpen,
-            size: 34,
-            color: Colors.red,
-          ),
-          onPressed: onMenuPressed ?? () {
-            print("Menu button pressed");
-          },
-        ),
+        menuButton ??
+            IconButton(
+              icon: Icon(
+                MdiIcons.menuOpen,
+                size: 34,
+                color: Colors.red,
+              ),
+              onPressed: onMenuPressed ?? () {
+                debugPrint('Menu button pressed');
+              },
+            ),
         Expanded(
           child: Center(
             child: Text(

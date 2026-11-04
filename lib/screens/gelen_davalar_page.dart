@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../widgets/gelen_dava_card.dart';
 import 'yargila_page.dart' hide Dava, FiveCardCaseInformation, DashedLinePainter;
 import 'actigim_davalar_page.dart' hide Dava, FiveCardCaseInformation;
@@ -27,7 +28,6 @@ class GelenDavalarPage extends StatefulWidget {
 }
 
 class _GelenDavalarPageState extends State<GelenDavalarPage> {
-  bool showLeftIcons = false; // Sol ikonların gösterilip gösterilmeyeceğini kontrol eder
   int? expandedCardIndex; // Hangi card'ın açık olduğunu kontrol eder
   List<Dava> _davaList = [];
   StreamSubscription? _incomingSub;
@@ -141,62 +141,50 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
+        child: AppExpandableIconMenu(
+          expandBody: true,
+          toggleTooltip: 'Sol menü',
+          panelWidth: 56,
+          curve: Curves.easeOutCubic,
+          openGap: 10,
+          panelPadding: const EdgeInsets.symmetric(vertical: 10),
+          inset: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+          openPanelDecoration: BoxDecoration(
+            color: const Color(0xFFF5F7FA),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE0E4EA)),
+          ),
+          items: [
+            AppExpandableIconMenuItem(
+              onTap: () {},
+              customChild: GelenDavalarLeftNavColumn(userEmail: widget.userEmail),
+            ),
+          ],
+          headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
             ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
-            // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
             ),
-            // ROW 3: Profil Bölümü
             Padding(
               padding: const EdgeInsets.all(4.0),
               child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                 userEmail: widget.userEmail,
                 onShowSavedDavalar: () {
-                  // Gelen davalar sayfasında kaydedilen davalar dialog'u açılamaz
-                  // Bu sayfa sadece gelen davaları gösterir
                 },
               ),
             ),
-            // ROW 4: Menü + başlık + gelen dava sayısı rozeti
             GelenDavalarHeadlineRow(
-              onMenuPressed: () {
-                setState(() {
-                  showLeftIcons = !showLeftIcons;
-                });
-              },
+              onMenuPressed: toggle,
+              menuButton: menuButton,
             ),
-            // ROW 5: Sol navigasyon + dava listesi
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOutCubic,
-                      width: showLeftIcons ? 56 : 0,
-                      child: showLeftIcons
-                          ? DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF5F7FA),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE0E4EA)),
-                              ),
-                              child: SingleChildScrollView(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                child: GelenDavalarLeftNavColumn(userEmail: widget.userEmail),
-                              ),
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                    if (showLeftIcons) const SizedBox(width: 10),
-                    Expanded(
-                      child: ListView.builder(
+              ],
+            );
+          },
+          body: ListView.builder(
                         itemCount: _davaList.length,
                         itemBuilder: (context, index) {
                           return ListTile(
@@ -227,12 +215,6 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
                           );
                         },
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -242,10 +224,12 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
 /// Menü, sayfa başlığı ve gelen dava sayısı rozetini tek satırda hizalar.
 class GelenDavalarHeadlineRow extends StatelessWidget {
   final VoidCallback onMenuPressed;
+  final Widget? menuButton;
 
   const GelenDavalarHeadlineRow({
     super.key,
     required this.onMenuPressed,
+    this.menuButton,
   });
 
   static const TextStyle _titleStyle = TextStyle(
@@ -261,11 +245,12 @@ class GelenDavalarHeadlineRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
         children: [
-          IconButton(
-            icon: Icon(MdiIcons.menuOpen, size: 34, color: Colors.red),
-            onPressed: onMenuPressed,
-            tooltip: 'Sol menü',
-          ),
+          menuButton ??
+              IconButton(
+                icon: Icon(MdiIcons.menuOpen, size: 34, color: Colors.red),
+                onPressed: onMenuPressed,
+                tooltip: 'Sol menü',
+              ),
           Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,

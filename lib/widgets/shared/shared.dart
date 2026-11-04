@@ -3,6 +3,7 @@ library;
 
 export 'app_accent_section_header.dart';
 export 'app_dialog_frame.dart';
+export 'app_expandable_icon_menu.dart';
 export 'app_empty_result_card.dart';
 export 'app_error_retry_view.dart';
 export 'app_info_banner.dart';

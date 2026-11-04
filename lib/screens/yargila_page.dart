@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../widgets/yargila_case_card.dart';
 import '../widgets/modern_yargila_card.dart';
 import '../services/hive_database_service.dart';
@@ -25,7 +26,6 @@ class _YargilaPageState extends State<YargilaPage> {
   int retweetCount = 0;
   int likeCount = 0;
   int dislikeCount = 0;
-  bool showLeftIcons = false;
   List<Dava> _davaList = [];
   final Map<String, TextEditingController> _hukumControllers = {}; // Her dava için ayrı controller
   final Map<String, bool> _isHukumExpanded = {}; // Her dava için ayrı expanded durumu
@@ -119,8 +119,12 @@ class _YargilaPageState extends State<YargilaPage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // Minimum alan kaplaması için
+          child: AppExpandableIconMenu(
+            bodyPadding: const EdgeInsets.all(8),
+            items: _yargilaMenuItems(),
+            headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+              return Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
               ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
@@ -156,11 +160,7 @@ class _YargilaPageState extends State<YargilaPage> {
                         size: 19,
                         color: Colors.red.shade700,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          showLeftIcons = !showLeftIcons;
-                        });
-                      },
+                      onPressed: toggle,
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.red.withOpacity(0.10),
                         padding: const EdgeInsets.all(10),
@@ -196,71 +196,10 @@ class _YargilaPageState extends State<YargilaPage> {
               ),
 
 
-              // ROW 5: 6 Icon Solda, Sağda Card ile Dava Bilgileri
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: showLeftIcons ? 60 : 0,
-                      child: showLeftIcons
-                          ? SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
-                              child: Icon(Icons.save_outlined, size: 24, color: Colors.black54),
-                            ),
-
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                              child: IconButton(
-                                icon: Icon(
-                                  MdiIcons.briefcaseEditOutline,
-                                  size: 26,
-                                  color: Colors.blue.shade700,
-                                ),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
-                                  );
-                                },
-                                style: IconButton.styleFrom(
-                                  backgroundColor: Colors.blue.withOpacity(0.10),
-                                  padding: const EdgeInsets.all(10),
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                              child: IconButton(
-                                icon: Icon(
-                                  MdiIcons.handcuffs,
-                                  size: 26,
-                                  color: Colors.blueGrey.shade700,
-                                ),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
-                                  );
-                                },
-                                style: IconButton.styleFrom(
-                                  backgroundColor: Colors.blueGrey.withOpacity(0.10),
-                                  padding: const EdgeInsets.all(10),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                          : const SizedBox.shrink(),
-                    ),
-                    Expanded(
-                      child: _davaList.isEmpty
+            ],
+              );
+            },
+            body: _davaList.isEmpty
                           ? Center(
                               child: Padding(
                                 padding: const EdgeInsets.all(32.0),
@@ -335,15 +274,68 @@ class _YargilaPageState extends State<YargilaPage> {
                                 );
                               },
                             ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
+          ),
+        ),
+    );
+  }
+
+  List<AppExpandableIconMenuItem> _yargilaMenuItems() {
+    return [
+      AppExpandableIconMenuItem(
+        onTap: () {},
+        customChild: Padding(
+          padding: EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
+          child: Icon(Icons.save_outlined, size: 24, color: Colors.black54),
+        ),
+      ),
+      AppExpandableIconMenuItem(
+        onTap: () {},
+        customChild: Padding(
+          padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+          child: IconButton(
+            icon: Icon(
+              MdiIcons.briefcaseEditOutline,
+              size: 26,
+              color: Colors.blue.shade700,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
+              );
+            },
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.blue.withOpacity(0.10),
+              padding: const EdgeInsets.all(10),
+            ),
           ),
         ),
       ),
-    );
+      AppExpandableIconMenuItem(
+        onTap: () {},
+        customChild: Padding(
+          padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+          child: IconButton(
+            icon: Icon(
+              MdiIcons.handcuffs,
+              size: 26,
+              color: Colors.blueGrey.shade700,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
+              );
+            },
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.blueGrey.withOpacity(0.10),
+              padding: const EdgeInsets.all(10),
+            ),
+          ),
+        ),
+      ),
+    ];
   }
 
   Widget _buildHukumComposer(Dava dava, TextEditingController controller) {
