@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
+/// Seyir defteri şeridinde ilk ikondan sonrakilerin boşluğu: sol 8, üst 48, sağ 8, alt 8.
+const EdgeInsets kSeyirMenuIconPadding = EdgeInsets.fromLTRB(8, 48, 8, 8);
+
+/// Seyir defteri şeridinde ilk ikonun boşluğu: sol 8, üst 8, sağ 8, alt 8.
+const EdgeInsets kSeyirMenuFirstIconPadding = EdgeInsets.fromLTRB(8, 8, 8, 8);
+
 /// Sol şeritteki bir ikon. [customChild] verilirse olduğu gibi çizilir.
 class AppExpandableIconMenuItem {
   const AppExpandableIconMenuItem({
@@ -12,7 +18,7 @@ class AppExpandableIconMenuItem {
     this.size = 24,
     this.tooltip,
     this.label,
-    this.padding = const EdgeInsets.fromLTRB(8, 48, 8, 8),
+    this.padding = kSeyirMenuIconPadding,
     this.customChild,
   });
 
@@ -35,6 +41,34 @@ class AppExpandableIconMenuItem {
 /// Açık/kapalı durum burada kalır. [headerBuilder] düğmeyi başlığa yerleştirir;
 /// [body] şeridin sağındaki içeriktir.
 class AppExpandableIconMenu extends StatefulWidget {
+  /// Seyir defteri şeridi: genişlik 60, 300 ms, doğrusal eğri, kaydırmalı, boşluksuz.
+  const AppExpandableIconMenu.seyirDefteri({
+    Key? key,
+    required List<AppExpandableIconMenuItem> items,
+    required Widget Function(
+      BuildContext context,
+      Widget menuButton,
+      VoidCallback toggle,
+      bool isOpen,
+    ) headerBuilder,
+    required Widget body,
+  }) : this(
+          key: key,
+          items: items,
+          headerBuilder: headerBuilder,
+          body: body,
+          expandBody: true,
+          panelWidth: 60,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.linear,
+          rowCrossAxisAlignment: CrossAxisAlignment.start,
+          scrollPanel: true,
+          openGap: 0,
+          panelPadding: EdgeInsets.zero,
+          bodyPadding: EdgeInsets.zero,
+          inset: EdgeInsets.zero,
+        );
+
   const AppExpandableIconMenu({
     super.key,
     required this.items,
@@ -154,6 +188,9 @@ class _AppExpandableIconMenuState extends State<AppExpandableIconMenu> {
 
   Widget _panel() {
     final Widget column = Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: widget.items.map(_tile).toList(),
     );
     Widget panelChild = const SizedBox.shrink();

@@ -136,30 +136,27 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: AppExpandableIconMenu(
-          expandBody: true,
+        child: AppExpandableIconMenu.seyirDefteri(
           items: buildSeyirDefteriMenuItems(
             context,
             userEmail: widget.userEmail,
           ),
           headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
             return Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-            ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(4.0),
-              child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
-                userEmail: widget.userEmail,
-                onShowSavedDavalar: () {
-                },
-              ),
-            ),
-            GelenDavalarHeadlineRow(menuButton: menuButton),
+                ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
+                Padding(
+                  padding: kSeyirFriendRowPadding,
+                  child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
+                ),
+                Padding(
+                  padding: kSeyirProfilePadding,
+                  child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
+                    userEmail: widget.userEmail,
+                    onShowSavedDavalar: () {},
+                  ),
+                ),
+                GelenDavalarHeadlineRow(menuButton: menuButton),
               ],
             );
           },
@@ -210,31 +207,30 @@ class GelenDavalarHeadlineRow extends StatelessWidget {
   });
 
   static const TextStyle _titleStyle = TextStyle(
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: FontWeight.w600,
-    letterSpacing: 0.5,
-    color: Color(0xFF2F3E35),
   );
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: kSeyirHeadlinePadding,
       child: Row(
         children: [
           menuButton,
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-
-                const Text('|| GELEN DAVALAR ||', style: _titleStyle),
-                const SizedBox(width: 7),
-                const _IncomingDavaCountBadge(),
-              ],
+          const Expanded(
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(' || GELEN DAVALAR ||', style: _titleStyle),
+                  SizedBox(width: 7),
+                  _IncomingDavaCountBadge(),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 38),
+          const SizedBox(width: 48),
         ],
       ),
     );

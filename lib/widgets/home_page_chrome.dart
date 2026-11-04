@@ -35,8 +35,7 @@ class _HomePageChromeState extends State<HomePageChrome> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: AppExpandableIconMenu(
-        expandBody: true,
+      child: AppExpandableIconMenu.seyirDefteri(
         items: buildSeyirDefteriMenuItems(
           context,
           userEmail: widget.userEmail,
@@ -159,15 +158,13 @@ class _HomePageChromeState extends State<HomePageChrome> {
                                 userEmail: widget.userEmail),
                             // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu - Adım 2: Vertical padding azaltıldı
                             Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 4.0),
+                              padding: kSeyirFriendRowPadding,
                               child: OneFriendPhoneBellMenu(
                                   userEmail: widget.userEmail),
                             ),
                             // ROW 3: Profil Bölümü - Adım 3: Padding optimize edildi
                             Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 2.0, horizontal: 4.0),
+                              padding: kSeyirProfilePadding,
                               child:
                                   SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                                 userEmail:
@@ -185,8 +182,7 @@ class _HomePageChromeState extends State<HomePageChrome> {
                             ),
                             // ROW 4: Hamburger Iconu, Seyir Defteri Başlığı - Adım 4: Padding azaltıldı
                             Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 4.0, horizontal: 8.0),
+                              padding: kSeyirHeadlinePadding,
                               child: dava_ac.TreeMenuPageheadlines(
                                 title:
                                     " || SEYİR DEFTERİ ||", // HomePage için özel başlık

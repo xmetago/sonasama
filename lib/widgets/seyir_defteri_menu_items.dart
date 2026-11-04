@@ -18,6 +18,15 @@ import '../screens/trend_insights_page.dart';
 import '../screens/yargila_page.dart';
 import 'shared/app_expandable_icon_menu.dart';
 
+/// Arkadaş satırı: dikey 4.
+const EdgeInsets kSeyirFriendRowPadding = EdgeInsets.symmetric(vertical: 4);
+
+/// Profil satırı: dikey 2, yatay 4.
+const EdgeInsets kSeyirProfilePadding = EdgeInsets.symmetric(vertical: 2, horizontal: 4);
+
+/// Menü düğmesinin oturduğu başlık satırı: dikey 4, yatay 8.
+const EdgeInsets kSeyirHeadlinePadding = EdgeInsets.symmetric(vertical: 4, horizontal: 8);
+
 /// Seyir defteri sol şeridindeki ikonlar. Ana sayfa ve gelen davalar aynı listeyi kullanır.
 List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
   BuildContext context, {
@@ -36,12 +45,13 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
           );
         },
         child: const Padding(
-          padding: EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 8.0),
+          padding: kSeyirMenuFirstIconPadding,
           child: _SeyirIncomingMenuIcon(),
         ),
       ),
     ),
     AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
       assetIcon: 'lib/icons/06_yargila_left_row_icon.png',
       onTap: () {
         Navigator.push(
@@ -53,6 +63,7 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
       },
     ),
     AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
       assetIcon: 'lib/icons/06_left_row_katildigim_davalar_icon.png',
       onTap: () {
         Navigator.push(
@@ -65,6 +76,7 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
       },
     ),
     AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
       assetIcon: 'lib/icons/06_left_row_actigim_davalar_icon.png',
       onTap: () {
         Navigator.push(
@@ -76,6 +88,7 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
       },
     ),
     AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
       assetIcon: 'lib/icons/06_left_row_unlulerin_actigi_davalar_iconu.png',
       onTap: () {
         Navigator.push(
@@ -87,6 +100,7 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
       },
     ),
     AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
       assetIcon: 'lib/icons/06_left_row_haykirislarim.png',
       onTap: () {
         Navigator.push(
@@ -98,6 +112,7 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
       },
     ),
     AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
       icon: MdiIcons.trendingUp,
       onTap: () {
         Navigator.push(
@@ -109,6 +124,7 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
       },
     ),
     AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
       icon: MdiIcons.bookmarkMultipleOutline,
       onTap: () {
         Navigator.push(
@@ -120,6 +136,7 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
       },
     ),
     AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
       icon: MdiIcons.chartBar,
       onTap: () {
         Navigator.push(
@@ -132,6 +149,7 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
       },
     ),
     AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
       icon: MdiIcons.cog,
       onTap: () {
         Navigator.push(
@@ -144,6 +162,7 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
       },
     ),
     AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
       icon: MdiIcons.logout,
       onTap: () async {
         final shouldLogout = await showDialog<bool>(
