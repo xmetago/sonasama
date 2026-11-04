@@ -378,7 +378,7 @@ Bu turda kapananlar:
 - Arkadaşlık satırı `FriendshipUserCard`. Gelen istek penceresi `FriendshipIncomingRequestsDialog`.
 - `AppOutlinedCard` istatistik dava ve haykır kartlarının kabuğu.
 - Kaydedilen haykır ve widget listeleri `SliverChildBuilderDelegate`. Arama alanı listenin dışında kalır. Fizik `AlwaysScrollableScrollPhysics`.
-- Sol menü: `AppExpandableIconMenu`. Kırmızı düğme ve açılır ikon şeridi kendi açık/kapalı durumunu tutar. Sayfa bu yüzden yeniden kurulmaz. `print` yerine `debugPrint`.
+- Sol menü: `AppExpandableIconMenu`. Kırmızı düğme ve açılır ikon şeridi kendi açık/kapalı durumunu tutar. Sayfa bu yüzden yeniden kurulmaz. `print` yerine `debugPrint`. Seyir defteri ikon listesi `buildSeyirDefteriMenuItems`. Gelen davalar sayfası aynı listeyi ve aynı düğmeyi kullanır.
 
 Bilinçli olarak duranlar (estetik fazın parçası değiller):
 

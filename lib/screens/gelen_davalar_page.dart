@@ -3,17 +3,12 @@ import 'dart:async';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/seyir_defteri_menu_items.dart';
 import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../widgets/gelen_dava_card.dart';
-import 'yargila_page.dart' hide Dava, FiveCardCaseInformation, DashedLinePainter;
-import 'actigim_davalar_page.dart' hide Dava, FiveCardCaseInformation;
-import 'davaci_unlulur_page.dart';
-import 'trend_insights_page.dart';
-import 'haykir_page.dart' hide FiveCardCaseInformation;
 import '../services/hive_database_service.dart';
 import '../services/dava_timer_service.dart';
 import 'gelen_davalar_kactane.dart';
-import 'friendship_management_page.dart';
 import '../providers/dava_provider.dart';
 
 export '../widgets/gelen_dava_card.dart' show Dava, FiveCardCaseInformation, DashedLinePainter;
@@ -143,23 +138,10 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
       body: SafeArea(
         child: AppExpandableIconMenu(
           expandBody: true,
-          toggleTooltip: 'Sol menü',
-          panelWidth: 56,
-          curve: Curves.easeOutCubic,
-          openGap: 10,
-          panelPadding: const EdgeInsets.symmetric(vertical: 10),
-          inset: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-          openPanelDecoration: BoxDecoration(
-            color: const Color(0xFFF5F7FA),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE0E4EA)),
+          items: buildSeyirDefteriMenuItems(
+            context,
+            userEmail: widget.userEmail,
           ),
-          items: [
-            AppExpandableIconMenuItem(
-              onTap: () {},
-              customChild: GelenDavalarLeftNavColumn(userEmail: widget.userEmail),
-            ),
-          ],
           headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
             return Column(
               mainAxisSize: MainAxisSize.min,
@@ -177,10 +159,7 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
                 },
               ),
             ),
-            GelenDavalarHeadlineRow(
-              onMenuPressed: toggle,
-              menuButton: menuButton,
-            ),
+            GelenDavalarHeadlineRow(menuButton: menuButton),
               ],
             );
           },
@@ -223,13 +202,11 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
 
 /// Menü, sayfa başlığı ve gelen dava sayısı rozetini tek satırda hizalar.
 class GelenDavalarHeadlineRow extends StatelessWidget {
-  final VoidCallback onMenuPressed;
-  final Widget? menuButton;
+  final Widget menuButton;
 
   const GelenDavalarHeadlineRow({
     super.key,
-    required this.onMenuPressed,
-    this.menuButton,
+    required this.menuButton,
   });
 
   static const TextStyle _titleStyle = TextStyle(
@@ -245,12 +222,7 @@ class GelenDavalarHeadlineRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
         children: [
-          menuButton ??
-              IconButton(
-                icon: Icon(MdiIcons.menuOpen, size: 34, color: Colors.red),
-                onPressed: onMenuPressed,
-                tooltip: 'Sol menü',
-              ),
+          menuButton,
           Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -339,133 +311,6 @@ class _IncomingDavaCountBadge extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Gelen davalar sayfası sol şerit navigasyonu.
-class GelenDavalarLeftNavColumn extends StatelessWidget {
-  final String? userEmail;
-
-  const GelenDavalarLeftNavColumn({super.key, this.userEmail});
-
-  static const double _iconSize = 24;
-  static const Color _iconColor = Colors.black54;
-
-  Widget _navItem({
-    required BuildContext context,
-    required Widget icon,
-    required VoidCallback onTap,
-    double top = 0,
-  }) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(8, top, 8, 4),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: icon,
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _navItem(
-          context: context,
-          top: 4,
-          icon: Icon(MdiIcons.briefcaseArrowLeftRight, size: _iconSize, color: const Color(0xFF5C6BC0)),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (context) => GelenDavalarPage(userEmail: userEmail),
-              ),
-            );
-          },
-        ),
-        _navItem(
-          context: context,
-          icon: Icon(MdiIcons.gavel, size: _iconSize, color: _iconColor),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (context) => YargilaPage(userEmail: userEmail),
-              ),
-            );
-          },
-        ),
-        _navItem(
-          context: context,
-          icon: Icon(MdiIcons.accountHeart, size: _iconSize, color: _iconColor),
-          onTap: () {
-            if (userEmail != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (context) => FriendshipManagementPage(userEmail: userEmail!),
-                ),
-              );
-            }
-          },
-        ),
-        _navItem(
-          context: context,
-          icon: Image.asset('lib/icons/06_left_row_actigim_davalar_icon.png', width: _iconSize, height: _iconSize),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (context) => ActigimDavalarPage(userEmail: userEmail),
-              ),
-            );
-          },
-        ),
-        _navItem(
-          context: context,
-          icon: Image.asset('lib/icons/06_left_row_unlulerin_actigi_davalar_iconu.png', width: _iconSize, height: _iconSize),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (context) => DavaciUnlulurPage(userEmail: userEmail),
-              ),
-            );
-          },
-        ),
-        _navItem(
-          context: context,
-          icon: Image.asset('lib/icons/06_left_row_haykirislarim.png', width: _iconSize, height: _iconSize),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (context) => HaykirPage(userEmail: userEmail),
-              ),
-            );
-          },
-        ),
-        _navItem(
-          context: context,
-          icon: Icon(MdiIcons.trendingUp, size: _iconSize, color: _iconColor),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (context) => TrendInsightsPage(userEmail: userEmail),
-              ),
-            );
-          },
-        ),
-      ],
     );
   }
 }
