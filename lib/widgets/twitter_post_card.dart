@@ -214,7 +214,7 @@ class TwitterPostCard extends StatelessWidget {
   }
 
   Widget _buildActionButton({
-    required IconData icon,
+    required FaIconData icon,
     int? count,
     bool isActive = false,
     Color activeColor = const Color(0xFF1DA1F2),

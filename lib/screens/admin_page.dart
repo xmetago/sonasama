@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_feather_icons/flutter_feather_icons.dart';
+import 'package:its19/utils/feather_icons.dart';
 import 'package:its19/services/hive_database_service.dart';
 import 'package:its19/services/verified_users_service.dart';
 import 'package:its19/models/registration_model.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../widgets/common_header_widgets.dart';
 import '../widgets/countdown_timer_widget.dart';
 import '../widgets/evidence_viewer_widget.dart';

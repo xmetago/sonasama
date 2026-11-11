@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_feather_icons/flutter_feather_icons.dart';
+import 'package:its19/utils/feather_icons.dart';
 import '../services/hive_database_service.dart';
 
 /// Reklam Yönetim Sayfası

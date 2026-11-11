@@ -18,6 +18,22 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// Eski eklentiler (file_picker 8) compileSdk 34 yazıyor. AGP 9, 36 isteyen
+// AndroidX kaydını bu yüzden reddediyor. finalizeDsl, eklentinin kendi
+// bloğundan sonra ve kilitlenmeden önce değeri yükseltir. Uygulama modülü
+// flutter.compileSdkVersion kullanmaya devam eder.
+subprojects {
+    plugins.withId("com.android.library") {
+        extensions.configure<com.android.build.api.variant.LibraryAndroidComponentsExtension>(
+            "androidComponents",
+        ) {
+            finalizeDsl { ext ->
+                ext.compileSdk = 36
+            }
+        }
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

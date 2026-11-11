@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
 /// Seyir defteri şeridinde ilk ikondan sonrakilerin boşluğu: sol 8, üst 48, sağ 8, alt 8.
 const EdgeInsets kSeyirMenuIconPadding = EdgeInsets.fromLTRB(8, 48, 8, 8);

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../widgets/shared/dava_count_headline_page.dart';
 
 /// Gelen Davalar Kaç Tane Sayfası - GelenDavalarPage'in kopyası

@@ -285,7 +285,7 @@ class _TwitterPostComposerState extends State<TwitterPostComposer> {
   }
 
   Widget _buildActionButton({
-    required IconData icon,
+    required FaIconData icon,
     required VoidCallback onPressed,
     Color color = const Color(0xFF1DA1F2),
   }) {
