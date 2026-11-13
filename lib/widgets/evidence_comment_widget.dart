@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'expandable_comment_text.dart';
 import '../models/evidence_comment_model.dart';
 import '../models/evidence_model.dart';

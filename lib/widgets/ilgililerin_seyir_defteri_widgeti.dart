@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../models/evidence_comment_model.dart';
@@ -18,6 +18,7 @@ import '../services/hive_database_service.dart';
 import '../utils/comment_utils.dart';
 import 'comment_section.dart';
 import 'rol_hukum_kartlari_section.dart';
+part 'seyir_defteri_bundles.dart';
 
 /// [KatildigimDavalarPage] / [ActigimDavaCard] ile aynı birleştirme: gerçek `davaId` ve
 /// `dava_${davaAdi.hashCode}` altındaki kayıtlar tek haritada toplanır.
@@ -4441,70 +4442,3 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   }
 }
 
-class _EngagementCellConfig {
-  final IconData icon;
-  final IconData activeIcon;
-  final int count;
-  final bool isActive;
-  final Color activeColor;
-  final VoidCallback onTap;
-  final bool showCount;
-  final bool alwaysShowCount;
-
-  const _EngagementCellConfig({
-    required this.icon,
-    required this.activeIcon,
-    required this.count,
-    required this.isActive,
-    required this.activeColor,
-    required this.onTap,
-    this.showCount = true,
-    this.alwaysShowCount = false,
-  });
-}
-
-class _DelillerHakkindaBundle {
-  final List<EvidenceModel> evidences;
-  final List<EvidenceCommentModel> comments;
-
-  const _DelillerHakkindaBundle({
-    required this.evidences,
-    required this.comments,
-  });
-}
-
-class _UygunCezalarBundle {
-  final List<Map<String, dynamic>> participants;
-  final Map<String, String> cezaByEmailLower;
-  final Map<String, String> votesByEmail;
-  final Map<String, String> roleCezaMap;
-  final CezaEffectiveResult effective;
-  final bool votingOpen;
-
-  const _UygunCezalarBundle({
-    required this.participants,
-    required this.cezaByEmailLower,
-    required this.votesByEmail,
-    required this.roleCezaMap,
-    required this.effective,
-    required this.votingOpen,
-  });
-}
-
-class _HediyelerBundle {
-  final List<Map<String, dynamic>> participants;
-  final Map<String, String> hediyeSatirByEmailLower;
-  final Map<String, String> votesByEmail;
-  final Map<String, String> roleHediyeMap;
-  final HediyeEffectiveResult effective;
-  final bool votingOpen;
-
-  const _HediyelerBundle({
-    required this.participants,
-    required this.hediyeSatirByEmailLower,
-    required this.votesByEmail,
-    required this.roleHediyeMap,
-    required this.effective,
-    required this.votingOpen,
-  });
-}

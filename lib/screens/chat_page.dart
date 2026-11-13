@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:shimmer/shimmer.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../services/hive_database_service.dart';
 import '../utils/dialog_utils.dart';
 import '../services/friend_category_service.dart';
@@ -39,7 +40,6 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  bool showLeftIcons = false;
   bool _isLoading = true;
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
   
@@ -226,8 +226,37 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: SafeArea(
-        child: Column(
-          children: [
+        child: AppExpandableIconMenu(
+          expandBody: true,
+          inset: _isLoading ? EdgeInsets.zero : const EdgeInsets.all(16),
+          openGap: _isLoading ? 0 : 16,
+          panelWidth: _isLoading ? 0 : 60,
+          items: [
+            AppExpandableIconMenuItem(
+              onTap: () {},
+              customChild: IconButton(
+                icon: const Icon(Icons.campaign, size: 24, color: Colors.black54),
+                onPressed: () {},
+              ),
+            ),
+            AppExpandableIconMenuItem(
+              onTap: () {},
+              customChild: Column(
+                children: [
+                  const SizedBox(height: 76),
+                  const Icon(Icons.save_as_outlined, size: 24, color: Colors.black54),
+                  const SizedBox(height: 76),
+                  const Icon(Icons.edit_document, size: 24, color: Colors.black54),
+                  const SizedBox(height: 76),
+                  Image.asset('lib/icons/06_left_row_ahizelitelefon_icon.png', width: 24, height: 24),
+                ],
+              ),
+            ),
+          ],
+          headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
             // Header Section
             Container(
               color: Colors.white,
@@ -255,11 +284,7 @@ class _ChatPageState extends State<ChatPage> {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        showLeftIcons = !showLeftIcons;
-                      });
-                    },
+                    onTap: toggle,
                     child: Icon(
                       MdiIcons.menuOpen,
                       size: 34,
@@ -315,9 +340,10 @@ class _ChatPageState extends State<ChatPage> {
               ),
             ),
 
-            // Content Section
-            Expanded(
-              child: _isLoading
+              ],
+            );
+          },
+          body: _isLoading
                   ? Shimmer.fromColors(
                       baseColor: Colors.grey[300]!,
                       highlightColor: Colors.grey[100]!,
@@ -377,39 +403,7 @@ class _ChatPageState extends State<ChatPage> {
                         complete: Icon(Icons.check, color: Colors.blue),
                         waterDropColor: Colors.blue,
                       ),
-                      child: Container(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Left Icons
-                          if (showLeftIcons) ...[
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              width: 60,
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.campaign, size: 24, color: Colors.black54),
-                                      onPressed: () {},
-                                    ),
-                                    const SizedBox(height: 76),
-                                    const Icon(Icons.save_as_outlined, size: 24, color: Colors.black54),
-                                    const SizedBox(height: 76),
-                                    const Icon(Icons.edit_document, size: 24, color: Colors.black54),
-                                    const SizedBox(height: 76),
-                                    Image.asset('lib/icons/06_left_row_ahizelitelefon_icon.png', width: 24, height: 24),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                          ],
-
-                          // Friends List
-                          Expanded(
-                            child: Column(
+                      child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // Aktif arkadaşlar
@@ -630,13 +624,7 @@ class _ChatPageState extends State<ChatPage> {
                                 ),
                               ],
                             ),
-                          ),
-                        ],
                       ),
-                    ),
-                    ),
-            ),
-          ],
         ),
       ),
     );

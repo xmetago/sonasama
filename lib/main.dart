@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // TextInputFormatter için
-import 'package:flutter_feather_icons/flutter_feather_icons.dart';
+import 'package:its19/utils/feather_icons.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import 'package:its19/screens/forgot_password_page.dart';
@@ -8,7 +8,7 @@ import 'package:its19/screens/home_page.dart';
 import 'package:its19/screens/privacy_policy_page.dart';
 import 'package:flutter/gestures.dart';
 import 'package:its19/screens/terms_conditions_page.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:its19/services/hive_database_service.dart';
 import 'package:its19/services/friend_category_service.dart';
 import 'package:its19/services/chat_service.dart';

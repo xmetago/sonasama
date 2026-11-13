@@ -1,49 +1,16 @@
 import 'dart:math' show pi, sin;
 
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:provider/provider.dart';
 import '../services/hive_database_service.dart';
 import '../providers/dava_provider.dart';
+import 'cezalar_unified_dava.dart';
 import 'countdown_timer_widget.dart';
 
-// ═══════════════════════════════════════════════════════════════
-// 🏛️  CEZALAR + CEZA YÖNETİMİ — Birleşik sağ panel
-// ═══════════════════════════════════════════════════════════════
+export 'cezalar_unified_dava.dart' show CezalarUnifiedDava;
 
-/// [CezalarPage] / [CezaYonetimWidget] için ortak dava özeti modeli.
-class CezalarUnifiedDava {
-  final String adi;
-  final String davali;
-  final String davaci;
-  final String mevkii;
-  final String kalanSure;
-  final String profilResmi;
-
-  const CezalarUnifiedDava({
-    required this.adi,
-    required this.davali,
-    this.davaci = '',
-    required this.mevkii,
-    required this.kalanSure,
-    required this.profilResmi,
-  });
-}
-
-/// Mahkeme renk paleti (mor tonları + kritik aksiyonda kırmızı)
-class _MahkemeRenkler {
-  static const Color koyu = Color(0xFF26215C); // Başlık şeritleri, koyu zemin
-  static const Color ortaKahve = Color(0xFF534AB7); // Vurgu, seçili durumlar
-  static const Color altin = Color(0xFFCECBF6); // Kenarlık, ikincil metin
-  static const Color kirmizi = Color(0xFFA32D2D); // Yalnızca ceza onayı / kritik butonlar
-  static const Color krem = Color(0xFFEEEDFE); // Panel zemini
-  static const Color kemik = Color(0xFFF1EFE8); // Liste yüzeyleri, nötr alan
-  // ignore: unused_field — palet rezervi (avukat / gizem vurguları için)
-  static const Color yesil = Color(0xFF1B4D2E); // Koyu yeşil — avukat
-  // ignore: unused_field
-  static const Color mor = Color(0xFF2D0B4E); // Mor — gizem
-  static const Color gri = Color(0xFF5C5C5C); // Gri — nötr
-}
+part 'cezalar_mahkeme_renkler.dart';
 
 /// Dava kartı + mahkeme temalı ceza yönetimi (tek panel).
 class CezalarCezaUnifiedPanel extends StatefulWidget {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import 'gelen_davalar_page.dart';
 import 'katildigim_davalar_page.dart';
 import 'yargila_page.dart';
@@ -48,7 +49,6 @@ class TrendDavaPage extends StatefulWidget {
 class _TrendDavaPageState extends State<TrendDavaPage> {
   bool isDavalar = true; // true: DAVALAR, false: HAYKIRLAR
   int? expandedCardIndex; // Hangi card'ın açık olduğunu takip eder
-  bool showLeftIcons = false; // Sol ikonların gösterilip gösterilmeyeceğini kontrol eder
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +104,11 @@ class _TrendDavaPageState extends State<TrendDavaPage> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Column(
+          child: AppExpandableIconMenu(
+            bodyPadding: const EdgeInsets.all(8),
+            items: _trendDavaMenuItems(),
+            headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+              return Column(
             children: [
               // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
               ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
@@ -131,18 +135,7 @@ class _TrendDavaPageState extends State<TrendDavaPage> {
                 padding: const EdgeInsets.all(8.0),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: Icon(
-                        MdiIcons.menuOpen,
-                        size: 34,
-                        color: Colors.red,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          showLeftIcons = !showLeftIcons;
-                        });
-                      },
-                    ),
+                    menuButton,
                     const SizedBox(width: 19),
                     // İki sekme
                     Expanded(
@@ -238,18 +231,100 @@ class _TrendDavaPageState extends State<TrendDavaPage> {
                   ],
                 ),
               ),
-              // ROW 5: 6 Icon Solda, Sağda Trend Dava Başlıkları
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: showLeftIcons ? 60 : 0,
-                      child: showLeftIcons
-                          ? SingleChildScrollView(
-                              child: Column(
+            ],
+              );
+            },
+            body: SizedBox(
+                        height: 500,
+                        child: ListView.builder(
+                          itemCount: currentList.length,
+                          itemBuilder: (context, index) {
+                            return Column(
+                              children: [
+                                // Trend Dava Başlığı ve Twitter İkonları
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12.0),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        // Hashtag Başlığı (Tıklanabilir)
+                                        GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              expandedCardIndex = expandedCardIndex == index ? null : index;
+                                            });
+                                          },
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  currentList[index].hashtag,
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.purple,
+                                                  ),
+                                                ),
+                                              ),
+                                              Icon(
+                                                expandedCardIndex == index ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        // Twitter Benzeri İkonlar
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                          children: [
+                                            _buildIconCounter(Icons.mode_comment_outlined, currentList[index].yorumSayisi, () {}),
+                                            _buildIconCounter(Icons.repeat, currentList[index].oySayisi, () {}),
+                                            _buildIconCounter(Icons.favorite_border, currentList[index].begeniSayisi, () {}),
+                                            _buildIconCounter(Icons.thumb_down_alt_outlined, currentList[index].begenmemeSayisi, () {}),
+                                            Flexible(
+                                              child: IconButton(
+                                                icon: Icon(Icons.bookmark_border, color: Colors.grey[600]),
+                                                onPressed: () {},
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Card açılır içerik alanı
+                                if (expandedCardIndex == index)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                                    child: TrendDavaCard(
+                                      trendDava: currentList[index],
+                                      onTap: () {},
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<AppExpandableIconMenuItem> _trendDavaMenuItems() {
+    return [
+      AppExpandableIconMenuItem(
+        onTap: () {},
+        customChild: Column(
                               children: [
                                 GestureDetector(
                                   onTap: () {
@@ -351,101 +426,8 @@ class _TrendDavaPageState extends State<TrendDavaPage> {
                                 ),
                               ],
                             ),
-                          )
-                          : const SizedBox.shrink(),
-                    ),
-
-
-                    Expanded(
-                      child: SizedBox(
-                        height: 500,
-                        child: ListView.builder(
-                          itemCount: currentList.length,
-                          itemBuilder: (context, index) {
-                            return Column(
-                              children: [
-                                // Trend Dava Başlığı ve Twitter İkonları
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(12.0),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.grey[300]!),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        // Hashtag Başlığı (Tıklanabilir)
-                                        GestureDetector(
-                                          onTap: () {
-                                            setState(() {
-                                              expandedCardIndex = expandedCardIndex == index ? null : index;
-                                            });
-                                          },
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  currentList[index].hashtag,
-                                                  style: const TextStyle(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.purple,
-                                                  ),
-                                                ),
-                                              ),
-                                              Icon(
-                                                expandedCardIndex == index ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                                color: Colors.grey[600],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        // Twitter Benzeri İkonlar
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                          children: [
-                                            _buildIconCounter(Icons.mode_comment_outlined, currentList[index].yorumSayisi, () {}),
-                                            _buildIconCounter(Icons.repeat, currentList[index].oySayisi, () {}),
-                                            _buildIconCounter(Icons.favorite_border, currentList[index].begeniSayisi, () {}),
-                                            _buildIconCounter(Icons.thumb_down_alt_outlined, currentList[index].begenmemeSayisi, () {}),
-                                            Flexible(
-                                              child: IconButton(
-                                                icon: Icon(Icons.bookmark_border, color: Colors.grey[600]),
-                                                onPressed: () {},
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                // Card açılır içerik alanı
-                                if (expandedCardIndex == index)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                                    child: TrendDavaCard(
-                                      trendDava: currentList[index],
-                                      onTap: () {},
-                                    ),
-                                  ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
-    );
+    ];
   }
 
   Widget _buildIconCounter(IconData icon, int count, VoidCallback onPressed) {

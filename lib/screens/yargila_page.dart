@@ -1,38 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../widgets/common_header_widgets.dart';
-import '../widgets/countdown_timer_widget.dart';
-import '../models/sekiz_hukum_arguments.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
+import '../widgets/yargila_case_card.dart';
+import '../widgets/modern_yargila_card.dart';
 import '../services/hive_database_service.dart';
 import '../utils/dialog_utils.dart';
-import 'delilleri_incele_page.dart';
 import 'cezalar_page.dart';
-import 'sekiz_hukum_page.dart';
 
-// Model class for Dava (unchanged)
-class Dava {
-  final String id;
-  final String adi;
-  final String davali;
-  final String mevkii;
-  final String kalanSure;
-  final String profilResmi;
-  final String davaKonusu;
-  final String davaci;
-  final String userRole;
-
-  Dava({
-    required this.id,
-    required this.adi,
-    required this.davali,
-    required this.mevkii,
-    required this.kalanSure,
-    required this.profilResmi,
-    this.davaKonusu = '',
-    this.davaci = '',
-    this.userRole = '',
-  });
-}
+export '../widgets/yargila_case_card.dart' show Dava, FiveCardCaseInformation;
+export '../widgets/modern_yargila_card.dart' show ModernYargilaCard, DashedLinePainter;
 
 // Yargıla Sayfası
 class YargilaPage extends StatefulWidget {
@@ -49,7 +26,6 @@ class _YargilaPageState extends State<YargilaPage> {
   int retweetCount = 0;
   int likeCount = 0;
   int dislikeCount = 0;
-  bool showLeftIcons = false;
   List<Dava> _davaList = [];
   final Map<String, TextEditingController> _hukumControllers = {}; // Her dava için ayrı controller
   final Map<String, bool> _isHukumExpanded = {}; // Her dava için ayrı expanded durumu
@@ -143,8 +119,12 @@ class _YargilaPageState extends State<YargilaPage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // Minimum alan kaplaması için
+          child: AppExpandableIconMenu(
+            bodyPadding: const EdgeInsets.all(8),
+            items: _yargilaMenuItems(),
+            headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+              return Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               // ROW 1: WhoBoom, Arama Iconu, Chat Iconu
               ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
@@ -180,11 +160,7 @@ class _YargilaPageState extends State<YargilaPage> {
                         size: 19,
                         color: Colors.red.shade700,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          showLeftIcons = !showLeftIcons;
-                        });
-                      },
+                      onPressed: toggle,
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.red.withOpacity(0.10),
                         padding: const EdgeInsets.all(10),
@@ -220,71 +196,10 @@ class _YargilaPageState extends State<YargilaPage> {
               ),
 
 
-              // ROW 5: 6 Icon Solda, Sağda Card ile Dava Bilgileri
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: showLeftIcons ? 60 : 0,
-                      child: showLeftIcons
-                          ? SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
-                              child: Icon(Icons.save_outlined, size: 24, color: Colors.black54),
-                            ),
-
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                              child: IconButton(
-                                icon: Icon(
-                                  MdiIcons.briefcaseEditOutline,
-                                  size: 26,
-                                  color: Colors.blue.shade700,
-                                ),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
-                                  );
-                                },
-                                style: IconButton.styleFrom(
-                                  backgroundColor: Colors.blue.withOpacity(0.10),
-                                  padding: const EdgeInsets.all(10),
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
-                              child: IconButton(
-                                icon: Icon(
-                                  MdiIcons.handcuffs,
-                                  size: 26,
-                                  color: Colors.blueGrey.shade700,
-                                ),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
-                                  );
-                                },
-                                style: IconButton.styleFrom(
-                                  backgroundColor: Colors.blueGrey.withOpacity(0.10),
-                                  padding: const EdgeInsets.all(10),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                          : const SizedBox.shrink(),
-                    ),
-                    Expanded(
-                      child: _davaList.isEmpty
+            ],
+              );
+            },
+            body: _davaList.isEmpty
                           ? Center(
                               child: Padding(
                                 padding: const EdgeInsets.all(32.0),
@@ -359,15 +274,68 @@ class _YargilaPageState extends State<YargilaPage> {
                                 );
                               },
                             ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
+          ),
+        ),
+    );
+  }
+
+  List<AppExpandableIconMenuItem> _yargilaMenuItems() {
+    return [
+      AppExpandableIconMenuItem(
+        onTap: () {},
+        customChild: Padding(
+          padding: EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
+          child: Icon(Icons.save_outlined, size: 24, color: Colors.black54),
+        ),
+      ),
+      AppExpandableIconMenuItem(
+        onTap: () {},
+        customChild: Padding(
+          padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+          child: IconButton(
+            icon: Icon(
+              MdiIcons.briefcaseEditOutline,
+              size: 26,
+              color: Colors.blue.shade700,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
+              );
+            },
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.blue.withOpacity(0.10),
+              padding: const EdgeInsets.all(10),
+            ),
           ),
         ),
       ),
-    );
+      AppExpandableIconMenuItem(
+        onTap: () {},
+        customChild: Padding(
+          padding: const EdgeInsets.fromLTRB(8.0, 48.0, 8.0, 8.0),
+          child: IconButton(
+            icon: Icon(
+              MdiIcons.handcuffs,
+              size: 26,
+              color: Colors.blueGrey.shade700,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
+              );
+            },
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.blueGrey.withOpacity(0.10),
+              padding: const EdgeInsets.all(10),
+            ),
+          ),
+        ),
+      ),
+    ];
   }
 
   Widget _buildHukumComposer(Dava dava, TextEditingController controller) {
@@ -525,577 +493,4 @@ class _YargilaPageState extends State<YargilaPage> {
       ),
     );
   }
-}
-
-// Reused Widgets from GelenDavalarPage (unchanged)
-class FiveCardCaseInformation extends StatelessWidget {
-  final Dava dava;
-  final VoidCallback? onTap;
-
-  const FiveCardCaseInformation({super.key, required this.dava, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Row
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 25,
-                    backgroundColor: Colors.grey[200],
-                    child: Image.asset(
-                      dava.profilResmi,
-                      width: 40,
-                      height: 40,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(MdiIcons.checkCircle, size: 24, color: Colors.green),
-                            const SizedBox(width: 4),
-                            const Text('Haklı', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(MdiIcons.closeCircle, size: 24, color: Colors.red),
-                            const SizedBox(width: 4),
-                            const Text('Haksız', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Dava Information
-              _buildInfoRow('Dava Adı', dava.adi, true),
-              const SizedBox(height: 8),
-              _buildInfoRow('Davalı', dava.davali, true),
-              const SizedBox(height: 8),
-              _buildInfoRow('Görev', dava.mevkii, false),
-              const SizedBox(height: 8),
-              _buildCountdownRow(
-                context: context,
-              ),
-              const SizedBox(height: 16),
-              // Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Hüküm yazmak için Göreviniz rozetine dokunun.')),
-                      );
-                    },
-                    icon: const Icon(Icons.gavel, size: 16),
-                    label: const Text('8-HÜKÜM', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, bool isEditable, {IconData? icon}) {
-    return Row(
-      children: [
-        if (icon != null) ...[
-          Icon(icon, size: 16, color: Colors.green),
-          const SizedBox(width: 8),
-        ],
-        Text(
-          '$label:',
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: isEditable
-              ? TextField(
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-            decoration: InputDecoration(
-              hintText: value,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-          )
-              : Text(
-            value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Modern Yargıla Card — Dava Künyesi: collapsing (expand/collapse) başlık + içerik
-class ModernYargilaCard extends StatefulWidget {
-  final Dava dava;
-  final String? userEmail;
-  final VoidCallback? onTap;
-  final DateTime? acceptedAt;
-
-  const ModernYargilaCard({
-    super.key,
-    required this.dava,
-    this.userEmail,
-    this.onTap,
-    this.acceptedAt,
-  });
-
-  @override
-  State<ModernYargilaCard> createState() => _ModernYargilaCardState();
-}
-
-class _ModernYargilaCardState extends State<ModernYargilaCard> {
-  bool _kunyeExpanded = true;
-
-  @override
-  Widget build(BuildContext context) {
-    final dava = widget.dava;
-    final acceptedAt = widget.acceptedAt;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFDDE9E2),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF101815).withValues(alpha: 0.07),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.all(10.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-                // Dava Künyesi — collapsing toolbar benzeri: sabit başlık çubuğu, içerik açılır/kapanır
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFDCE7E1)),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
-                            setState(() => _kunyeExpanded = !_kunyeExpanded);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Center(
-                                        child: Text(
-                                          ' || Dava Künyesi ||',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.2,
-                                            color: const Color(0xFF1B2A23),
-                                          ),
-                                        ),
-                                      ),
-
-                                    ],
-                                  ),
-                                ),
-                                AnimatedRotation(
-                                  turns: _kunyeExpanded ? 0.5 : 0,
-                                  duration: const Duration(milliseconds: 220),
-                                  curve: Curves.easeOutCubic,
-                                  child: Icon(
-                                    Icons.expand_more,
-                                    color: Colors.grey.shade600,
-                                    size: 26,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      AnimatedCrossFade(
-                        firstCurve: Curves.easeOutCubic,
-                        secondCurve: Curves.easeInCubic,
-                        sizeCurve: Curves.easeInOutCubic,
-                        duration: const Duration(milliseconds: 280),
-                        crossFadeState: _kunyeExpanded
-                            ? CrossFadeState.showSecond
-                            : CrossFadeState.showFirst,
-                        firstChild: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _buildInfoRow('Göreviniz', dava.mevkii, Icons.gavel_outlined),
-                              const SizedBox(height: 3),
-                              _buildDashedLine(const Color(0xFFD8E5DE)),
-                              const SizedBox(height: 3),
-                              _buildInfoRow('Dava Adı', dava.adi, Icons.description),
-                              const SizedBox(height: 3),
-                              _buildDashedLine(const Color(0xFFD8E5DE)),
-                              const SizedBox(height: 3),
-                              _buildInfoRow('Davacı', dava.davaci, Icons.person),
-                              const SizedBox(height: 3),
-                              _buildDashedLine(const Color(0xFFD8E5DE)),
-                              const SizedBox(height: 3),
-                              _buildInfoRow('Davalı', dava.davali, Icons.person_outline),
-                              const SizedBox(height: 3),
-                              _buildDashedLine(const Color(0xFFD8E5DE)),
-                              const SizedBox(height: 1),
-                              _buildCountdownRow(
-                                context: context,
-                                acceptedAt: acceptedAt,
-                              ),
-                            ],
-                          ),
-                        ),
-                        secondChild: const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: widget.onTap,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                // Dava Konusu
-                dava.davaKonusu.isNotEmpty
-                    ? Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF6FBF8),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFDCE7E1)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.article, color: Colors.green.shade700, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Dava Konusu:',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green.shade700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                SelectableText(
-                                  dava.davaKonusu,
-                                  textAlign: TextAlign.justify,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black87,
-                                    height: 1.5,
-                                  ),
-                                )
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                      )
-                    : const SizedBox.shrink(),
-                // Action Buttons Row
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DelilleriIncelePage(
-                                userEmail: widget.userEmail,
-                                davaId: dava.id, // Seçili davanın ID'sini geç
-                              ),
-                            ),
-                          );
-                        },
-                        icon: Icon(
-                          Icons.content_paste_search,
-                          size: 24,
-                          color: Colors.blue.shade700,
-                        ),
-                        label: Text(
-                          'Deliller',
-                          style: TextStyle(
-                            color: Colors.blue.shade800,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.withOpacity(0.10),
-                          foregroundColor: Colors.blue.shade800,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            side: BorderSide(
-                              color: Colors.blue.withOpacity(0.20),
-                              width: 1.2,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 34),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          final SekizHukumArguments arguments = SekizHukumArguments(
-                            davaId: dava.id.isNotEmpty ? dava.id : null,
-                            davaAdi: dava.adi.isNotEmpty ? dava.adi : 'Dava adı belirtilmedi',
-                            davaDavali: dava.davali.isNotEmpty ? dava.davali : 'Davalı bilgisi yok',
-                            davaDavaci: dava.davaci.isNotEmpty ? dava.davaci : 'Davacı bilgisi yok',
-                            davaGorev: dava.mevkii.isNotEmpty ? dava.mevkii : 'Görev bilgisi yok',
-                            kalanSure: dava.kalanSure.isNotEmpty ? dava.kalanSure : 'Süre bilgisi yok',
-                            openedAt: acceptedAt,
-                          );
-
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SekizHukumPage(
-                                userEmail: widget.userEmail,
-                                arguments: arguments,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: Icon(
-                          MdiIcons.accountDetails,
-                          size: 24,
-                          color: Colors.green.shade700,
-                        ),
-                        label: Text(
-                          '8-HÜKÜM',
-                          style: TextStyle(
-                            color: Colors.green.shade800,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.withOpacity(0.10),
-                          foregroundColor: Colors.green.shade800,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            side: BorderSide(
-                              color: Colors.green.withOpacity(0.20),
-                              width: 1.2,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  ],
-                ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-    );
-  }
-
-  Widget _buildDashedLine(Color color) {
-    return SizedBox(
-      height: 10,
-      child: CustomPaint(
-        size: const Size(double.infinity, 10),
-        painter: DashedLinePainter(color: color, strokeWidth: 1.6),
-      ),
-    );
-
-  }
-
-  Widget _buildInfoRow(String label, String value, IconData icon, {bool isHighlight = false}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          icon,
-          size: 20,
-          color: isHighlight ? Colors.red.shade600 : Colors.green.shade700,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isHighlight ? Colors.red.shade700 : Colors.grey.shade900,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Placeholder for DashedLinePainter (ensure it's implemented in your codebase)
-class DashedLinePainter extends CustomPainter {
-  final Color color;
-  final double strokeWidth;
-
-  DashedLinePainter({required this.color, required this.strokeWidth});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke;
-
-    const dashWidth = 5;
-    const dashSpace = 6;
-    final y = size.height / 2;
-    double startX = 0;
-
-    while (startX < size.width) {
-      canvas.drawLine(
-        Offset(startX, y),
-        Offset(startX + dashWidth, y),
-        paint,
-      );
-      startX += dashWidth + dashSpace;
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
-}
-
-/// Geriye doğru sayan sayaç satırı
-Widget _buildCountdownRow({
-  required BuildContext context,
-  DateTime? acceptedAt,
-}) {
-  final DateTime startTime =
-      acceptedAt ?? DateTime.now().subtract(const Duration(hours: 1));
-  const Duration totalDuration = Duration(hours: 168);
-
-  return Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      SizedBox(
-        width: 120,
-        child: Text(
-          'Kalan Süre :',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.green.shade700,
-          ),
-        ),
-      ),
-      Expanded(
-        child: CountdownTimerWidget(
-          startTime: startTime,
-          totalDuration: totalDuration,
-          showHourglass: true,
-          onTimeUp: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('⏰ Yargılama süresi doldu!'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          },
-        ),
-      ),
-    ],
-  );
 }

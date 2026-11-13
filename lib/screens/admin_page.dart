@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_feather_icons/flutter_feather_icons.dart';
+import 'package:its19/utils/feather_icons.dart';
 import 'package:its19/services/hive_database_service.dart';
 import 'package:its19/services/verified_users_service.dart';
 import 'package:its19/models/registration_model.dart';
 import 'package:its19/models/category_model.dart';
 import 'database_debug_page.dart';
 import 'reklam_yonetim_page.dart';
+import '../widgets/admin_stat_card.dart';
+import '../widgets/shared/app_snack.dart';
 
 /// Admin sayfası - Sadece admin yetkisine sahip kullanıcılar erişebilir
 /// Kullanıcı yönetimi, veritabanı istatistikleri ve sistem ayarları içerir
@@ -879,12 +881,7 @@ class _AdminPageState extends State<AdminPage> {
                               ],
                               onSelected: (value) {
                                 if (_selectedUserIds.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Lütfen en az bir kullanıcı seçin'),
-                                      backgroundColor: Colors.orange,
-                                    ),
-                                  );
+                                  showAppSnack(context, 'Lütfen en az bir kullanıcı seçin', backgroundColor: Colors.orange);
                                   return;
                                 }
                                 
@@ -1208,33 +1205,7 @@ class _AdminPageState extends State<AdminPage> {
   /// İstatistik kartı widget'ı oluşturur
   /// Başlık, değer ve icon parametreleri alır
   Widget _buildStatCard(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: const Color(0xFF059669)),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF059669),
-            ),
-          ),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
+    return AdminStatCard(title: title, value: value, icon: icon);
   }
 
   /// Kullanıcı düzenleme modalını açar
@@ -1374,12 +1345,7 @@ class _AdminPageState extends State<AdminPage> {
                           final resetUser = user.copyWith(loginAttempts: 0);
                           await HiveDatabaseService.updateRegistration(resetUser);
                           setDialogState(() {});
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Giriş denemeleri sıfırlandı'),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
+                          showAppSnack(context, 'Giriş denemeleri sıfırlandı', backgroundColor: Colors.orange);
                         },
                         child: const Text('Sıfırla'),
                       ),
@@ -1428,14 +1394,7 @@ class _AdminPageState extends State<AdminPage> {
                   _loadData();
                   
                   // Başarı mesajı
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${updatedUser.judgeName} başarıyla güncellendi${isVerified ? ' (Mavi tik verildi ✓)' : ''}',
-                      ),
-                      backgroundColor: const Color(0xFF059669),
-                    ),
-                  );
+                  showAppSnack(context, '${updatedUser.judgeName} başarıyla güncellendi${isVerified ? ' (Mavi tik verildi ✓)' : ''}', backgroundColor: const Color(0xFF059669));
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF059669),
@@ -1634,12 +1593,7 @@ class _AdminPageState extends State<AdminPage> {
     // Admin kendi hesabını kilitleyemez
     final lock = !user.isLocked;
     if (lock && user.email == widget.adminEmail) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kendi hesabınızı kilitleyemezsiniz!'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppSnack(context, 'Kendi hesabınızı kilitleyemezsiniz!', backgroundColor: Colors.red);
       return;
     }
     
@@ -1648,28 +1602,16 @@ class _AdminPageState extends State<AdminPage> {
     await HiveDatabaseService.updateRegistration(updated);
     _loadData();
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          lock 
+    showAppSnack(context, lock 
               ? '${user.judgeName} kilitlendi' 
-              : '${user.judgeName} kilidi açıldı',
-        ),
-        backgroundColor: lock ? Colors.red : Colors.orange,
-      ),
-    );
+              : '${user.judgeName} kilidi açıldı', backgroundColor: lock ? Colors.red : Colors.orange);
   }
 
   /// Kullanıcı admin durumunu değiştirir
   Future<void> _toggleUserAdmin(RegistrationModel user) async {
     // Admin kendi yetkisini kaldıramaz
     if (user.isAdmin && user.email == widget.adminEmail) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kendi admin yetkinizi kaldıramazsınız!'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppSnack(context, 'Kendi admin yetkinizi kaldıramazsınız!', backgroundColor: Colors.red);
       return;
     }
     
@@ -1677,28 +1619,16 @@ class _AdminPageState extends State<AdminPage> {
     await HiveDatabaseService.updateRegistration(updated);
     _loadData();
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          updated.isAdmin 
+    showAppSnack(context, updated.isAdmin 
               ? '${user.judgeName} admin yetkisi verildi' 
-              : '${user.judgeName} admin yetkisi kaldırıldı',
-        ),
-        backgroundColor: const Color(0xFF059669),
-      ),
-    );
+              : '${user.judgeName} admin yetkisi kaldırıldı', backgroundColor: const Color(0xFF059669));
   }
 
   /// Kullanıcı aktif durumunu değiştirir
   Future<void> _toggleUserActive(RegistrationModel user) async {
     // Admin kendini pasif yapamaz
     if (user.isActive && user.email == widget.adminEmail) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kendi hesabınızı pasif yapamazsınız!'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppSnack(context, 'Kendi hesabınızı pasif yapamazsınız!', backgroundColor: Colors.red);
       return;
     }
     
@@ -1706,16 +1636,9 @@ class _AdminPageState extends State<AdminPage> {
     await HiveDatabaseService.updateRegistration(updated);
     _loadData();
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          updated.isActive 
+    showAppSnack(context, updated.isActive 
               ? '${user.judgeName} aktif hale getirildi' 
-              : '${user.judgeName} pasif hale getirildi',
-        ),
-        backgroundColor: updated.isActive ? Colors.green : Colors.grey,
-      ),
-    );
+              : '${user.judgeName} pasif hale getirildi', backgroundColor: updated.isActive ? Colors.green : Colors.grey);
   }
 
   /// Kullanıcı silme onay modalını açar
@@ -1723,12 +1646,7 @@ class _AdminPageState extends State<AdminPage> {
   void _deleteUser(RegistrationModel user) {
     // Admin kendi hesabını silemez
     if (user.email == widget.adminEmail) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kendi hesabınızı silemezsiniz!'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppSnack(context, 'Kendi hesabınızı silemezsiniz!', backgroundColor: Colors.red);
       return;
     }
     
@@ -1748,12 +1666,7 @@ class _AdminPageState extends State<AdminPage> {
               Navigator.pop(context);
               _loadData();
               
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${user.judgeName} silindi'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              showAppSnack(context, '${user.judgeName} silindi', backgroundColor: Colors.red);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Sil'),
@@ -1920,12 +1833,7 @@ class _AdminPageState extends State<AdminPage> {
               Navigator.pop(context);
               _loadData();
               
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$davaAdi silindi'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              showAppSnack(context, '$davaAdi silindi', backgroundColor: Colors.red);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -2084,12 +1992,7 @@ class _AdminPageState extends State<AdminPage> {
     
     // Admin'in kendini kilitlemesini engelle
     if (lock && selectedUsers.any((u) => u.email == widget.adminEmail)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kendi hesabınızı kilitleyemezsiniz!'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppSnack(context, 'Kendi hesabınızı kilitleyemezsiniz!', backgroundColor: Colors.red);
       return;
     }
     
@@ -2133,14 +2036,7 @@ class _AdminPageState extends State<AdminPage> {
     
     _loadData();
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${selectedUsers.length} kullanıcı ${lock ? "kilitlendi" : "kilidi açıldı"}',
-        ),
-        backgroundColor: lock ? Colors.red : Colors.orange,
-      ),
-    );
+    showAppSnack(context, '${selectedUsers.length} kullanıcı ${lock ? "kilitlendi" : "kilidi açıldı"}', backgroundColor: lock ? Colors.red : Colors.orange);
   }
 
   /// Seçili kullanıcıları aktif/pasif yap
@@ -2149,12 +2045,7 @@ class _AdminPageState extends State<AdminPage> {
     
     // Admin'in kendini pasif yapmasını engelle
     if (!activate && selectedUsers.any((u) => u.email == widget.adminEmail)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kendi hesabınızı pasif yapamazsınız!'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppSnack(context, 'Kendi hesabınızı pasif yapamazsınız!', backgroundColor: Colors.red);
       return;
     }
     
@@ -2197,14 +2088,7 @@ class _AdminPageState extends State<AdminPage> {
     
     _loadData();
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${selectedUsers.length} kullanıcı ${activate ? "aktif" : "pasif"} yapıldı',
-        ),
-        backgroundColor: activate ? Colors.green : Colors.grey,
-      ),
-    );
+    showAppSnack(context, '${selectedUsers.length} kullanıcı ${activate ? "aktif" : "pasif"} yapıldı', backgroundColor: activate ? Colors.green : Colors.grey);
   }
 
   /// Seçili kullanıcıları sil
@@ -2213,12 +2097,7 @@ class _AdminPageState extends State<AdminPage> {
     
     // Admin'in kendini silmesini engelle
     if (selectedUsers.any((u) => u.email == widget.adminEmail)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kendi hesabınızı silemezsiniz!'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppSnack(context, 'Kendi hesabınızı silemezsiniz!', backgroundColor: Colors.red);
       return;
     }
     
@@ -2282,12 +2161,7 @@ class _AdminPageState extends State<AdminPage> {
               
               _loadData();
               
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${selectedUsers.length} kullanıcı silindi'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              showAppSnack(context, '${selectedUsers.length} kullanıcı silindi', backgroundColor: Colors.red);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Sil', style: TextStyle(color: Colors.white)),

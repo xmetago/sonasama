@@ -4,7 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../data/hukum_gift_categories.dart';
@@ -17,6 +17,7 @@ import '../services/user_star_balance_store.dart';
 import '../theme/hukum_gift_colors.dart';
 import '../utils/dialog_utils.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../widgets/cezalar_page_layout_rails.dart';
 import '../widgets/hukum_gift_short_name_text.dart';
 import '../widgets/hukum_gift_star_strip.dart';
@@ -45,8 +46,6 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
   static const Duration _masrafCongratsDisplay = Duration(seconds: 4);
 
   bool _isHeaderCollapsed = true;
-  bool _showLeftIcons = false;
-
   bool _billingReady = false;
   int _yellowStars = 0;
 
@@ -390,10 +389,18 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
         fit: StackFit.expand,
         children: <Widget>[
           SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-            AnimatedContainer(
+            child: AppExpandableIconMenu(
+              expandBody: true,
+              inset: const EdgeInsets.all(8),
+              rowCrossAxisAlignment: CrossAxisAlignment.stretch,
+              items: [
+                AppExpandableIconMenuItem(
+                  onTap: () {},
+                  customChild: CezalarLeftIconScrollColumn(userEmail: widget.userEmail),
+                ),
+              ],
+              headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+                return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               height: _isHeaderCollapsed ? 40 : null,
               child: _isHeaderCollapsed
@@ -401,8 +408,7 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                       title: 'MASRAF — HEDİYE ',
                       onExpandHeader: () =>
                           setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
-                      onToggleLeftNav: () =>
-                          setState(() => _showLeftIcons = !_showLeftIcons),
+                      onToggleLeftNav: toggle,
                     )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -425,8 +431,7 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                           ),
                         ),
                         CezalarMenuTitleRow(
-                          onToggleLeftNav: () =>
-                              setState(() => _showLeftIcons = !_showLeftIcons),
+                          onToggleLeftNav: toggle,
                           title: ' Masraf Seçimi',
                           isHeaderCollapsed: _isHeaderCollapsed,
                           onToggleCollapse: () =>
@@ -434,26 +439,9 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                         ),
                       ],
                     ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: _showLeftIcons ? 60 : 0,
-                      child: _showLeftIcons
-                          ? SingleChildScrollView(
-                              child: CezalarLeftIconScrollColumn(
-                                userEmail: widget.userEmail,
-                              ),
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                    Expanded(
-                      child: DecoratedBox(
+            );
+              },
+              body: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
@@ -651,13 +639,8 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-              ],
-            ),
+        ),
+
           ),
           if (_showMasrafCongrats) _MasrafCongratsOverlay(theme: theme),
         ],

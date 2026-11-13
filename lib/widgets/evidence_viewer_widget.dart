@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../services/evidence_service.dart';
 import '../services/hive_database_service.dart';
 import '../models/evidence_model.dart';
