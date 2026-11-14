@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:provider/provider.dart';
+import '../theme/seyir_tokens.dart';
+import '../widgets/home_feed_card_shell.dart';
 import '../widgets/home_page_chrome.dart';
 import 'database_debug_page.dart';
 import 'admin_page.dart';
@@ -17,7 +19,6 @@ import '../widgets/ilgililerin_seyir_defteri_widgeti.dart';
 import '../widgets/home_haykir_card.dart';
 export '../widgets/home_haykir_card.dart' show HaykirCardWidget, WaveClipper, WavePainter;
 import '../utils/comment_utils.dart';
-import '../utils/app_theme.dart';
 import 'tutorial_case_page.dart';
 
 import 'dava_ac_page.dart' as dava_ac; // New import for dava a�ma
@@ -266,6 +267,8 @@ class _HomePageState extends State<HomePage> {
   /// Home feed widget'�n� olu�turur
   Widget _buildHomeFeed(List<Map<String, dynamic>> homeFeedPosts) {
     if (homeFeedPosts.isEmpty) {
+      final SeyirPalette palette = SeyirPalette.of(context);
+      final TextStyle comma = palette.headline(color: palette.textSecondary);
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -273,67 +276,36 @@ class _HomePageState extends State<HomePage> {
             Icon(
               Icons.feed_outlined,
               size: 64,
-              color: Colors.grey[400],
+              color: palette.textMuted,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: SeyirTokens.space4),
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(
                 children: [
                   TextSpan(
                     text: 'Dava Aç',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: AppTheme.successColor, // Huzur verici yeşil
-                      fontWeight: FontWeight.w600,
+                    style: palette.headline(
+                      color: palette.foreground(SeyirTokens.brandDeep),
                     ),
                   ),
-                  TextSpan(
-                    text: ', ',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  TextSpan(text: ', ', style: comma),
                   TextSpan(
                     text: 'Haykır',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: AppTheme.calmGreenDark, // Koyu huzur verici yeşil
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: palette.headline(color: palette.textPrimary),
                   ),
-                  TextSpan(
-                    text: ', ',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  TextSpan(text: ', ', style: comma),
                   TextSpan(
                     text: 'Kitlelere Ulaş',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: AppTheme.successLightColor, // Açık başarı yeşili
-                      fontWeight: FontWeight.w600,
+                    style: palette.headline(
+                      color: palette.foreground(SeyirTokens.brand),
                     ),
                   ),
-                  TextSpan(
-                    text: ', ',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  TextSpan(text: ', ', style: comma),
                   TextSpan(
                     text: 'Sesini Duyur',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: AppTheme.calmGreen, // Huzur verici açık yeşil
-                      fontWeight: FontWeight.w600,
+                    style: palette.headline(
+                      color: palette.foreground(SeyirTokens.brandDeep),
                     ),
                   ),
                 ],
@@ -361,19 +333,16 @@ class _HomePageState extends State<HomePage> {
               child: _buildHomeFeedPost(item, davaProvider),
             );
           },
-          firstPageProgressIndicatorBuilder: (context) => const Center(
-            child: CircularProgressIndicator(),
-          ),
-          newPageProgressIndicatorBuilder: (context) => const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          noMoreItemsIndicatorBuilder: (context) => const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
+          firstPageProgressIndicatorBuilder: (context) =>
+              const HomeFeedSkeletonList(),
+          newPageProgressIndicatorBuilder: (context) =>
+              const HomeFeedSkeletonCard(),
+          noMoreItemsIndicatorBuilder: (context) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space4),
             child: Center(
               child: Text(
                 'Hepsi bu kadar 🎉',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+                style: SeyirPalette.of(context).body(),
               ),
             ),
           ),
@@ -440,23 +409,7 @@ class _HomePageState extends State<HomePage> {
 
   /// Paged list hata widget'ı
   Widget _buildPagingError({required VoidCallback onRetry}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Veriler yüklenirken bir hata oluştu',
-            style: TextStyle(color: Colors.red),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text('Tekrar dene'),
-          ),
-        ],
-      ),
-    );
+    return HomeFeedErrorCard(onRetry: onRetry);
   }
 
   @override
@@ -574,24 +527,24 @@ class _HomePageState extends State<HomePage> {
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.only(left: 20),
           decoration: BoxDecoration(
-            color: Colors.red,
-            borderRadius: BorderRadius.circular(12),
+            color: SeyirTokens.reject,
+            borderRadius: SeyirTokens.radiusMdAll,
           ),
-          child: const Column(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.delete_outline,
-                color: Colors.white,
+                color: SeyirPalette.of(context).onSolid(SeyirTokens.reject),
                 size: 32,
               ),
               SizedBox(height: 8),
               Text(
                 'Sil',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: SeyirPalette.of(context).onSolid(SeyirTokens.reject),
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: SeyirTokens.typeTitle,
                 ),
               ),
             ],
@@ -653,18 +606,12 @@ class _HomePageState extends State<HomePage> {
           }
         },
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+          margin: HomeFeedCardShell.cardMargin,
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE6E6E6)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            color: SeyirPalette.of(context).card,
+            borderRadius: SeyirTokens.radiusMdAll,
+            border: Border.all(color: SeyirPalette.of(context).border),
+            boxShadow: SeyirPalette.of(context).cardShadow,
           ),
           child: Padding(
             padding: const EdgeInsets.only(bottom: 4),
@@ -973,13 +920,15 @@ class _HomePageState extends State<HomePage> {
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
+        color: SeyirPalette.of(context).surfaceMuted,
+        borderRadius: SeyirTokens.radiusMdAll,
+        border: Border.all(color: SeyirPalette.of(context).border),
       ),
       child: Text(
         'Bilinmeyen post tipi: $type',
-        style: TextStyle(color: Colors.grey[600]),
+        style: SeyirPalette.of(context).body(
+          color: SeyirPalette.of(context).textSecondary,
+        ),
       ),
     );
   }
@@ -1002,18 +951,10 @@ class _HomePageState extends State<HomePage> {
         (payload['watchStateLabel'] ?? fallbackLabel).toString();
     final String caseName =
         (payload['davaAdi'] ?? 'Dava Adı Belirtilmemiş').toString();
-    final String dateText = _formatWatchDate(
+    final DateTime moment = _watchMoment(
       payload['openedAt']?.toString(),
       payload['stateChangedAt']?.toString(),
     );
-    const Color accentColor = Color(0xFF9C27B0);
-    final Color frameColor = isWatching ? accentColor : Colors.grey.shade400;
-    final Color badgeFill =
-        isWatching ? const Color(0xFFE8F5E9) : Colors.grey.shade100;
-    final Color badgeBorder =
-        isWatching ? const Color(0xFF66BB6A) : Colors.grey.shade300;
-    final Color stateTextColor =
-        isWatching ? const Color(0xFF2E7D32) : Colors.grey.shade600;
     // Kullanıcı email'ini al ve profil resmini Hive'dan oku
     final String? userEmail =
         payload['userEmail']?.toString() ?? widget.userEmail;
@@ -1022,101 +963,20 @@ class _HomePageState extends State<HomePage> {
       userEmail: userEmail,
     );
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: frameColor, width: 1.4),
-        boxShadow: [
-          BoxShadow(
-            color: frameColor.withOpacity(0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: Colors.grey[200],
-            backgroundImage: avatarProvider,
-            child: null, // backgroundImage varsa child gösterilmez
-            onBackgroundImageError: (exception, stackTrace) {
-              // Resim yüklenemezse varsayılan ikonu göster
-              print('⚠️ Avatar resim yükleme hatası: $exception');
-            },
-          ),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: badgeFill,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: badgeBorder),
-            ),
-            child: Text(
-              dateText,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-                color: Color(0xFF2E7D32),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              caseName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          InkWell(
-            onTap: () => _handleWatchCloseIcon(post, payload),
-            borderRadius: BorderRadius.circular(16),
-            child: const Icon(
-              Icons.close_sharp,
-              color: Color(0xFFE53935),
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 8),
-          InkWell(
-            onTap: () => _handleWatchCardToggle(post, payload),
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color:
-                    isWatching ? const Color(0xFFFFF3E0) : Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isWatching
-                      ? const Color(0xFFFFB74D)
-                      : Colors.grey.shade400,
-                  width: 1.2,
-                ),
-              ),
-              child: Text(
-                stateLabel,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: stateTextColor,
-                ),
-              ),
-            ),
-          ),
-        ],
+    return DavaWatchFeedCard(
+      name: caseName,
+      timeLabel: seyirRelativeTime(moment),
+      isWatching: isWatching,
+      stateLabel: stateLabel,
+      onClose: () => _handleWatchCloseIcon(post, payload),
+      onToggle: () => _handleWatchCardToggle(post, payload),
+      avatar: CircleAvatar(
+        radius: 18,
+        backgroundColor: SeyirPalette.of(context).surfaceMuted,
+        backgroundImage: avatarProvider,
+        onBackgroundImageError: (exception, stackTrace) {
+          print('⚠️ Avatar resim yükleme hatası: $exception');
+        },
       ),
     );
   }
@@ -1282,9 +1142,9 @@ class _HomePageState extends State<HomePage> {
           maxChildSize: 0.95,
           builder: (sheetContext, scrollController) {
             return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: SeyirPalette.of(sheetContext).surface,
+                borderRadius: SeyirTokens.sheetTop,
               ),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               child: SingleChildScrollView(
@@ -1348,7 +1208,7 @@ class _HomePageState extends State<HomePage> {
     return AssetImage(path) as ImageProvider<Object>;
   }
 
-  String _formatWatchDate(String? primaryIso, String? fallbackIso) {
+  DateTime _watchMoment(String? primaryIso, String? fallbackIso) {
     DateTime? parsed;
     if (primaryIso != null && primaryIso.isNotEmpty) {
       parsed = DateTime.tryParse(primaryIso);
@@ -1356,11 +1216,7 @@ class _HomePageState extends State<HomePage> {
     if (parsed == null && fallbackIso != null && fallbackIso.isNotEmpty) {
       parsed = DateTime.tryParse(fallbackIso);
     }
-    parsed ??= DateTime.now();
-    final String day = parsed.day.toString().padLeft(2, '0');
-    final String month = parsed.month.toString().padLeft(2, '0');
-    final String year = parsed.year.toString();
-    return '$day.$month.$year';
+    return parsed ?? DateTime.now();
   }
 
   // Kaydedilen davaları yükle
@@ -1418,23 +1274,9 @@ class _HomePageState extends State<HomePage> {
             width: MediaQuery.of(context).size.width * 0.9,
             height: MediaQuery.of(context).size.height * 0.8,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white,
-                  Colors.green.withOpacity(0.05),
-                  Colors.blue.withOpacity(0.05),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
+              borderRadius: SeyirTokens.sheetTop,
+              color: SeyirPalette.of(context).surface,
+              boxShadow: SeyirPalette.of(context).cardShadow,
             ),
             child: Column(
               children: [
@@ -1530,36 +1372,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildEmptyState() {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.gavel_outlined,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Henüz Dava Açmadınız',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade700,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
+    return const HomeEmptyCases();
   }
 
   Widget _buildDavalarList(
@@ -1573,27 +1386,14 @@ class _HomePageState extends State<HomePage> {
           final isOpened = dava['isOpened'] ?? false;
           final isBeklemede = dava['davaAdi'] == 'Beklemede';
 
+          final SeyirPalette palette = SeyirPalette.of(context);
           return Container(
-            margin: const EdgeInsets.only(bottom: 16),
+            margin: const EdgeInsets.only(bottom: SeyirTokens.space4),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white,
-                  isOpened
-                      ? Colors.green.withOpacity(0.02)
-                      : Colors.orange.withOpacity(0.02),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              borderRadius: SeyirTokens.radiusLgAll,
+              color: palette.card,
+              border: Border.all(color: palette.border),
+              boxShadow: palette.cardShadow,
             ),
             child: Material(
               color: Colors.transparent,
@@ -1644,11 +1444,7 @@ class _HomePageState extends State<HomePage> {
                           Expanded(
                             child: Text(
                               dava['davaAdi'] ?? 'Dava Adı Belirtilmemiş',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
+                              style: SeyirPalette.of(context).title(),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1765,20 +1561,17 @@ class _HomePageState extends State<HomePage> {
             width: 80,
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
+              style: SeyirPalette.of(context).caption(
+                weight: FontWeight.w600,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
+              style: SeyirPalette.of(context).caption(
+                weight: FontWeight.w500,
+                color: SeyirPalette.of(context).textPrimary,
               ),
             ),
           ),
@@ -1798,8 +1591,8 @@ class _HomePageState extends State<HomePage> {
             margin: const EdgeInsets.all(12),
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              color: SeyirPalette.of(context).surface,
+              borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1916,8 +1709,8 @@ class _HomePageState extends State<HomePage> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.white,
-      barrierColor: Colors.black.withOpacity(0.6),
+      backgroundColor: SeyirPalette.of(context).surface,
+      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.6),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -2036,8 +1829,9 @@ class _HomePageState extends State<HomePage> {
           floatingActionButton: FloatingActionButton(
             onPressed: () =>
                 _showPostOptionsSheet(isAdmin: authProvider.isAdmin),
-            backgroundColor: const Color(0xFF059669),
-            foregroundColor: Colors.white,
+            backgroundColor: SeyirTokens.brand,
+            foregroundColor:
+                SeyirPalette.of(context).onSolid(SeyirTokens.brand),
             tooltip: 'Yeni paylaşım',
             child: const Icon(Icons.add),
           ),

@@ -11,6 +11,7 @@ import '../screens/uyarilar_page.dart';
 import '../services/durtme_service.dart';
 import '../services/hive_database_service.dart';
 import '../services/local_notification_service.dart';
+import '../theme/seyir_tokens.dart';
 import '../widgets/timed_action_buttons.dart';
 import '../widgets/profile_icons_row.dart';
 import '../widgets/verified_users_management_dialog.dart';
@@ -100,7 +101,7 @@ class ZeroWhoboomSearchMessage extends StatelessWidget {
             child: Icon(
               MdiIcons.chatOutline,
               size: 24,
-              color: Colors.black54,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -275,7 +276,7 @@ class _OneFriendPhoneBellMenuState extends State<OneFriendPhoneBellMenu> {
             child: Icon(
               MdiIcons.menuOpen, // Menü ikonu her zaman aynı kalır
               size: 24,
-              color: Colors.black54,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -290,6 +291,7 @@ class _OneFriendPhoneBellMenuState extends State<OneFriendPhoneBellMenu> {
     Color badgeColor = Colors.red,
     required VoidCallback onTap,
   }) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Stack(
@@ -298,10 +300,10 @@ class _OneFriendPhoneBellMenuState extends State<OneFriendPhoneBellMenu> {
           Container(
             padding: const EdgeInsets.fromLTRB(19, 0, 24.0, 0),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: palette.surfaceMuted,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 19, color: Colors.black87),
+            child: Icon(icon, size: 19, color: palette.textPrimary),
           ),
           if (badgeCount != null && badgeCount > 0)
             Positioned(
@@ -968,7 +970,7 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
                 : null, // Kendi profilini gösteriyorsa tıklama yok
             child: CircleAvatar( //PROFİL RESMİ ALANI //rengini değiştir
               radius: 30,
-              backgroundColor: Colors.grey[200],
+              backgroundColor: SeyirPalette.of(context).surfaceMuted,
               backgroundImage: displayProfileImageUrl != null && displayProfileImageUrl.isNotEmpty
                   ? _getImageProvider(displayProfileImageUrl)
                   : null,
@@ -984,7 +986,11 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
                   : null,
               child: displayProfileImageUrl != null && displayProfileImageUrl.isNotEmpty
                   ? null
-                  : const Icon(Icons.account_circle, size: 40, color: Colors.grey),
+                  : Icon(
+                      Icons.account_circle,
+                      size: 40,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
             ),
           ),
           const SizedBox(width: 12),
@@ -994,10 +1000,10 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
               children: [
                 Text(
                   judgeName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    color: Colors.black,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

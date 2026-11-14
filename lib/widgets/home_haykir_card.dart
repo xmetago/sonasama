@@ -8,6 +8,7 @@ import '../providers/dava_provider.dart';
 import '../screens/haykirislarim_page.dart';
 import '../screens/saved_widgets_page.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/haykir_duration.dart';
 import 'expandable_comment_text.dart';
 import 'haykir_card_shell.dart';
@@ -237,14 +238,15 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
   Widget _buildHaykirCommentsPanel(String haykirId) {
     if (!showComments) return const SizedBox.shrink();
 
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.shade200),
+          color: palette.surfaceMuted,
+          borderRadius: SeyirTokens.radiusMdAll,
+          border: Border.all(color: palette.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -740,34 +742,30 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
     }
 
     if (widget.showCloseButton && !isExpanded) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-        child: buildShell(expanded: false),
-      );
+      return buildShell(expanded: false);
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (widget.showCloseButton && isExpanded)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.expand_less, color: Colors.grey[600]),
-                  onPressed: () {
-                    setState(() {
-                      isExpanded = false;
-                      _expandController.reverse();
-                    });
-                  },
-                  tooltip: 'Daralt',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.red),
-                  onPressed: () async {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.showCloseButton && isExpanded)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: Icon(Icons.expand_less, color: palette.textSecondary),
+                onPressed: () {
+                  setState(() {
+                    isExpanded = false;
+                    _expandController.reverse();
+                  });
+                },
+                tooltip: 'Daralt',
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: palette.foreground(SeyirTokens.reject)),
+                onPressed: () async {
                     await widget.davaProvider
                         .removeHomeFeedPost(widget.post['id']);
                     if (mounted) {
@@ -780,7 +778,6 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
             ),
           buildShell(expanded: shellExpanded),
         ],
-      ),
     );
   }
 

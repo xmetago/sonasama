@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/haykir_duration.dart';
+import 'home_feed_card_shell.dart';
 
 enum HaykirCardShellVariant { feed, katildigim }
 
@@ -77,8 +79,164 @@ class HaykirCardShell extends StatelessWidget {
     );
   }
 
+  String _feedTimeLabel() {
+    final DateTime? parsed = DateTime.tryParse(createdAt);
+    if (parsed == null) return authorSubtitle;
+    return seyirRelativeTime(parsed);
+  }
+
+  Widget _buildFeedCard(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final time = _timeInfo();
+    final bool muted = isExpired || time.isExpired;
+    final String initial = authorDisplayName.isNotEmpty
+        ? authorDisplayName[0].toUpperCase()
+        : '?';
+    final Color ink = muted ? palette.textSecondary : palette.textPrimary;
+
+    final Widget body = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: SeyirTokens.space2,
+          runSpacing: SeyirTokens.space2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: SeyirTokens.space2,
+                vertical: SeyirTokens.space1,
+              ),
+              decoration: BoxDecoration(
+                color: SeyirTokens.brandDeep,
+                borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
+              ),
+              child: Text(
+                _typeBadge,
+                style: palette.caption(
+                  weight: FontWeight.w800,
+                  color: palette.onSolid(SeyirTokens.brandDeep),
+                ),
+              ),
+            ),
+            Text(
+              time.isExpired ? 'Süre doldu' : 'Aktif',
+              style: palette.caption(
+                weight: FontWeight.w700,
+                color: time.isExpired
+                    ? palette.textMuted
+                    : palette.foreground(SeyirTokens.brandDeep),
+              ),
+            ),
+            if (!time.isExpired)
+              Text(
+                time.label,
+                style: palette.caption(
+                  weight: FontWeight.w700,
+                  color: palette.foreground(SeyirTokens.brandDeep),
+                ),
+              ),
+            if (showSuccessBadge)
+              Text(
+                isSuccess ? 'Başarılı' : 'Başarısız',
+                style: palette.caption(
+                  weight: FontWeight.w800,
+                  color: palette.foreground(
+                    isSuccess ? SeyirTokens.accept : SeyirTokens.reject,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: SeyirTokens.space3),
+        ClipRRect(
+          borderRadius: SeyirTokens.radiusSmAll,
+          child: LinearProgressIndicator(
+            value: time.isExpired ? 0 : time.progress,
+            minHeight: 5,
+            backgroundColor: palette.surfaceMuted,
+            color: time.isExpired ? palette.textMuted : SeyirTokens.brand,
+          ),
+        ),
+        const SizedBox(height: SeyirTokens.space3),
+        Text(adi, style: palette.headline(color: ink)),
+        if (slogan.isNotEmpty) ...[
+          const SizedBox(height: SeyirTokens.space2),
+          Text(
+            slogan,
+            maxLines: isExpanded ? null : 2,
+            overflow: isExpanded ? null : TextOverflow.ellipsis,
+            style: palette.body(
+              color: palette.textSecondary,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+        if (direme.isNotEmpty) ...[
+          const SizedBox(height: SeyirTokens.space2),
+          Text(
+            direme,
+            maxLines: isExpanded ? 2 : 1,
+            overflow: TextOverflow.ellipsis,
+            style: palette.body(
+              weight: FontWeight.w700,
+              color: palette.foreground(SeyirTokens.brandDeep),
+            ),
+          ),
+        ],
+      ],
+    );
+
+    final bool showActions = isExpanded &&
+        (trailingAction != null ||
+            (expandedChildren != null && expandedChildren!.isNotEmpty));
+
+    return HomeFeedCardShell(
+      name: authorDisplayName,
+      timeLabel: _feedTimeLabel(),
+      onHeaderTap: onHeaderTap,
+      avatar: CircleAvatar(
+        radius: 18,
+        backgroundColor: palette.brandSoft,
+        child: Text(
+          initial,
+          style: palette.title(
+            color: palette.foreground(SeyirTokens.brandDeep),
+          ),
+        ),
+      ),
+      headerTrailing: onHeaderTap == null
+          ? null
+          : AnimatedRotation(
+              turns: isExpanded ? 0.5 : 0,
+              duration: SeyirTokens.motion,
+              child: Icon(
+                Icons.keyboard_arrow_down,
+                color: palette.textSecondary,
+              ),
+            ),
+      body: body,
+      actions: showActions
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (trailingAction != null)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: trailingAction!,
+                  ),
+                if (expandedChildren != null) ...expandedChildren!,
+              ],
+            )
+          : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (variant == HaykirCardShellVariant.feed) {
+      return _buildFeedCard(context);
+    }
     final time = _timeInfo();
     final muted = isExpired || time.isExpired;
 
@@ -428,19 +586,10 @@ class HaykirCompactSocialBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: actions
-            .map((action) => Expanded(child: _HaykirSocialButton(action: action)))
-            .toList(),
-      ),
+    return Row(
+      children: actions
+          .map((action) => Expanded(child: _HaykirSocialButton(action: action)))
+          .toList(),
     );
   }
 }
@@ -474,10 +623,11 @@ class _HaykirSocialButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     final disabled = action.isDisabled;
     final color = disabled
-        ? Colors.grey.shade400
-        : (action.isActive ? action.color : Colors.grey.shade600);
+        ? palette.textMuted
+        : (action.isActive ? action.color : palette.textSecondary);
 
     return Tooltip(
       message: action.tooltip,
@@ -486,34 +636,29 @@ class _HaykirSocialButton extends StatelessWidget {
         child: InkWell(
           onTap: disabled ? null : action.onTap,
           onLongPress: disabled ? null : action.onLongPress,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: action.isActive && !disabled
-                        ? action.color.withValues(alpha: 0.15)
-                        : Colors.grey.shade100,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(action.icon, size: 20, color: color),
-                ),
-                if (action.count > 0) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    '${action.count}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: color,
+          borderRadius: SeyirTokens.radiusMdAll,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: SeyirTokens.tapTarget,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space1),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(action.icon, size: 22, color: color),
+                  if (action.count > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${action.count}',
+                      style: palette.caption(
+                        weight: FontWeight.w800,
+                        color: color,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

@@ -46,7 +46,7 @@ class TreeMenuPageheadlines extends StatelessWidget {
             icon: Icon(
               isCollapsed ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
               size: 24,
-              color: Colors.black,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
             onPressed: onToggleCollapse,
             tooltip: isCollapsed ? 'Arayüzü Aç' : 'Arayüzü Kapat',
