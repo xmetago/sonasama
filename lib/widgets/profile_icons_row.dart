@@ -68,18 +68,19 @@ class ProfileIconsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color color = Theme.of(context).colorScheme.onSurfaceVariant;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        ligIcon(5),
+        ligIcon(5, color: color),
         const SizedBox(width: 4),
-        ligIcon(4),
+        ligIcon(4, color: color),
         const SizedBox(width: 4),
-        ligIcon(3),
+        ligIcon(3, color: color),
         const SizedBox(width: 4),
-        ligIcon(1),
+        ligIcon(1, color: color),
         const SizedBox(width: 4),
-        ligIcon(2),
+        ligIcon(2, color: color),
       ],
     );
   }

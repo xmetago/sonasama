@@ -18,6 +18,7 @@ import 'package:its19/providers/dava_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:its19/services/local_notification_service.dart';
 import 'package:its19/utils/timeago_helper.dart';
+import 'package:its19/theme/app_theme.dart';
 import 'package:its19/utils/app_theme.dart';
 import 'package:its19/utils/country_display_utils.dart';
 import 'package:its19/utils/country_picker_extension.dart';
@@ -397,27 +398,9 @@ class WhoBoomApp extends StatelessWidget {
     return MaterialApp(
       title: 'WhoBoom',
       debugShowCheckedModeBanner: false, // O çirkin debug bandını kaldıralım
-      theme: ThemeData(
-        useMaterial3: true, // Modern Android/Flutter görünümü için şart
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1CB5B5), // Görseldeki ana turkuaz
-          primary: const Color(0xFF1CB5B5),
-          surface: const Color(0xFFF8FBFB), // Saf beyaz yerine çok hafif maviye çalan beyaz
-        ),
-        // Proje içi tanımlı yerel fontu kullan
-        fontFamily: 'cocon',
-
-        // Butonları görseldeki gibi yuvarlak ve gölgeli yapalım
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1CB5B5),
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            elevation: 2,
-          ),
-        ),
-      ),
+      theme: WhoBoomTheme.light,
+      darkTheme: WhoBoomTheme.dark,
+      themeMode: ThemeMode.system,
       home: const WhoBoomLoginPage(),
     );
   }

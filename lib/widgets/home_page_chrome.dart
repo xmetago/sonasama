@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
+import '../screens/chat_page.dart';
+import '../screens/dava_ac_page.dart' as dava_ac;
+import '../screens/home_page.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/dialog_utils.dart';
 import 'common_header_widgets.dart';
 import 'seyir_defteri_menu_items.dart';
 import 'shared/app_expandable_icon_menu.dart';
-import '../screens/chat_page.dart';
-import '../screens/dava_ac_page.dart' as dava_ac;
-import '../screens/home_page.dart';
 
 /// Üst şerit ve sol menü. Katlanma burada kalır. İkon listesi seyir defteri menüsündedir.
 class HomePageChrome extends StatefulWidget {
@@ -29,177 +31,175 @@ class HomePageChrome extends StatefulWidget {
 }
 
 class _HomePageChromeState extends State<HomePageChrome> {
-  bool isHeaderCollapsed =
-      false; // Üst arayüzün küçültülüp küçültülmediğini kontrol eder
+  bool isHeaderCollapsed = false;
+
+  bool _onFeedScroll(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification is! UserScrollNotification) return false;
+    if (notification.direction == ScrollDirection.reverse &&
+        !isHeaderCollapsed) {
+      setState(() => isHeaderCollapsed = true);
+    } else if (notification.direction == ScrollDirection.forward &&
+        isHeaderCollapsed) {
+      setState(() => isHeaderCollapsed = false);
+    }
+    return false;
+  }
+
+  void _toggleHeader() {
+    setState(() => isHeaderCollapsed = !isHeaderCollapsed);
+  }
+
+  ButtonStyle _compactIconStyle(SeyirPalette palette) {
+    return IconButton.styleFrom(
+      foregroundColor: palette.textSecondary,
+      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+      fixedSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: EdgeInsets.zero,
+    );
+  }
+
+  Widget _brandMark(SeyirPalette palette) {
+    final Color ink = palette.onSolid(SeyirTokens.brand);
+    return InkWell(
+      onTap: () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomePage(userEmail: widget.userEmail),
+          ),
+        );
+      },
+      borderRadius: SeyirTokens.radiusMdAll,
+      child: SizedBox(
+        width: SeyirTokens.tapTarget,
+        height: SeyirTokens.tapTarget,
+        child: Center(
+          child: Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: SeyirTokens.brand,
+              borderRadius: SeyirTokens.radiusSmAll,
+            ),
+            child: Text(
+              'W',
+              style: palette.headline(color: ink),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _compactHeader(SeyirPalette palette, VoidCallback toggle) {
+    final ButtonStyle iconStyle = _compactIconStyle(palette);
+    return Row(
+      children: [
+        _brandMark(palette),
+        IconButton(
+          icon: const Icon(Icons.search, size: 22),
+          onPressed: () {},
+          style: iconStyle,
+        ),
+        IconButton(
+          icon: Icon(MdiIcons.chatOutline, size: 22),
+          style: iconStyle,
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatPage(userEmail: widget.userEmail),
+              ),
+            );
+          },
+        ),
+        IconButton(
+          icon: Icon(MdiIcons.menuOpen, size: 22),
+          style: iconStyle,
+          onPressed: toggle,
+        ),
+        Expanded(
+          child: Text(
+            'Seyir Defteri',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: palette.title(),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.keyboard_arrow_down, size: 22),
+          onPressed: _toggleHeader,
+          style: iconStyle,
+          tooltip: 'Arayüzü Aç',
+        ),
+      ],
+    );
+  }
+
+  Widget _expandedHeader(Widget menuButton) {
+    return Column(
+      children: [
+        ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
+        Padding(
+          padding: kSeyirFriendRowPadding,
+          child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
+        ),
+        Padding(
+          padding: kSeyirProfilePadding,
+          child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
+            userEmail: widget.profileEmail,
+            targetUserEmail: widget.targetUserEmail,
+            onShowSavedDavalar: () {
+              if (widget.userEmail != null) {
+                showSavedDavalarDialog(context, widget.userEmail!);
+              }
+            },
+          ),
+        ),
+        Padding(
+          padding: kSeyirHeadlinePadding,
+          child: dava_ac.TreeMenuPageheadlines(
+            title: 'Seyir Defteri',
+            isCollapsed: isHeaderCollapsed,
+            onToggleCollapse: _toggleHeader,
+            menuButton: menuButton,
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return SafeArea(
-      child: AppExpandableIconMenu.seyirDefteri(
-        items: buildSeyirDefteriMenuItems(
-          context,
-          userEmail: widget.userEmail,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _onFeedScroll,
+        child: AppExpandableIconMenu.seyirDefteri(
+          items: buildSeyirDefteriMenuItems(
+            context,
+            userEmail: widget.userEmail,
+          ),
+          headerBuilder: (
+            BuildContext context,
+            Widget menuButton,
+            VoidCallback toggle,
+            bool isOpen,
+          ) {
+            return AnimatedSize(
+              duration: SeyirTokens.motion,
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: isHeaderCollapsed
+                  ? _compactHeader(palette, toggle)
+                  : _expandedHeader(menuButton),
+            );
+          },
+          body: widget.feed,
         ),
-        headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
-          return AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  height: isHeaderCollapsed ? 40 : null,
-                  child: isHeaderCollapsed
-                      ? // Tek satır halinde küçültülmüş görünüm - Kompakt UI
-                      Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8.0, vertical: 2.0),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Kompakt WhoBoom logosu
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          HomePage(userEmail: widget.userEmail),
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(4),
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFF059669), Colors.green],
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'WB',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              // Kompakt arama ikonu
-                              IconButton(
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                icon: const Icon(Icons.search, size: 16),
-                                onPressed: () {},
-                              ),
-                              const SizedBox(width: 4),
-                              // Kompakt chat ikonu
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          ChatPage(userEmail: widget.userEmail),
-                                    ),
-                                  );
-                                },
-                                child: Icon(
-                                  MdiIcons.chatOutline,
-                                  size: 16,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Kompakt menü ikonu
-                              GestureDetector(
-                                onTap: toggle,
-                                child: Icon(
-                                  MdiIcons.menuOpen,
-                                  size: 16,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              // Kompakt başlık
-                              const Expanded(
-                                child: Text(
-                                  'SEYİR DEFTERİ',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              // Aç/kapa ok butonu
-                              IconButton(
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                icon: Icon(
-                                  Icons.keyboard_arrow_down,
-                                  size: 18,
-                                  color: Colors.black,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    isHeaderCollapsed = !isHeaderCollapsed;
-                                  });
-                                },
-                                tooltip: 'Arayüzü Aç',
-                              ),
-                            ],
-                          ),
-                        )
-                      : // Normal görünüm
-                      Column(
-                          children: [
-                            // ROW 1: WhoBoom, Arama Iconu, Chat Iconu - Adım 1: Padding azaltıldı
-                            ZeroWhoboomSearchMessage(
-                                userEmail: widget.userEmail),
-                            // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu - Adım 2: Vertical padding azaltıldı
-                            Padding(
-                              padding: kSeyirFriendRowPadding,
-                              child: OneFriendPhoneBellMenu(
-                                  userEmail: widget.userEmail),
-                            ),
-                            // ROW 3: Profil Bölümü - Adım 3: Padding optimize edildi
-                            Padding(
-                              padding: kSeyirProfilePadding,
-                              child:
-                                  SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
-                                userEmail:
-                                    widget.profileEmail,
-                                targetUserEmail:
-                                    widget.targetUserEmail,
-                                onShowSavedDavalar: () {
-                                  // Global utility fonksiyonunu kullan
-                                  if (widget.userEmail != null) {
-                                    showSavedDavalarDialog(
-                                        context, widget.userEmail!);
-                                  }
-                                },
-                              ),
-                            ),
-                            // ROW 4: Hamburger Iconu, Seyir Defteri Başlığı - Adım 4: Padding azaltıldı
-                            Padding(
-                              padding: kSeyirHeadlinePadding,
-                              child: dava_ac.TreeMenuPageheadlines(
-                                title:
-                                    " || SEYİR DEFTERİ ||", // HomePage için özel başlık
-                                isCollapsed: isHeaderCollapsed,
-                                onToggleCollapse: () {
-                                  setState(() {
-                                    isHeaderCollapsed = !isHeaderCollapsed;
-                                  });
-                                },
-                                menuButton: menuButton,
-                              ),
-                            ),
-                          ],
-                        ),
-                );
-        },
-        body: widget.feed,
       ),
     );
   }
