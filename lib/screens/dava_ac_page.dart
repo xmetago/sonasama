@@ -18,6 +18,7 @@ import 'actigim_davalar_page.dart' hide Dava, FiveCardCaseInformation, TreeMenuP
 import 'home_page.dart' hide Dava;
 import 'delilleri_incele_page.dart' hide Dava, FiveCardCaseInformation;
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/dialog_utils.dart';
 import '../models/dava.dart' as dava_model; // Dava modeli için import eklendi (alias ile)
 import '../providers/auth_provider.dart';
@@ -1806,7 +1807,7 @@ class _DavaAcPageState extends State<DavaAcPage> {
   /// Collapsed (tek satır) üst başlık satırı - Dava Aç sayfası
   Widget _buildCollapsedHeaderRow(VoidCallback toggle) {
     return CollapsedWbHeaderRow(
-      title: 'Dava  Aç ',
+      title: 'Dava Aç',
       onExpandHeader: () => setState(() => isHeaderCollapsed = !isHeaderCollapsed),
       onToggleLeftNav: toggle,
     );
@@ -1859,7 +1860,7 @@ class _DavaAcPageState extends State<DavaAcPage> {
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: TreeMenuPageheadlines(
-                        title: "Dava  Aç ",
+                        title: "Dava Aç",
                         isCollapsed: isHeaderCollapsed,
                         onToggleCollapse: () {
                           setState(() => isHeaderCollapsed = !isHeaderCollapsed);
@@ -1971,7 +1972,9 @@ class _DavaAcPageState extends State<DavaAcPage> {
           child: Icon(
             MdiIcons.contentSaveOutline,
             size: 24,
-            color: Colors.black54,
+            color: SeyirPalette.of(context).isDark
+                ? SeyirPalette.of(context).textSecondary
+                : Colors.black54,
           ),
         ),
       ),
