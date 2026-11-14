@@ -35,7 +35,7 @@ class TreeMenuPageheadlines extends StatelessWidget {
         Expanded(
           child: Center(
             child: Text(
-              title ?? "Dava  Aç ", // Parametre varsa onu kullan, yoksa varsayılan
+              title ?? 'Dava Aç', // Parametre varsa onu kullan, yoksa varsayılan
               style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
             ),
           ),

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart'; // TextInputFormatter için
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:provider/provider.dart';
-import '../widgets/common_header_widgets.dart';
+import '../theme/seyir_tokens.dart';
 import '../widgets/shared/app_expandable_icon_menu.dart';
+import '../widgets/shared/app_page_header.dart';
 import '../widgets/dava_ac_case_card.dart';
 import '../widgets/group_selection_dialog.dart';
-import '../widgets/dava_ac_page_headline.dart';
 export '../widgets/dava_ac_page_headline.dart' show TreeMenuPageheadlines;
 export '../widgets/group_selection_dialog.dart' show GroupOption, GroupSelectionDialog;
 export '../widgets/dava_ac_case_card.dart' show Dava, FiveCardCaseInformation;
@@ -1803,83 +1804,67 @@ class _DavaAcPageState extends State<DavaAcPage> {
     );
   }
 
-  /// Collapsed (tek satır) üst başlık satırı - Dava Aç sayfası
-  Widget _buildCollapsedHeaderRow(VoidCallback toggle) {
-    return CollapsedWbHeaderRow(
-      title: 'Dava  Aç ',
-      onExpandHeader: () => setState(() => isHeaderCollapsed = !isHeaderCollapsed),
-      onToggleLeftNav: toggle,
-    );
+  bool _onHeaderScroll(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification is! UserScrollNotification) return false;
+    if (notification.direction == ScrollDirection.reverse &&
+        !isHeaderCollapsed) {
+      setState(() => isHeaderCollapsed = true);
+    } else if (notification.direction == ScrollDirection.forward &&
+        isHeaderCollapsed) {
+      setState(() => isHeaderCollapsed = false);
+    }
+    return false;
   }
 
   /// Dava Aç sayfasının ana içeriğini oluştur
   Widget _buildDavaAcPage(AuthProvider authProvider, DavaProvider davaProvider) {
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: NotificationListener<ScrollNotification>(
+          onNotification: _onHeaderScroll,
           child: AppExpandableIconMenu(
             openRequest: _menuOpenRequest,
-            bodyPadding: const EdgeInsets.all(8),
+            expandBody: true,
             items: _davaAcMenuItems(),
             headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                height: isHeaderCollapsed ? 40 : null,
-                child: isHeaderCollapsed
-                    ? _buildCollapsedHeaderRow(toggle)
-                    : Column(
-                  children: [
-                    ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
-                        userEmail: widget.userEmail,
-                        onDateUpdate: (String date) {
-                          setState(() {
-                            davaList[0] = Dava(
-                              id: davaList[0].id,
-                              adi: davaList[0].adi,
-                              davali: davaList[0].davali,
-                              mevkii: davaList[0].mevkii,
-                              kalanSure: date,
-                              profilResmi: davaList[0].profilResmi,
-                              davaKonusu: davaList[0].davaKonusu,
-                              davaKategorisi: davaList[0].davaKategorisi,
-                              isOpened: davaList[0].isOpened,
-                            );
-                          });
-                        },
-                        onShowSavedDavalar: _showSavedDavalarDialog,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: TreeMenuPageheadlines(
-                        title: "Dava  Aç ",
-                        isCollapsed: isHeaderCollapsed,
-                        onToggleCollapse: () {
-                          setState(() => isHeaderCollapsed = !isHeaderCollapsed);
-                        },
-                        menuButton: menuButton,
-                      ),
-                    ),
-                  ],
+              return AnimatedSize(
+                duration: SeyirTokens.motion,
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: AppPageHeader(
+                  title: 'Dava Aç',
+                  userEmail: widget.userEmail,
+                  profileEmail: widget.userEmail,
+                  isCollapsed: isHeaderCollapsed,
+                  onToggleCollapse: () {
+                    setState(() => isHeaderCollapsed = !isHeaderCollapsed);
+                  },
+                  menuButton: menuButton,
+                  onToggleMenu: toggle,
+                  onShowSavedDavalar: _showSavedDavalarDialog,
+                  onDateUpdate: (String date) {
+                    setState(() {
+                      davaList[0] = Dava(
+                        id: davaList[0].id,
+                        adi: davaList[0].adi,
+                        davali: davaList[0].davali,
+                        mevkii: davaList[0].mevkii,
+                        kalanSure: date,
+                        profilResmi: davaList[0].profilResmi,
+                        davaKonusu: davaList[0].davaKonusu,
+                        davaKategorisi: davaList[0].davaKategorisi,
+                        isOpened: davaList[0].isOpened,
+                      );
+                    });
+                  },
                 ),
               );
             },
-            body: Column(
-              children: [
-
-                          // Dava listesi
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: davaList.length,
-                            itemBuilder: (context, index) {
+            body: ListView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: davaList.length,
+              itemBuilder: (context, index) {
                               final dava = davaList[index];
                               final isExpanded = expandedCardIndex == index;
 
@@ -1927,10 +1912,9 @@ class _DavaAcPageState extends State<DavaAcPage> {
                                 showDavaliError: _showDavaliError,
                                 davaliErrorText: _davaliErrorText,
                                 davaliFocusNode: _davaliFocusNode,
+                                davalaDisabledReason: _davalaDisabledReason,
                               );
                             },
-                          ),
-              ],
             ),
           ),
         ),
