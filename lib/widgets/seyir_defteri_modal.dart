@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
 import 'ilgililerin_seyir_defteri_widgeti.dart';
+import 'seyir_defteri/seyir_sheet_chrome.dart';
 
 /// Ilgililerin seyir defteri widget'ını modern bir alt sayfada gösterir.
 class SeyirDefteriModal {
@@ -24,45 +26,56 @@ class SeyirDefteriModal {
       backgroundColor: Colors.transparent,
       builder: (BuildContext modalContext) {
         final mediaQuery = MediaQuery.of(modalContext);
+        final palette = SeyirPalette.of(modalContext);
         return DraggableScrollableSheet(
           expand: false,
           maxChildSize: 0.95,
           minChildSize: 0.45,
           initialChildSize: mediaQuery.size.height > 700 ? 0.75 : 0.9,
           builder: (_, controller) {
-            return Container(
+            return DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                color: palette.surface,
+                borderRadius: SeyirTokens.sheetTop,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
+                    color: palette.shadow,
                     blurRadius: 24,
                     offset: const Offset(0, -6),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                child: SingleChildScrollView(
-                  controller: controller,
-                  padding: EdgeInsets.only(
-                    bottom: mediaQuery.viewInsets.bottom + 24,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                    child: IlgililerinSeyirDefteriWidgeti(
-                      davaId: davaId,
-                      userEmail: userEmail,
-                      davaAdi: davaAdi,
-                      davaci: davaci,
-                      davali: davali,
-                      kategori: kategori,
-                      davaKonusu: davaKonusu,
-                      openedAt: openedAt,
-                      onClose: () => Navigator.of(modalContext).maybePop(),
+                borderRadius: SeyirTokens.sheetTop,
+                child: Column(
+                  children: [
+                    const SeyirDragHandle(),
+                    Expanded(
+                      child: ListView(
+                        controller: controller,
+                        padding: EdgeInsets.fromLTRB(
+                          SeyirTokens.space4,
+                          SeyirTokens.space2,
+                          SeyirTokens.space4,
+                          mediaQuery.viewInsets.bottom + SeyirTokens.space6,
+                        ),
+                        children: [
+                          IlgililerinSeyirDefteriWidgeti(
+                            davaId: davaId,
+                            userEmail: userEmail,
+                            davaAdi: davaAdi,
+                            davaci: davaci,
+                            davali: davali,
+                            kategori: kategori,
+                            davaKonusu: davaKonusu,
+                            openedAt: openedAt,
+                            onClose: () =>
+                                Navigator.of(modalContext).maybePop(),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             );
@@ -72,4 +85,3 @@ class SeyirDefteriModal {
     );
   }
 }
-

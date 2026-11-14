@@ -16,16 +16,19 @@ import '../screens/saved_haykirlar_page.dart';
 import '../screens/statistics_dashboard_page.dart';
 import '../screens/trend_insights_page.dart';
 import '../screens/yargila_page.dart';
+import '../theme/seyir_tokens.dart';
 import 'shared/app_expandable_icon_menu.dart';
 
 /// Arkadaş satırı: dikey 4.
 const EdgeInsets kSeyirFriendRowPadding = EdgeInsets.symmetric(vertical: 4);
 
 /// Profil satırı: dikey 2, yatay 4.
-const EdgeInsets kSeyirProfilePadding = EdgeInsets.symmetric(vertical: 2, horizontal: 4);
+const EdgeInsets kSeyirProfilePadding =
+    EdgeInsets.symmetric(vertical: 2, horizontal: 4);
 
 /// Menü düğmesinin oturduğu başlık satırı: dikey 4, yatay 8.
-const EdgeInsets kSeyirHeadlinePadding = EdgeInsets.symmetric(vertical: 4, horizontal: 8);
+const EdgeInsets kSeyirHeadlinePadding =
+    EdgeInsets.symmetric(vertical: 4, horizontal: 8);
 
 /// Seyir defteri sol şeridindeki ikonlar. Ana sayfa ve gelen davalar aynı listeyi kullanır.
 List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
@@ -142,8 +145,7 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                StatisticsDashboardPage(userEmail: userEmail),
+            builder: (context) => StatisticsDashboardPage(userEmail: userEmail),
           ),
         );
       },
@@ -179,8 +181,8 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
                 ElevatedButton(
                   onPressed: () => Navigator.of(dialogContext).pop(true),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
+                    backgroundColor: SeyirTokens.reject,
+                    foregroundColor: SeyirTokens.neutral0,
                   ),
                   child: const Text('Çıkış'),
                 ),
@@ -194,7 +196,8 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
         Provider.of<AuthProvider>(context, listen: false).logout();
 
         if (!context.mounted) return;
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/login', (route) => false);
       },
     ),
   ];
@@ -268,18 +271,18 @@ class _SeyirIncomingMenuIconState extends State<_SeyirIncomingMenuIcon> {
           });
         }
 
+        final palette = SeyirPalette.of(context);
+        final active = _highlightIncomingIcon || _hasIncomingDavaForBlink;
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.all(4),
+          duration: SeyirTokens.motion,
+          padding: const EdgeInsets.all(SeyirTokens.space1),
           decoration: BoxDecoration(
-            color: _highlightIncomingIcon || _hasIncomingDavaForBlink
-                ? Colors.blue.withOpacity(0.08)
+            color: active
+                ? SeyirTokens.brand.withValues(alpha: 0.16)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: SeyirTokens.radiusMdAll,
             border: Border.all(
-              color: _highlightIncomingIcon || _hasIncomingDavaForBlink
-                  ? Colors.blueAccent
-                  : Colors.transparent,
+              color: active ? SeyirTokens.brand : Colors.transparent,
               width: _highlightIncomingIcon
                   ? 3
                   : (_hasIncomingDavaForBlink ? 1.5 : 0),
@@ -287,17 +290,17 @@ class _SeyirIncomingMenuIconState extends State<_SeyirIncomingMenuIcon> {
             boxShadow: _highlightIncomingIcon
                 ? [
                     BoxShadow(
-                      color: Colors.blue.withOpacity(0.45),
+                      color: SeyirTokens.brand.withValues(alpha: 0.45),
                       blurRadius: 10,
                       spreadRadius: 2,
                     ),
                   ]
-                : [],
+                : const [],
           ),
           child: Icon(
             MdiIcons.briefcaseArrowLeftRight,
             size: 24,
-            color: Colors.black54,
+            color: palette.textSecondary,
           ),
         );
       },

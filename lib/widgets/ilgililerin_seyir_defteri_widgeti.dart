@@ -15,23 +15,26 @@ import '../services/dava_timer_service.dart';
 import '../services/evidence_comment_service.dart';
 import '../services/evidence_service.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/comment_utils.dart';
 import 'comment_section.dart';
 import 'rol_hukum_kartlari_section.dart';
+import 'seyir_defteri/seyir_sheet_chrome.dart';
 part 'seyir_defteri_bundles.dart';
 
 /// [KatildigimDavalarPage] / [ActigimDavaCard] ile aynı birleştirme: gerçek `davaId` ve
 /// `dava_${davaAdi.hashCode}` altındaki kayıtlar tek haritada toplanır.
 Map<String, Map<String, dynamic>> _mergeSeyirHukumlerGroupedMaps(
-    List<Map<String, Map<String, dynamic>>> parts,
-    ) {
-  final Map<String, Map<String, dynamic>> out = <String, Map<String, dynamic>>{};
+  List<Map<String, Map<String, dynamic>>> parts,
+) {
+  final Map<String, Map<String, dynamic>> out =
+      <String, Map<String, dynamic>>{};
   for (final Map<String, Map<String, dynamic>> part in parts) {
     for (final MapEntry<String, Map<String, dynamic>> e in part.entries) {
       final String roleFromRow =
-      (e.value['userRole'] as String?)?.trim().isNotEmpty == true
-          ? (e.value['userRole'] as String)
-          : e.key;
+          (e.value['userRole'] as String?)?.trim().isNotEmpty == true
+              ? (e.value['userRole'] as String)
+              : e.key;
       final String nk = normalizeRolKarari(roleFromRow);
       final String newText = (e.value['hukumText'] as String?)?.trim() ?? '';
       final Map<String, dynamic>? prev = out[nk];
@@ -59,6 +62,7 @@ class IlgililerinSeyirDefteriWidgeti extends StatefulWidget {
   final VoidCallback? onClose;
   final VoidCallback? onRemove;
   final VoidCallback? onToggleCollapse;
+
   /// Ana sayfa akışındaki kaynak post (yorum/retweet senkronu).
   final String? feedPostId;
   final String? sourceAuthorEmail;
@@ -87,10 +91,12 @@ class IlgililerinSeyirDefteriWidgeti extends StatefulWidget {
   });
 
   @override
-  State<IlgililerinSeyirDefteriWidgeti> createState() => _IlgililerinSeyirDefteriWidgetiState();
+  State<IlgililerinSeyirDefteriWidgeti> createState() =>
+      _IlgililerinSeyirDefteriWidgetiState();
 }
 
-class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteriWidgeti>
+class _IlgililerinSeyirDefteriWidgetiState
+    extends State<IlgililerinSeyirDefteriWidgeti>
     with AutomaticKeepAliveClientMixin {
   bool showDetails = true;
   bool isLiked = false;
@@ -133,21 +139,77 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
 
   List<Map<String, String>> get caseDetails {
     return [
-      if (_kategori.isNotEmpty) {"label": "Dava kategorisi", "value": _kategori},
+      if (_kategori.isNotEmpty)
+        {"label": "Dava kategorisi", "value": _kategori},
       if (_davaci.isNotEmpty) {"label": "Davacı", "value": _davaci},
       if (_davali.isNotEmpty) {"label": "Davalı", "value": _davali},
     ];
   }
 
-  // 🎨 GÜNCELLENMİŞ: Bölüm bazlı ikon ve renk eşleştirmeleri
+  SeyirPalette get _palette => SeyirPalette.of(context);
+
   static const Map<String, MapEntry<Color, IconData>> _sectionStyles = {
-    "Davayı Yorumlamayı Kabul ve Red Edenler": MapEntry(Colors.blue, Icons.people_outline),
-    "Deliller Hakkında": MapEntry(Colors.purple, Icons.receipt_long_outlined),
-    "Uygun Görülen Cezalar": MapEntry(Colors.red, Icons.scale_outlined),
-    "Ceza Onayı": MapEntry(Colors.indigo, Icons.fact_check_outlined),
-    "Uygun Görülen Hediyeler": MapEntry(Colors.pink, Icons.redeem_outlined),
-    "Hediye Onayı": MapEntry(Colors.amber, Icons.schedule_send_outlined),
+    "Davayı Yorumlamayı Kabul ve Red Edenler":
+        MapEntry(SeyirTokens.sectionPeople, Icons.people_outline),
+    "Deliller Hakkında":
+        MapEntry(SeyirTokens.sectionEvidence, Icons.receipt_long_outlined),
+    "Uygun Görülen Cezalar":
+        MapEntry(SeyirTokens.sectionPenalty, Icons.scale_outlined),
+    "Ceza Onayı":
+        MapEntry(SeyirTokens.sectionPenaltyVote, Icons.fact_check_outlined),
+    "Uygun Görülen Hediyeler":
+        MapEntry(SeyirTokens.sectionGift, Icons.redeem_outlined),
+    "Hediye Onayı":
+        MapEntry(SeyirTokens.sectionGiftVote, Icons.schedule_send_outlined),
   };
+
+  Widget? _sectionBadge(String title, Color accent) {
+    switch (title) {
+      case "Davayı Yorumlamayı Kabul ve Red Edenler":
+        if (_isLoadingRejecters && _participants.isEmpty) {
+          return null;
+        }
+        return SeyirCountBadge(count: _participants.length, accent: accent);
+      case "Deliller Hakkında":
+        return SeyirFutureCount<_DelillerHakkindaBundle>(
+          future: _delillerHakkindaFuture,
+          accent: accent,
+          countOf: (bundle) => _orderedEvidenceIds(bundle).length,
+        );
+      case "Uygun Görülen Cezalar":
+        return SeyirFutureCount<_UygunCezalarBundle>(
+          future: _uygunCezalarFuture,
+          accent: accent,
+          countOf: (bundle) => bundle.roleCezaMap.values
+              .where((value) => value.trim().isNotEmpty)
+              .length,
+        );
+      case "Ceza Onayı":
+        return SeyirFutureCount<_UygunCezalarBundle>(
+          future: _uygunCezalarFuture,
+          accent: accent,
+          countOf: (bundle) =>
+              (bundle.effective.cezaText ?? '').trim().isEmpty ? 0 : 1,
+        );
+      case "Uygun Görülen Hediyeler":
+        return SeyirFutureCount<_HediyelerBundle>(
+          future: _hediyelerFuture,
+          accent: accent,
+          countOf: (bundle) => bundle.roleHediyeMap.values
+              .where((value) => value.trim().isNotEmpty)
+              .length,
+        );
+      case "Hediye Onayı":
+        return SeyirFutureCount<_HediyelerBundle>(
+          future: _hediyelerFuture,
+          accent: accent,
+          countOf: (bundle) =>
+              (bundle.effective.hediyeText ?? '').trim().isEmpty ? 0 : 1,
+        );
+      default:
+        return null;
+    }
+  }
 
   final List<String> expandableItems = [
     "Davayı Yorumlamayı Kabul ve Red Edenler",
@@ -160,7 +222,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
 
   String _kullaniciGorevResolved = '';
   final Map<String, String> _rolHukumleri = <String, String>{};
-  final Map<String, HukumSentiment> _rolSentimentleri = <String, HukumSentiment>{};
+  final Map<String, HukumSentiment> _rolSentimentleri =
+      <String, HukumSentiment>{};
   final Map<String, String> _rolCezalari = <String, String>{};
   final Map<String, String> _rolMasraflari = <String, String>{};
   HukumSentiment? _rolSeciliSentiment;
@@ -185,16 +248,15 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       return '';
     }
     final List<Map<String, dynamic>> katildim =
-    HiveDatabaseService.getKatildigimDavalar(email);
+        HiveDatabaseService.getKatildigimDavalar(email);
     for (final Map<String, dynamic> d in katildim) {
-      final String did =
-      (d['id'] ?? d['davaId'] ?? '').toString().trim();
+      final String did = (d['id'] ?? d['davaId'] ?? '').toString().trim();
       if (did == id) {
         return (d['mevkii'] ?? d['userRole'] ?? '').toString().trim();
       }
     }
     final List<Map<String, dynamic>> incoming =
-    HiveDatabaseService.getIncomingDavalar(email);
+        HiveDatabaseService.getIncomingDavalar(email);
     for (final Map<String, dynamic> d in incoming) {
       if ((d['id'] ?? '').toString().trim() == id) {
         return (d['mevkii'] ?? d['userRole'] ?? '').toString().trim();
@@ -215,11 +277,13 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     }
     try {
       DateTime? openedAt = widget.openedAt ?? _openedAt;
-      if (openedAt == null && widget.davaId != null && widget.davaId!.isNotEmpty) {
+      if (openedAt == null &&
+          widget.davaId != null &&
+          widget.davaId!.isNotEmpty) {
         final List<Map<String, dynamic>> opened =
-        HiveDatabaseService.getOpenedDavalar();
+            HiveDatabaseService.getOpenedDavalar();
         final Map<String, dynamic> row = opened.firstWhere(
-              (Map<String, dynamic> d) => d['id'] == widget.davaId,
+          (Map<String, dynamic> d) => d['id'] == widget.davaId,
           orElse: () => <String, dynamic>{},
         );
         final String? s = row['openedAt'] as String?;
@@ -228,7 +292,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
         }
       }
       final DavaConsensusEvaluation evaluation =
-      await DavaConsensusService.evaluateConsensus(
+          await DavaConsensusService.evaluateConsensus(
         davaId: davaId,
         openedAt: openedAt,
       );
@@ -250,19 +314,19 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   Future<void> _loadRolHukumMaps() async {
     final String pid = widget.davaId?.trim() ?? '';
     final String davaAdi = _effectiveDavaAdi();
-    final String? hid =
-    davaAdi.isNotEmpty ? 'dava_${davaAdi.hashCode}' : null;
+    final String? hid = davaAdi.isNotEmpty ? 'dava_${davaAdi.hashCode}' : null;
     if (pid.isEmpty && (hid == null || hid.isEmpty)) {
       return;
     }
     try {
       final List<Map<String, Map<String, dynamic>>> idChunks =
-      <Map<String, Map<String, dynamic>>>[];
+          <Map<String, Map<String, dynamic>>>[];
       if (pid.isNotEmpty) {
-        Map<String, Map<String, dynamic>> byPid = <String, Map<String, dynamic>>{};
+        Map<String, Map<String, dynamic>> byPid =
+            <String, Map<String, dynamic>>{};
         try {
           final DavaProvider davaProvider =
-          Provider.of<DavaProvider>(context, listen: false);
+              Provider.of<DavaProvider>(context, listen: false);
           byPid = await davaProvider.getHukumlerByDavaId(
             pid,
             davaAdi: davaAdi.isNotEmpty ? davaAdi : null,
@@ -282,7 +346,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       }
       if (hid != null && (pid.isEmpty || hid != pid)) {
         final Map<String, Map<String, dynamic>> byHid =
-        await HiveDatabaseService.getHukumlerByDavaIdGrouped(
+            await HiveDatabaseService.getHukumlerByDavaIdGrouped(
           hid,
           davaAdi: davaAdi.isNotEmpty ? davaAdi : null,
         );
@@ -291,7 +355,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
         }
       }
       final Map<String, Map<String, dynamic>> existing =
-      _mergeSeyirHukumlerGroupedMaps(idChunks);
+          _mergeSeyirHukumlerGroupedMaps(idChunks);
       if (!mounted) {
         return;
       }
@@ -303,14 +367,15 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           await HiveDatabaseService.getCezaMapForDavaId(cezaPrimaryId),
         );
         masraflarByEmail = Map<String, String>.from(
-          await HiveDatabaseService.getMasrafGiftLineMapForDavaId(cezaPrimaryId),
+          await HiveDatabaseService.getMasrafGiftLineMapForDavaId(
+              cezaPrimaryId),
         );
       }
       if (hid != null) {
         final Map<String, String> cezaAlt =
-        await HiveDatabaseService.getCezaMapForDavaId(hid);
+            await HiveDatabaseService.getCezaMapForDavaId(hid);
         final Map<String, String> masrafAlt =
-        await HiveDatabaseService.getMasrafGiftLineMapForDavaId(hid);
+            await HiveDatabaseService.getMasrafGiftLineMapForDavaId(hid);
         for (final MapEntry<String, String> e in cezaAlt.entries) {
           cezalarByEmail.putIfAbsent(e.key, () => e.value);
         }
@@ -325,7 +390,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
         _rolHukumleri
           ..clear()
           ..addEntries(
-            existing.entries.where((MapEntry<String, Map<String, dynamic>> entry) {
+            existing.entries
+                .where((MapEntry<String, Map<String, dynamic>> entry) {
               final dynamic text = entry.value['hukumText'];
               return (text is String) && text.trim().isNotEmpty;
             }).map((MapEntry<String, Map<String, dynamic>> entry) {
@@ -338,11 +404,11 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           );
         _rolSentimentleri.clear();
         for (final MapEntry<String, Map<String, dynamic>> entry
-        in existing.entries) {
+            in existing.entries) {
           final String? sentimentValue =
-          entry.value['hukumSentiment'] as String?;
+              entry.value['hukumSentiment'] as String?;
           final HukumSentiment? sentiment =
-          hukumSentimentFromStorage(sentimentValue);
+              hukumSentimentFromStorage(sentimentValue);
           final String normalizedKey = normalizeRolKarari(entry.key);
           if (sentiment != null) {
             _rolSentimentleri[normalizedKey] = sentiment;
@@ -351,14 +417,14 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
         _rolCezalari.clear();
         _rolMasraflari.clear();
         for (final MapEntry<String, Map<String, dynamic>> entry
-        in existing.entries) {
+            in existing.entries) {
           final String roleFromRow =
-          (entry.value['userRole'] as String?)?.trim().isNotEmpty == true
-              ? (entry.value['userRole'] as String)
-              : entry.key;
+              (entry.value['userRole'] as String?)?.trim().isNotEmpty == true
+                  ? (entry.value['userRole'] as String)
+                  : entry.key;
           final String normalizedKey = normalizeRolKarari(roleFromRow);
           final String email =
-          (entry.value['userEmail'] as String? ?? '').trim();
+              (entry.value['userEmail'] as String? ?? '').trim();
           if (email.isNotEmpty) {
             final String emailKey = email.toLowerCase();
             final String? ceza = cezalarByEmail[emailKey];
@@ -373,7 +439,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
         }
         _kullaniciGorevResolved = _resolveKullaniciGorev();
         final String normalizedUserRole =
-        normalizeRolKarari(_kullaniciGorevResolved);
+            normalizeRolKarari(_kullaniciGorevResolved);
         _rolSeciliSentiment = _rolSentimentleri[normalizedUserRole];
       });
     } catch (e) {
@@ -464,7 +530,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     try {
       final openedDavalar = HiveDatabaseService.getOpenedDavalar();
       final dava = openedDavalar.firstWhere(
-            (d) => d['id'] == widget.davaId,
+        (d) => d['id'] == widget.davaId,
         orElse: () => <String, dynamic>{},
       );
 
@@ -480,7 +546,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
               ? (dava['davali'] ?? '').toString().trim()
               : _davali;
           _kategori = _kategori.isEmpty
-              ? (dava['kategori'] ?? dava['davaKategori'] ?? '').toString().trim()
+              ? (dava['kategori'] ?? dava['davaKategori'] ?? '')
+                  .toString()
+                  .trim()
               : _kategori;
           _davaKonusu = _davaKonusu.isEmpty
               ? (dava['davaKonusu'] ?? '').toString().trim()
@@ -512,16 +580,19 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       }
 
       if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-        final incomingDavalar = HiveDatabaseService.getIncomingDavalar(widget.userEmail!);
+        final incomingDavalar =
+            HiveDatabaseService.getIncomingDavalar(widget.userEmail!);
         final incomingDava = incomingDavalar.firstWhere(
-              (d) => d['id'] == widget.davaId,
+          (d) => d['id'] == widget.davaId,
           orElse: () => <String, dynamic>{},
         );
 
         if (incomingDava.isNotEmpty) {
           setState(() {
             _davaAdi = _davaAdi.isEmpty
-                ? (incomingDava['davaAdi'] ?? incomingDava['adi'] ?? '').toString().trim()
+                ? (incomingDava['davaAdi'] ?? incomingDava['adi'] ?? '')
+                    .toString()
+                    .trim()
                 : _davaAdi;
             _davaci = _davaci.isEmpty
                 ? (incomingDava['davaci'] ?? '').toString().trim()
@@ -530,7 +601,11 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 ? (incomingDava['davali'] ?? '').toString().trim()
                 : _davali;
             _kategori = _kategori.isEmpty
-                ? (incomingDava['kategori'] ?? incomingDava['davaKategori'] ?? '').toString().trim()
+                ? (incomingDava['kategori'] ??
+                        incomingDava['davaKategori'] ??
+                        '')
+                    .toString()
+                    .trim()
                 : _kategori;
             _davaKonusu = _davaKonusu.isEmpty
                 ? (incomingDava['davaKonusu'] ?? '').toString().trim()
@@ -545,7 +620,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             }
             if (_openedAt == null && incomingDava['createdAt'] != null) {
               try {
-                _openedAt = DateTime.parse(incomingDava['createdAt'].toString());
+                _openedAt =
+                    DateTime.parse(incomingDava['createdAt'].toString());
               } catch (e) {
                 _openedAt = null;
               }
@@ -573,16 +649,17 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     });
 
     try {
-      final participants = await HiveDatabaseService.getDavaParticipants(widget.davaId!);
+      final participants =
+          await HiveDatabaseService.getDavaParticipants(widget.davaId!);
       if (!mounted) return;
       setState(() {
         _participants = participants;
-        _rejecters = participants
-            .where((p) {
+        _rejecters = participants.where((p) {
           final status = p['status']?.toString();
-          return status == 'manual_rejected' || status == 'auto_rejected' || status == 'rejected';
-        })
-            .toList();
+          return status == 'manual_rejected' ||
+              status == 'auto_rejected' ||
+              status == 'rejected';
+        }).toList();
         _isLoadingRejecters = false;
       });
     } catch (e) {
@@ -608,7 +685,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       parts.add('"$_kategori" kategorisinde');
     }
 
-    final davaAdiText = _davaAdi.isNotEmpty ? _davaAdi : 'Dava Adı Belirtilmemiş';
+    final davaAdiText =
+        _davaAdi.isNotEmpty ? _davaAdi : 'Dava Adı Belirtilmemiş';
     parts.add('"$davaAdiText" adlı davayı');
 
     final tarihText = _openedAt != null
@@ -618,7 +696,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
 
     final description = parts.join(' ');
 
-    if (description.trim().isEmpty || description == '"Dava Adı Belirtilmemiş" adlı davayı "..." tarihi ile açmış bulunuyor.') {
+    if (description.trim().isEmpty ||
+        description ==
+            '"Dava Adı Belirtilmemiş" adlı davayı "..." tarihi ile açmış bulunuyor.') {
       return 'Dava bilgileri yükleniyor...';
     }
 
@@ -628,14 +708,18 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   String _formatHeaderDate() {
     final date = widget.openedAt ?? _openedAt;
     if (date == null) return '';
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    return '$day.$month.${date.year}';
+    return seyirAbsoluteDate(date);
+  }
+
+  String _formatHeaderRelative() {
+    final date = widget.openedAt ?? _openedAt;
+    if (date == null) return '';
+    return seyirRelativeTime(date);
   }
 
   String _headerTitle() {
     final ad = _effectiveDavaAdi();
-    return (ad.isNotEmpty ? ad : 'DAVA').toUpperCase();
+    return ad.isNotEmpty ? ad : 'DAVA';
   }
 
   void _loadEngagementData() {
@@ -645,7 +729,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     try {
       final stats = HiveDatabaseService.getDavaActionStats(davaId);
       if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-        final userAction = HiveDatabaseService.getUserDavaAction(davaId, widget.userEmail!);
+        final userAction =
+            HiveDatabaseService.getUserDavaAction(davaId, widget.userEmail!);
         isLiked = userAction['like'] == true;
         isDisliked = userAction['dislike'] == true;
         yorumSayisi = userAction['commentCount'] as int? ?? 0;
@@ -679,7 +764,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       }
 
       if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-        isRetweeted = HiveDatabaseService.hasUserRetweetedDava(davaId, widget.userEmail!) ||
+        isRetweeted = HiveDatabaseService.hasUserRetweetedDava(
+                davaId, widget.userEmail!) ||
             isRetweeted;
       }
     } catch (e) {
@@ -731,11 +817,13 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
 
     final postId = widget.feedPostId?.trim() ?? '';
     if (postId.isNotEmpty && userEmail.isNotEmpty) {
-      final post = HiveDatabaseService.getHomeFeedPostById(postId, userEmail: userEmail);
+      final post =
+          HiveDatabaseService.getHomeFeedPostById(postId, userEmail: userEmail);
       if (post != null) {
         final updated = Map<String, dynamic>.from(post);
         final payload = Map<String, dynamic>.from(
-          (updated['payload'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{},
+          (updated['payload'] as Map?)?.cast<String, dynamic>() ??
+              <String, dynamic>{},
         );
         payload['yorumlar'] = _yorumlar;
         payload['yorumSayisi'] = count;
@@ -867,7 +955,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       switch (type) {
         case 'retweet':
           if (isRetweeted) {
-            final undone = await HiveDatabaseService.undoRetweetDavaFromSeyirDefteri(
+            final undone =
+                await HiveDatabaseService.undoRetweetDavaFromSeyirDefteri(
               davaId,
               userEmail,
             );
@@ -898,7 +987,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
               payloadOverride: _buildDavaPayloadSnapshot(),
             );
             if (!added) {
-              _showEngagementSnack('Retweet zaten yapılmış veya dava verisi bulunamadı');
+              _showEngagementSnack(
+                  'Retweet zaten yapılmış veya dava verisi bulunamadı');
               return;
             }
             final newCount = retweetSayisi + 1;
@@ -921,20 +1011,23 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           await HiveDatabaseService.toggleDavaLike(davaId, userEmail, true);
           _loadEngagementData();
           setState(() {});
-          _showEngagementSnack(isLiked ? '❤️ Beğeni kaldırıldı' : '❤️ Beğenildi');
+          _showEngagementSnack(
+              isLiked ? '❤️ Beğeni kaldırıldı' : '❤️ Beğenildi');
           break;
         case 'dislike':
           await HiveDatabaseService.toggleDavaLike(davaId, userEmail, false);
           _loadEngagementData();
           setState(() {});
-          _showEngagementSnack(isDisliked ? 'Kına kaldırıldı' : '👎 Kına gönderildi');
+          _showEngagementSnack(
+              isDisliked ? 'Kına kaldırıldı' : '👎 Kına gönderildi');
           break;
         case 'save':
           setState(() => isSaved = !isSaved);
           _showEngagementSnack(isSaved ? '🔖 Kaydedildi' : 'Kayıt kaldırıldı');
           break;
         case 'share':
-          final userAction = HiveDatabaseService.getUserDavaAction(davaId, userEmail);
+          final userAction =
+              HiveDatabaseService.getUserDavaAction(davaId, userEmail);
           if (userAction['sharedAt'] != null) {
             _showEngagementSnack('Bu davayı zaten paylaştınız');
             return;
@@ -1004,50 +1097,52 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     final normalized = CommentUtils.normalizeComments(_yorumlar);
     final canWrite = _canWriteComments;
 
+    final palette = _palette;
     return Material(
-      color: const Color(0xFFF9FAFB),
+      color: palette.surfaceMuted,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+        padding: const EdgeInsets.fromLTRB(
+          SeyirTokens.space3,
+          SeyirTokens.space3,
+          SeyirTokens.space3,
+          SeyirTokens.space3,
+        ),
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+          border: Border(top: BorderSide(color: palette.border)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Icon(Icons.chat_bubble_outline, size: 18, color: Colors.grey.shade700),
-                const SizedBox(width: 8),
+                Icon(Icons.chat_bubble_outline,
+                    size: 18, color: palette.textSecondary),
+                const SizedBox(width: SeyirTokens.space2),
                 Text(
                   'Yorumlar (${CommentUtils.countAllComments(normalized)})',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade800,
-                  ),
+                  style: palette.title(),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: SeyirTokens.space2),
             if (!canWrite)
               Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.only(bottom: SeyirTokens.space2),
                 child: Text(
                   'Yorum yazmak için giriş yapın ve dava kimliğinin yüklü olması gerekir.',
-                  style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                  style: palette.caption(
+                    color: SeyirTokens.warning,
+                    weight: FontWeight.w600,
+                  ),
                 ),
               )
             else ...[
               Text(
                 'Yorum türü',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700,
-                ),
+                style: palette.caption(weight: FontWeight.w700),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: SeyirTokens.space2),
               Row(
                 children: [
                   Expanded(
@@ -1078,28 +1173,25 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     'Yorumunuz "${HiveDatabaseService.gizliTanikDisplayName}" adıyla görünecektir.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade600,
-                      fontStyle: FontStyle.italic,
-                    ),
+                    style: palette.caption(fontStyle: FontStyle.italic),
                   ),
                 ),
-              const SizedBox(height: 10),
+              const SizedBox(height: SeyirTokens.space2),
               TextField(
                 controller: _commentController,
                 focusNode: _commentFocusNode,
                 enabled: canWrite && !_isSendingComment,
+                style: palette.body(),
                 decoration: InputDecoration(
                   hintText: _yorumGizliTanik
                       ? 'Gizli tanık yorumunuzu yazın...'
                       : 'Yorumunuzu yazın...',
                   filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                  fillColor: palette.card,
+                  border: const OutlineInputBorder(
+                    borderRadius: SeyirTokens.radiusMdAll,
                   ),
-                  contentPadding: const EdgeInsets.all(12),
+                  contentPadding: const EdgeInsets.all(SeyirTokens.space3),
                 ),
                 minLines: 2,
                 maxLines: 5,
@@ -1122,20 +1214,11 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 ),
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: SeyirTokens.space3),
             if (normalized.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Text(
-                  'Henüz yorum yok. İlk yorumu sen yaz!',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                ),
+              const SeyirEmptyState(
+                icon: Icons.chat_bubble_outline,
+                message: 'Henüz yorum yok. İlk yorumu sen yaz!',
               )
             else
               ...normalized.map(
@@ -1162,106 +1245,135 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   }
 
   Widget _buildCollapsedHeaderRow({required bool isCollapsed}) {
-    final headerDate = _formatHeaderDate();
+    final palette = _palette;
+    final absolute = _formatHeaderDate();
+    final relative = _formatHeaderRelative();
+    final dateActive = _engagementMenuOpen && isCollapsed;
+    final chips = <Widget>[
+      if (_davaci.isNotEmpty)
+        SeyirMetaChip(icon: Icons.person_outline, label: 'Davacı: $_davaci'),
+      if (_davali.isNotEmpty)
+        SeyirMetaChip(
+            icon: Icons.person_off_outlined, label: 'Davalı: $_davali'),
+      if (_kategori.isNotEmpty)
+        SeyirMetaChip(icon: Icons.category_outlined, label: _kategori),
+    ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(
+        SeyirTokens.space3,
+        SeyirTokens.space2,
+        SeyirTokens.space2,
+        SeyirTokens.space3,
+      ),
       decoration: BoxDecoration(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         border: Border(
           bottom: BorderSide(
-            color: _engagementMenuOpen && isCollapsed
-                ? Colors.transparent
-                : Colors.grey.shade200,
+            color: dateActive ? Colors.transparent : palette.border,
           ),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (headerDate.isNotEmpty)
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(6),
-                onTap: isCollapsed ? _toggleEngagementMenu : null,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _engagementMenuOpen && isCollapsed
-                        ? const Color(0xFFBBF7D0)
-                        : const Color(0xFFE9FFF6),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: _engagementMenuOpen && isCollapsed
-                          ? const Color(0xFF34D399)
-                          : const Color(0xFFBFEFDC),
-                    ),
-                  ),
-                  child: Text(
-                    headerDate,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0C7A54),
-                    ),
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  _headerTitle(),
+                  style: palette.display(),
                 ),
               ),
-            ),
-          if (headerDate.isNotEmpty) const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              _headerTitle(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: Colors.black87,
-                letterSpacing: 0.2,
-              ),
-            ),
+              if (widget.onToggleCollapse != null)
+                IconButton(
+                  tooltip: isCollapsed ? 'Ayrıntıları aç' : 'Ayrıntıları kapat',
+                  onPressed: widget.onToggleCollapse,
+                  icon: Icon(
+                    isCollapsed
+                        ? Icons.keyboard_arrow_down
+                        : Icons.keyboard_arrow_up,
+                    color: isCollapsed
+                        ? palette.textSecondary
+                        : SeyirTokens.brandDeep,
+                  ),
+                )
+              else if (widget.onClose != null)
+                IconButton(
+                  tooltip: 'Kapat',
+                  constraints: const BoxConstraints(
+                    minWidth: SeyirTokens.tapTarget,
+                    minHeight: SeyirTokens.tapTarget,
+                  ),
+                  onPressed: widget.onClose,
+                  icon: Icon(Icons.close, color: palette.textPrimary),
+                ),
+            ],
           ),
-          const SizedBox(width: 8),
-          if (widget.onToggleCollapse != null)
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: widget.onToggleCollapse,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isCollapsed ? const Color(0xFFF3F4F6) : const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isCollapsed ? const Color(0xFFE5E7EB) : const Color(0xFFBBF7D0),
+          if (chips.isNotEmpty) ...[
+            const SizedBox(height: SeyirTokens.space2),
+            Wrap(
+              spacing: SeyirTokens.space2,
+              runSpacing: SeyirTokens.space2,
+              children: chips,
+            ),
+          ],
+          if (absolute.isNotEmpty) ...[
+            const SizedBox(height: SeyirTokens.space2),
+            Tooltip(
+              message: absolute,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: isCollapsed ? _toggleEngagementMenu : null,
+                  borderRadius: SeyirTokens.radiusSmAll,
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: dateActive
+                            ? palette.brandSoft
+                            : palette.surfaceMuted,
+                        borderRadius: SeyirTokens.radiusSmAll,
+                        border: Border.all(
+                          color:
+                              dateActive ? SeyirTokens.brand : palette.border,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SeyirTokens.space3,
+                          vertical: SeyirTokens.space2,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.schedule,
+                              size: 16,
+                              color: palette.foreground(SeyirTokens.brandDeep),
+                            ),
+                            const SizedBox(width: SeyirTokens.space2),
+                            Text(
+                              relative,
+                              style: palette.body(
+                                weight: FontWeight.w800,
+                                color:
+                                    palette.foreground(SeyirTokens.brandDeep),
+                              ),
+                            ),
+                            const SizedBox(width: SeyirTokens.space2),
+                            Text(absolute, style: palette.caption()),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.category_outlined,
-                      size: 12,
-                      color: isCollapsed ? const Color(0xFF6B7280) : const Color(0xFF15803D),
-                    ),
-                    const SizedBox(width: 6),
-                    Icon(
-                      isCollapsed ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
-                      size: 16,
-                      color: isCollapsed ? const Color(0xFF6B7280) : const Color(0xFF15803D),
-                    ),
-                  ],
-                ),
               ),
-            )
-          else if (widget.onClose != null)
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              onPressed: widget.onClose,
-              icon: const Icon(Icons.close, size: 20),
             ),
+          ],
         ],
       ),
     );
@@ -1269,16 +1381,17 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
 
   /// 3×2 eşit grid: Yorum · Retweet · Beğen / Kına · Görüntüleme · Kaydet
   Widget _buildTwitterEngagementRow() {
-    const Color inactiveColor = Color(0xFF71767B);
+    final Color inactiveColor = _palette.textMuted;
 
-    final List<List<_EngagementCellConfig>> grid = <List<_EngagementCellConfig>>[
+    final List<List<_EngagementCellConfig>> grid =
+        <List<_EngagementCellConfig>>[
       <_EngagementCellConfig>[
         _EngagementCellConfig(
           icon: MdiIcons.commentOutline,
           activeIcon: MdiIcons.comment,
           count: yorumSayisi,
           isActive: _showComments || yorumSayisi > 0,
-          activeColor: const Color(0xFF1D9BF0),
+          activeColor: SeyirTokens.engageComment,
           onTap: () => _handleEngagementAction('comment'),
         ),
         _EngagementCellConfig(
@@ -1286,7 +1399,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           activeIcon: MdiIcons.repeat,
           count: retweetSayisi,
           isActive: isRetweeted,
-          activeColor: const Color(0xFF00BA7C),
+          activeColor: SeyirTokens.engageRetweet,
           onTap: () => _handleEngagementAction('retweet'),
         ),
         _EngagementCellConfig(
@@ -1294,7 +1407,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           activeIcon: MdiIcons.heart,
           count: begeniSayisi,
           isActive: isLiked,
-          activeColor: const Color(0xFFF91880),
+          activeColor: SeyirTokens.engageLike,
           onTap: () => _handleEngagementAction('like'),
         ),
       ],
@@ -1304,7 +1417,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           activeIcon: MdiIcons.handWave,
           count: begenmemeSayisi,
           isActive: isDisliked,
-          activeColor: Colors.grey.shade700,
+          activeColor: inactiveColor,
           onTap: () => _handleEngagementAction('dislike'),
         ),
         _EngagementCellConfig(
@@ -1321,7 +1434,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           activeIcon: MdiIcons.bookmark,
           count: 0,
           isActive: isSaved,
-          activeColor: const Color(0xFF7856FF),
+          activeColor: SeyirTokens.engageSave,
           showCount: false,
           onTap: () => _handleEngagementAction('save'),
         ),
@@ -1329,15 +1442,15 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space1),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+        border: Border(bottom: BorderSide(color: _palette.border)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           for (int row = 0; row < grid.length; row++) ...<Widget>[
-            if (row > 0) Divider(height: 1, color: Colors.grey.shade200),
+            if (row > 0) Divider(height: 1, color: _palette.border),
             _buildEngagementGridRow(
               inactiveColor: inactiveColor,
               cells: grid[row],
@@ -1380,8 +1493,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   Widget _buildEngagementRowDivider() {
     return Container(
       width: 1,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      color: Colors.grey.shade200,
+      margin: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
+      color: _palette.border,
     );
   }
 
@@ -1397,41 +1510,16 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     bool alwaysShowCount = false,
     bool expanded = true,
   }) {
-    final Color color = isActive ? activeColor : inactiveColor;
-    final bool displayCount = showCount && (alwaysShowCount || count > 0);
-
-    final Widget content = Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isActive ? activeIcon : icon,
-                  size: 18,
-                  color: color,
-                ),
-                if (displayCount) ...[
-                  const SizedBox(width: 5),
-                  Text(
-                    '$count',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
+    final Widget content = SeyirEngagementButton(
+      icon: icon,
+      activeIcon: activeIcon,
+      count: count,
+      isActive: isActive,
+      activeColor: activeColor,
+      inactiveColor: inactiveColor,
+      showCount: showCount,
+      alwaysShowCount: alwaysShowCount,
+      onTap: onTap,
     );
 
     if (expanded) {
@@ -1443,18 +1531,17 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final palette = _palette;
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      margin: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space2,
+        vertical: SeyirTokens.space2,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: palette.card,
+        borderRadius: SeyirTokens.radiusLgAll,
+        border: Border.all(color: palette.border),
+        boxShadow: palette.cardShadow,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1473,161 +1560,159 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   }
 
   Widget _buildCaseTable() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFFFAFAFA),
-            Color(0xFFF5F5F5),
-          ],
-        ),
+    final palette = _palette;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space4,
+        vertical: SeyirTokens.space3,
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ...caseDetails.asMap().entries.map((entry) {
-              final index = entry.key;
-              final row = entry.value;
-              final label = row["label"]!;
-              final appealParty = label == 'Davacı'
-                  ? 'davaci'
-                  : (label == 'Davalı' ? 'davali' : null);
-              return Padding(
-                padding: EdgeInsets.only(bottom: index < caseDetails.length - 1 ? 12 : 0),
-                child: _buildInfoCard(
-                  label,
-                  row["value"]!,
-                  appealParty: appealParty,
-                ),
-              );
-            }),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.grey[200]!,
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF34dfae).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.description_outlined, // 🎨 GÜNCELLENDİ
-                      color: Color(0xFF34dfae),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _buildDavaDescription(),
-                      style: TextStyle(
-                        color: Colors.grey[800],
-                        fontSize: 13,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildInfoGrid(),
+          const SizedBox(height: SeyirTokens.space4),
+          Container(
+            padding: const EdgeInsets.all(SeyirTokens.space3),
+            decoration: BoxDecoration(
+              color: palette.surfaceMuted,
+              borderRadius: SeyirTokens.radiusMdAll,
+              border: Border.all(color: palette.border),
             ),
-            const SizedBox(height: 20),
-            _buildSectionTitle("Dava Detayları", Icons.gavel),
-            const SizedBox(height: 14),
-            ...expandableItems.asMap().entries.map((entry) {
-              final index = entry.key;
-              final item = entry.value;
-              final style = _sectionStyles[item] ?? const MapEntry(Colors.green, Icons.info_outline);
-              return Padding(
-                padding: EdgeInsets.only(bottom: index < expandableItems.length - 1 ? 8 : 0),
-                child: _buildModernExpansionTile(
-                  item,
-                  style.key,
-                  style.value,
-                  index: index,
-                ),
-              );
-            }),
-            if (_davaKonusu.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _buildCollapsibleSection(
-                title: 'Dava Konusu',
-                color: const Color(0xFF34dfae),
-                icon: Icons.description_outlined,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: _buildDavaKonusuCard(),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
-            _buildCollapsibleSection(
-              title: 'Rol Kararları ve Hükümleri',
-              color: Colors.indigo,
-              icon: Icons.account_balance,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (widget.davaId != null && widget.davaId!.trim().isNotEmpty)
-                  RolHukumKartlariSection(
-                    davaId: widget.davaId,
-                    openedAt: widget.openedAt ?? _openedAt,
-                    userEmail: widget.userEmail,
-                    kullaniciGorev: _kullaniciGorevResolved,
-                    rolHukumleri: _rolHukumleri,
-                    rolSentimentleri: _rolSentimentleri,
-                    rolCezalari: _rolCezalari,
-                    rolMasraflari: _rolMasraflari,
-                    seciliSentiment: _rolSeciliSentiment,
-                    consensusEvaluation: _rolConsensusEvaluation,
-                    consensusLoading: _rolConsensusLoading,
-                    onConsensusRefresh: _canRefreshRolConsensus
-                        ? () {
-                      _loadRolConsensusEvaluation();
-                    }
-                        : null,
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                    child: Text(
-                      'Dava kimliği olmadan rol hükümleri gösterilemez.',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
+                Container(
+                  padding: const EdgeInsets.all(SeyirTokens.space2),
+                  decoration: BoxDecoration(
+                    color: palette.brandSoft,
+                    borderRadius: SeyirTokens.radiusSmAll,
                   ),
+                  child: const Icon(
+                    Icons.description_outlined,
+                    color: SeyirTokens.brandDeep,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: SeyirTokens.space3),
+                Expanded(
+                  child: Text(
+                    _buildDavaDescription(),
+                    style: palette.body(color: palette.textSecondary),
+                  ),
+                ),
               ],
             ),
-
+          ),
+          const SizedBox(height: SeyirTokens.space6),
+          _buildSectionTitle("Dava Detayları", Icons.gavel),
+          const SizedBox(height: SeyirTokens.space3),
+          ...expandableItems.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            final style = _sectionStyles[item] ??
+                const MapEntry(SeyirTokens.brand, Icons.info_outline);
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom:
+                    index < expandableItems.length - 1 ? SeyirTokens.space2 : 0,
+              ),
+              child: _buildModernExpansionTile(
+                item,
+                style.key,
+                style.value,
+                index: index,
+              ),
+            );
+          }),
+          if (_davaKonusu.isNotEmpty) ...[
+            const SizedBox(height: SeyirTokens.space3),
+            _buildCollapsibleSection(
+              title: 'Dava Konusu',
+              color: SeyirTokens.brand,
+              icon: Icons.description_outlined,
+              count: 1,
+              children: [
+                _buildDavaKonusuCard(),
+              ],
+            ),
           ],
-        ),
+          const SizedBox(height: SeyirTokens.space3),
+          _buildCollapsibleSection(
+            title: 'Rol Kararları ve Hükümleri',
+            color: SeyirTokens.sectionVerdict,
+            icon: Icons.account_balance,
+            count: _rolHukumleri.length,
+            children: [
+              if (widget.davaId != null && widget.davaId!.trim().isNotEmpty)
+                RolHukumKartlariSection(
+                  davaId: widget.davaId,
+                  openedAt: widget.openedAt ?? _openedAt,
+                  userEmail: widget.userEmail,
+                  kullaniciGorev: _kullaniciGorevResolved,
+                  rolHukumleri: _rolHukumleri,
+                  rolSentimentleri: _rolSentimentleri,
+                  rolCezalari: _rolCezalari,
+                  rolMasraflari: _rolMasraflari,
+                  seciliSentiment: _rolSeciliSentiment,
+                  consensusEvaluation: _rolConsensusEvaluation,
+                  consensusLoading: _rolConsensusLoading,
+                  onConsensusRefresh: _canRefreshRolConsensus
+                      ? () {
+                          _loadRolConsensusEvaluation();
+                        }
+                      : null,
+                )
+              else
+                const SeyirEmptyState(
+                  icon: Icons.account_balance_outlined,
+                  message: 'Dava kimliği olmadan rol hükümleri gösterilemez.',
+                ),
+            ],
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildInfoGrid() {
+    final tiles = <Widget>[];
+    for (final row in caseDetails) {
+      final label = row['label']!;
+      final appealParty =
+          label == 'Davacı' ? 'davaci' : (label == 'Davalı' ? 'davali' : null);
+      tiles.add(
+        _buildInfoCard(
+          label,
+          row['value']!,
+          appealParty: appealParty,
+        ),
+      );
+    }
+    if (tiles.isEmpty) return const SizedBox.shrink();
+    final rows = <Widget>[];
+    for (var i = 0; i < tiles.length; i += 2) {
+      rows.add(
+        Padding(
+          padding: EdgeInsets.only(
+            bottom: i + 2 < tiles.length ? SeyirTokens.space3 : 0,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: tiles[i]),
+              const SizedBox(width: SeyirTokens.space3),
+              Expanded(
+                child: i + 1 < tiles.length
+                    ? tiles[i + 1]
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Column(children: rows);
   }
 
   /// Davacı tarafının nihai sonucu: true = davacı haklı, false = davalı haklı, null = belirsiz.
@@ -1687,10 +1772,10 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   }
 
   Widget _buildInfoCard(
-      String label,
-      String value, {
-        String? appealParty,
-      }) {
+    String label,
+    String value, {
+    String? appealParty,
+  }) {
     final isDavali = label == 'Davalı';
     final guest = isDavali && _isGuestDisplayValue(value);
 
@@ -1705,14 +1790,20 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
 
       Widget temyizIcon = Icon(
         MdiIcons.scaleBalance,
-        color: canTap ? const Color(0xFF8A5FBF) : Colors.grey.shade400,
-        size: 32,
+        color: canTap ? SeyirTokens.sectionAppeal : _palette.textMuted,
+        size: 28,
       );
       if (canTap) {
         temyizIcon = InkWell(
           onTap: () => _onAppealDoorTapped(appealParty),
-          borderRadius: BorderRadius.circular(8),
-          child: temyizIcon,
+          borderRadius: SeyirTokens.radiusSmAll,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: SeyirTokens.tapTarget,
+              minHeight: SeyirTokens.tapTarget,
+            ),
+            child: Center(child: temyizIcon),
+          ),
         );
       }
 
@@ -1723,10 +1814,11 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: Tooltip(
-                message: appealParty == 'davaci' ? 'Davacı haklı' : 'Davalı haklı',
-                child: Icon(
+                message:
+                    appealParty == 'davaci' ? 'Davacı haklı' : 'Davalı haklı',
+                child: const Icon(
                   Icons.sentiment_satisfied_alt,
-                  color: Colors.green.shade600,
+                  color: SeyirTokens.accept,
                   size: 28,
                 ),
               ),
@@ -1744,90 +1836,21 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       return trailing;
     }
 
-    return Container(
-      padding: const EdgeInsets.all(9),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey[200]!,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF8A5FBF).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              _getInfoCardIcon(label), // 🎨 GÜNCELLENDİ: Dinamik ikon
-              color: const Color(0xFF8A5FBF),
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            label,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          if (guest) ...[
-                            const SizedBox(width: 6),
-                            Tooltip(
-                              message: 'Misafir (üye kaydı yok)',
-                              child: Icon(
-                                Icons.person_off_outlined,
-                                color: Colors.red.shade700,
-                                size: 18,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        value,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF1A1A1A),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 2,
-                      ),
-                    ],
-                  ),
-                ),
-                if (appealParty != null) temyizHakimiTrailing(),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return SeyirInfoTile(
+      icon: _getInfoCardIcon(label),
+      label: label,
+      value: value,
+      labelTrailing: guest
+          ? const Tooltip(
+              message: 'Misafir (üye kaydı yok)',
+              child: Icon(
+                Icons.person_off_outlined,
+                color: SeyirTokens.warning,
+                size: 18,
+              ),
+            )
+          : null,
+      trailing: appealParty != null ? temyizHakimiTrailing() : null,
     );
   }
 
@@ -1947,7 +1970,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(blockReason),
-          backgroundColor: Colors.orange.shade800,
+          backgroundColor: SeyirTokens.warning,
         ),
       );
       return;
@@ -1966,7 +1989,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       messenger.showSnackBar(
         SnackBar(
           content: Text(result.message ?? 'Temyiz talebi kaydedilemedi.'),
-          backgroundColor: Colors.orange.shade800,
+          backgroundColor: SeyirTokens.warning,
         ),
       );
       return;
@@ -1979,7 +2002,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             result.message ??
                 'Temyiz talebi kaydedildi; takipçi bulunamadı. Dava mevcut haliyle sonuçlanır.',
           ),
-          backgroundColor: Colors.orange.shade800,
+          backgroundColor: SeyirTokens.warning,
           duration: const Duration(seconds: 4),
         ),
       );
@@ -1992,7 +2015,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           'Temyiz süreci başlatıldı. '
           '${result.assigneeDisplayName ?? 'Takipçi'} temyiz hakimi olarak görevlendirildi.',
         ),
-        backgroundColor: Colors.green,
+        backgroundColor: SeyirTokens.accept,
         duration: const Duration(seconds: 4),
       ),
     );
@@ -2001,52 +2024,37 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
 
   Widget _buildDavaKonusuCard() {
     return Container(
-      padding: const EdgeInsets.all(14),
+      width: double.infinity,
+      padding: const EdgeInsets.all(SeyirTokens.space3),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFDCE7E1),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: _palette.surfaceMuted,
+        borderRadius: SeyirTokens.radiusMdAll,
+        border: Border.all(color: _palette.border),
       ),
       child: SelectableText(
         _davaKonusu,
-        style: TextStyle(
-          color: Colors.grey[800],
-          fontSize: 13,
-          height: 1.5,
-        ),
+        style: _palette.body(color: _palette.textSecondary),
       ),
     );
   }
 
   Widget _buildSectionTitle(String title, IconData icon) {
+    final palette = _palette;
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(SeyirTokens.space2),
           decoration: BoxDecoration(
-            color: const Color(0xFF34dfae).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(6),
+            color: palette.brandSoft,
+            borderRadius: SeyirTokens.radiusSmAll,
           ),
-          child: Icon(icon, size: 16, color: const Color(0xFF34dfae)),
+          child: Icon(icon, size: 16, color: SeyirTokens.brandDeep),
         ),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1A1A1A),
-            letterSpacing: -0.5,
+        const SizedBox(width: SeyirTokens.space2),
+        Expanded(
+          child: Text(
+            title,
+            style: palette.headline(),
           ),
         ),
       ],
@@ -2058,239 +2066,101 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     required Color color,
     required IconData icon,
     required List<Widget> children,
+    int? count,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey[200]!,
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-          expansionTileTheme: ExpansionTileThemeData(
-            iconColor: color,
-            collapsedIconColor: color,
-            textColor: const Color(0xFF1A1A1A),
-            collapsedTextColor: const Color(0xFF1A1A1A),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            collapsedShape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-        child: ExpansionTile(
-          initiallyExpanded: false,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-          maintainState: true,
-          leading: _buildAnimatedIcon(icon, color),
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              color: Color(0xFF1A1A1A),
-              letterSpacing: -0.2,
-              height: 1.3,
-            ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
-          ),
-          children: children,
-        ),
+    return SeyirSectionCard(
+      title: title,
+      accent: color,
+      icon: icon,
+      badge:
+          count == null ? null : SeyirCountBadge(count: count, accent: color),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
       ),
     );
   }
 
-  Widget _buildModernExpansionTile(String title, Color color, IconData icon, {int index = 0}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey[200]!,
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-            spreadRadius: 0,
-          ),
+  Widget _buildModernExpansionTile(String title, Color color, IconData icon,
+      {int index = 0}) {
+    return SeyirSectionCard(
+      title: title,
+      accent: color,
+      icon: icon,
+      badge: _sectionBadge(title, color),
+      onExpansionChanged: (isExpanded) {
+        if (isExpanded) {
+          if (title == "Davayı Yorumlamayı Kabul ve Red Edenler" &&
+              widget.davaId != null &&
+              widget.davaId!.isNotEmpty) {
+            _loadParticipants();
+          }
+          if (title == "Deliller Hakkında" &&
+              isExpanded &&
+              widget.davaId != null &&
+              widget.davaId!.isNotEmpty) {
+            setState(() {
+              _delillerHakkindaFuture = _loadDelillerHakkindaBundle();
+            });
+          }
+          if ((title == "Uygun Görülen Cezalar" || title == "Ceza Onayı") &&
+              isExpanded &&
+              widget.davaId != null &&
+              widget.davaId!.isNotEmpty) {
+            setState(() {
+              _uygunCezalarFuture = _loadUygunCezalarBundle();
+            });
+          }
+          if ((title == "Uygun Görülen Hediyeler" || title == "Hediye Onayı") &&
+              isExpanded &&
+              widget.davaId != null &&
+              widget.davaId!.isNotEmpty) {
+            setState(() {
+              _hediyelerFuture = _loadHediyelerBundle();
+            });
+          }
+          Future.delayed(const Duration(milliseconds: 250), () {
+            // Scroll işlemi için gerekirse burada yapılabilir
+          });
+        }
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (title == "Davayı Yorumlamayı Kabul ve Red Edenler" &&
+              widget.davaId != null &&
+              widget.davaId!.isNotEmpty)
+            _buildRejectersContent(color)
+          else if (title == "Deliller Hakkında" &&
+              widget.davaId != null &&
+              widget.davaId!.isNotEmpty)
+            _buildDelillerHakkindaContent(color)
+          else if (title == "Uygun Görülen Cezalar" &&
+              widget.davaId != null &&
+              widget.davaId!.isNotEmpty)
+            _buildUygunGorulenCezalarContent(color)
+          else if (title == "Ceza Onayı" &&
+              widget.davaId != null &&
+              widget.davaId!.isNotEmpty)
+            _buildCezaOnayiContent(color)
+          else if (title == "Uygun Görülen Hediyeler" &&
+              widget.davaId != null &&
+              widget.davaId!.isNotEmpty)
+            _buildUygunGorulenHediyelerContent(color)
+          else if (title == "Hediye Onayı" &&
+              widget.davaId != null &&
+              widget.davaId!.isNotEmpty)
+            _buildHediyeOnayiContent(color)
+          else
+            SeyirEmptyState(
+              icon: Icons.info_outline,
+              accent: color,
+              message: title.contains("Kişi")
+                  ? "$title: Henüz yorum yapılmadı."
+                  : "Bu bölüm için içerik yakında eklenecektir.",
+            ),
         ],
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-          expansionTileTheme: ExpansionTileThemeData(
-            iconColor: color,
-            collapsedIconColor: color,
-            textColor: const Color(0xFF1A1A1A),
-            collapsedTextColor: const Color(0xFF1A1A1A),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            collapsedShape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-          maintainState: true,
-          onExpansionChanged: (isExpanded) {
-            if (isExpanded) {
-              if (title == "Davayı Yorumlamayı Kabul ve Red Edenler" && widget.davaId != null && widget.davaId!.isNotEmpty) {
-                _loadParticipants();
-              }
-              if (title == "Deliller Hakkında" &&
-                  isExpanded &&
-                  widget.davaId != null &&
-                  widget.davaId!.isNotEmpty) {
-                setState(() {
-                  _delillerHakkindaFuture = _loadDelillerHakkindaBundle();
-                });
-              }
-              if ((title == "Uygun Görülen Cezalar" || title == "Ceza Onayı") &&
-                  isExpanded &&
-                  widget.davaId != null &&
-                  widget.davaId!.isNotEmpty) {
-                setState(() {
-                  _uygunCezalarFuture = _loadUygunCezalarBundle();
-                });
-              }
-              if ((title == "Uygun Görülen Hediyeler" || title == "Hediye Onayı") &&
-                  isExpanded &&
-                  widget.davaId != null &&
-                  widget.davaId!.isNotEmpty) {
-                setState(() {
-                  _hediyelerFuture = _loadHediyelerBundle();
-                });
-              }
-              Future.delayed(const Duration(milliseconds: 250), () {
-                // Scroll işlemi için gerekirse burada yapılabilir
-              });
-            }
-          },
-          leading: _buildAnimatedIcon(icon, color), // 🎨 GÜNCELLENDİ: Animasyonlu ikon wrapper
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              color: Color(0xFF1A1A1A),
-              letterSpacing: -0.2,
-              height: 1.3,
-            ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
-          ),
-          children: [
-            if (title == "Davayı Yorumlamayı Kabul ve Red Edenler" && widget.davaId != null && widget.davaId!.isNotEmpty)
-              _buildRejectersContent(color)
-            else if (title == "Deliller Hakkında" && widget.davaId != null && widget.davaId!.isNotEmpty)
-              _buildDelillerHakkindaContent(color)
-            else if (title == "Uygun Görülen Cezalar" && widget.davaId != null && widget.davaId!.isNotEmpty)
-              _buildUygunGorulenCezalarContent(color)
-            else if (title == "Ceza Onayı" && widget.davaId != null && widget.davaId!.isNotEmpty)
-              _buildCezaOnayiContent(color)
-            else if (title == "Uygun Görülen Hediyeler" &&
-                widget.davaId != null &&
-                widget.davaId!.isNotEmpty)
-              _buildUygunGorulenHediyelerContent(color)
-            else if (title == "Hediye Onayı" &&
-                widget.davaId != null &&
-                widget.davaId!.isNotEmpty)
-              _buildHediyeOnayiContent(color)
-            else
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 2),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              color.withOpacity(0.06),
-                              color.withOpacity(0.03),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: color.withOpacity(0.2),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: color.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Icon(
-                                Icons.info_outline,
-                                size: 15,
-                                color: color,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                title.contains("Kişi")
-                                    ? "$title: Henüz yorum yapılmadı."
-                                    : "Bu bölüm için içerik yakında eklenecektir.",
-                                style: TextStyle(
-                                  color: color.withOpacity(0.9),
-                                  fontSize: 12.5,
-                                  height: 1.5,
-                                  fontWeight: FontWeight.w500,
-                                  letterSpacing: 0.1,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 🎨 YENİ: Animasyonlu ikon wrapper
-  Widget _buildAnimatedIcon(IconData icon, Color color, {double size = 17}) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: color.withOpacity(0.25),
-          width: 1.2,
-        ),
-      ),
-      child: Icon(icon, size: size, color: color),
     );
   }
 
@@ -2306,18 +2176,18 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white,
-            color.withOpacity(0.03),
+            _palette.card,
+            color.withValues(alpha: 0.03),
           ],
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
         border: Border.all(
-          color: color.withOpacity(0.15),
+          color: color.withValues(alpha: 0.15),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.08),
+            color: color.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -2331,13 +2201,13 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  color.withOpacity(0.1),
-                  color.withOpacity(0.05),
+                  color.withValues(alpha: 0.1),
+                  color.withValues(alpha: 0.05),
                 ],
               ),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
               border: Border.all(
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -2346,8 +2216,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
                   ),
                   child: Icon(
                     Icons.groups_outlined, // 🎨 GÜNCELLENDİ
@@ -2360,8 +2230,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                   child: Text(
                     'Davada Hüküm Vermeyi Kabul ve Red Edenler',
                     style: TextStyle(
-                      color: Colors.grey[900],
-                      fontSize: 15,
+                      color: _palette.textPrimary,
+                      fontSize: SeyirTokens.typeTitle,
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.3,
                     ),
@@ -2371,28 +2241,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             ),
           ),
           const SizedBox(height: 20),
-
           if (_isLoadingRejecters)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  children: [
-                    CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Yükleniyor...',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
+            const SeyirLoadingBlock()
           else ...[
             LayoutBuilder(
               builder: (context, constraints) {
@@ -2439,18 +2289,18 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.red[50]!,
-              Colors.red[50]!.withOpacity(0.5),
+              _palette.tint(SeyirTokens.reject),
+              _palette.tint(SeyirTokens.reject).withValues(alpha: 0.5),
             ],
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
           border: Border.all(
-            color: Colors.red[200]!,
+            color: _palette.tintBorder(SeyirTokens.reject),
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.red.withOpacity(0.1),
+              color: SeyirTokens.reject.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -2462,37 +2312,37 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: _palette.card,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.red.withOpacity(0.2),
+                    color: SeyirTokens.reject.withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.person_remove_outlined, // 🎨 GÜNCELLENDİ
                 size: 36,
-                color: Colors.red[400],
+                color: SeyirTokens.reject,
               ),
             ),
             const SizedBox(height: 16),
             Text(
               'Red Edenler',
               style: TextStyle(
-                color: Colors.red[900],
-                fontSize: 16,
+                color: _palette.foreground(SeyirTokens.reject),
+                fontSize: SeyirTokens.typeHeadline,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               'Henüz red eden yok',
               style: TextStyle(
-                color: Colors.red[600],
-                fontSize: 13,
+                color: SeyirTokens.reject,
+                fontSize: SeyirTokens.typeBody,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -2507,18 +2357,18 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.red[50]!,
-            Colors.red[50]!.withOpacity(0.5),
+            _palette.tint(SeyirTokens.reject),
+            _palette.tint(SeyirTokens.reject).withValues(alpha: 0.5),
           ],
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
         border: Border.all(
-          color: Colors.red[200]!,
+          color: _palette.tintBorder(SeyirTokens.reject),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.red.withOpacity(0.1),
+            color: SeyirTokens.reject.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -2533,17 +2383,17 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.red[100]!,
-                  Colors.red[50]!,
+                  _palette.tint(SeyirTokens.reject),
+                  _palette.tint(SeyirTokens.reject),
                 ],
               ),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
+                topLeft: Radius.circular(SeyirTokens.radiusMd),
+                topRight: Radius.circular(SeyirTokens.radiusMd),
               ),
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.red[300]!,
+                  color: _palette.tintBorder(SeyirTokens.reject),
                   width: 1.5,
                 ),
               ),
@@ -2553,13 +2403,13 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
+                    color: _palette.card,
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.person_remove_outlined, // 🎨 GÜNCELLENDİ
                     size: 18,
-                    color: Colors.red[700],
+                    color: SeyirTokens.reject,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -2567,8 +2417,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                   child: Text(
                     'Red',
                     style: TextStyle(
-                      color: Colors.red[900],
-                      fontSize: 14,
+                      color: _palette.foreground(SeyirTokens.reject),
+                      fontSize: SeyirTokens.typeTitle,
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.2,
                     ),
@@ -2578,16 +2428,17 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.red[700],
-                    borderRadius: BorderRadius.circular(12),
+                    color: SeyirTokens.reject,
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                   ),
                   child: Text(
                     '${normalizedRejecters.length}',
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
+                      color: SeyirTokens.neutral0,
+                      fontSize: SeyirTokens.typeBody,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -2602,15 +2453,19 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 final index = entry.key;
                 final rejecter = entry.value;
                 final email = rejecter['userEmail'] as String? ?? '';
-                final displayName = (rejecter['displayName'] ?? '').toString().isNotEmpty
-                    ? rejecter['displayName'].toString()
-                    : HiveDatabaseService.getRegistrationByEmail(email)?.judgeName ?? email.split('@')[0];
+                final displayName =
+                    (rejecter['displayName'] ?? '').toString().isNotEmpty
+                        ? rejecter['displayName'].toString()
+                        : HiveDatabaseService.getRegistrationByEmail(email)
+                                ?.judgeName ??
+                            email.split('@')[0];
                 final initials = _getInitials(displayName);
                 final settings = HiveDatabaseService.getSettings(email);
                 final profileImageUrl = settings?.profileImageUrl;
 
                 String? rejectedTimeText;
-                final rejectedAt = rejecter['statusUpdatedAt'] ?? rejecter['rejectedAt'] ?? '';
+                final rejectedAt =
+                    rejecter['statusUpdatedAt'] ?? rejecter['rejectedAt'] ?? '';
 
                 if (rejectedAt.isNotEmpty) {
                   try {
@@ -2641,18 +2496,19 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 }
 
                 return Container(
-                  margin: EdgeInsets.only(bottom: index < normalizedRejecters.length - 1 ? 10 : 0),
+                  margin: EdgeInsets.only(
+                      bottom: index < normalizedRejecters.length - 1 ? 10 : 0),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
+                    color: _palette.card,
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                     border: Border.all(
-                      color: Colors.red[300]!,
+                      color: _palette.tintBorder(SeyirTokens.reject),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.red.withOpacity(0.08),
+                        color: SeyirTokens.reject.withValues(alpha: 0.08),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -2662,23 +2518,26 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                     children: [
                       CircleAvatar(
                         radius: 21,
-                        backgroundColor: Colors.red[400],
-                        backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
+                        backgroundColor: SeyirTokens.reject,
+                        backgroundImage: profileImageUrl != null &&
+                                profileImageUrl.isNotEmpty
                             ? NetworkImage(profileImageUrl)
                             : null,
-                        onBackgroundImageError: profileImageUrl != null && profileImageUrl.isNotEmpty
+                        onBackgroundImageError: profileImageUrl != null &&
+                                profileImageUrl.isNotEmpty
                             ? (exception, stackTrace) {}
                             : null,
-                        child: profileImageUrl != null && profileImageUrl.isNotEmpty
+                        child: profileImageUrl != null &&
+                                profileImageUrl.isNotEmpty
                             ? null
                             : Text(
-                          initials,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                                initials,
+                                style: const TextStyle(
+                                  color: SeyirTokens.neutral0,
+                                  fontSize: SeyirTokens.typeTitle,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -2688,8 +2547,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                             Text(
                               displayName,
                               style: TextStyle(
-                                color: Colors.red[900],
-                                fontSize: 14,
+                                color: _palette.foreground(SeyirTokens.reject),
+                                fontSize: SeyirTokens.typeTitle,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: -0.2,
                               ),
@@ -2700,32 +2559,36 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                             Row(
                               children: [
                                 Icon(
-                                  status == 'auto_rejected' ? Icons.timer_outlined : Icons.person_remove_outlined, // 🎨 GÜNCELLENDİ
+                                  status == 'auto_rejected'
+                                      ? Icons.timer_outlined
+                                      : Icons
+                                          .person_remove_outlined, // 🎨 GÜNCELLENDİ
                                   size: 12,
-                                  color: Colors.red[600],
+                                  color: SeyirTokens.reject,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   statusLabel,
-                                  style: TextStyle(
-                                    color: Colors.red[600],
-                                    fontSize: 11,
+                                  style: const TextStyle(
+                                    color: SeyirTokens.reject,
+                                    fontSize: SeyirTokens.typeCaption,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 if (rejectedTimeText != null) ...[
                                   const SizedBox(width: 8),
-                                  Icon(
-                                    Icons.history_toggle_off_outlined, // 🎨 GÜNCELLENDİ
+                                  const Icon(
+                                    Icons
+                                        .history_toggle_off_outlined, // 🎨 GÜNCELLENDİ
                                     size: 12,
-                                    color: Colors.red[400],
+                                    color: SeyirTokens.reject,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     rejectedTimeText,
-                                    style: TextStyle(
-                                      color: Colors.red[400],
-                                      fontSize: 10,
+                                    style: const TextStyle(
+                                      color: SeyirTokens.reject,
+                                      fontSize: SeyirTokens.typeCaption,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -2747,14 +2610,15 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   }
 
   Widget _buildActiveColumn(Color color) {
-    final activeParticipants = _participants
-        .where((participant) {
-      final email = (participant['userEmail']?.toString() ?? '').trim().toLowerCase();
+    final activeParticipants = _participants.where((participant) {
+      final email =
+          (participant['userEmail']?.toString() ?? '').trim().toLowerCase();
       if (email.isEmpty) return false;
       final status = participant['status']?.toString() ?? 'pending';
-      return !(status == 'manual_rejected' || status == 'auto_rejected' || status == 'rejected');
-    })
-        .toList();
+      return !(status == 'manual_rejected' ||
+          status == 'auto_rejected' ||
+          status == 'rejected');
+    }).toList();
 
     if (activeParticipants.isEmpty) {
       return Container(
@@ -2762,18 +2626,18 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.green[50]!,
-              Colors.green[50]!.withOpacity(0.5),
+              _palette.tint(SeyirTokens.accept),
+              _palette.tint(SeyirTokens.accept).withValues(alpha: 0.5),
             ],
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
           border: Border.all(
-            color: Colors.green[200]!,
+            color: _palette.tintBorder(SeyirTokens.accept),
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.green.withOpacity(0.1),
+              color: SeyirTokens.accept.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -2785,37 +2649,37 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: _palette.card,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.green.withOpacity(0.2),
+                    color: SeyirTokens.accept.withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.person_add_outlined, // 🎨 GÜNCELLENDİ
                 size: 36,
-                color: Colors.green[400],
+                color: SeyirTokens.accept,
               ),
             ),
             const SizedBox(height: 16),
             Text(
               'Kabul Edenler',
               style: TextStyle(
-                color: Colors.green[900],
-                fontSize: 16,
+                color: _palette.foreground(SeyirTokens.accept),
+                fontSize: SeyirTokens.typeHeadline,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               'Henüz kabul eden yok',
               style: TextStyle(
-                color: Colors.green[600],
-                fontSize: 13,
+                color: SeyirTokens.accept,
+                fontSize: SeyirTokens.typeBody,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -2830,18 +2694,18 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.green[50]!,
-            Colors.green[50]!.withOpacity(0.5),
+            _palette.tint(SeyirTokens.accept),
+            _palette.tint(SeyirTokens.accept).withValues(alpha: 0.5),
           ],
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
         border: Border.all(
-          color: Colors.green[200]!,
+          color: _palette.tintBorder(SeyirTokens.accept),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.1),
+            color: SeyirTokens.accept.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -2856,17 +2720,17 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.green[100]!,
-                  Colors.green[50]!,
+                  _palette.tint(SeyirTokens.accept),
+                  _palette.tint(SeyirTokens.accept),
                 ],
               ),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
+                topLeft: Radius.circular(SeyirTokens.radiusMd),
+                topRight: Radius.circular(SeyirTokens.radiusMd),
               ),
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.green[300]!,
+                  color: _palette.tintBorder(SeyirTokens.accept),
                   width: 1.5,
                 ),
               ),
@@ -2876,13 +2740,13 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
+                    color: _palette.card,
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.person_add_outlined, // 🎨 GÜNCELLENDİ
                     size: 18,
-                    color: Colors.green[700],
+                    color: SeyirTokens.accept,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -2890,8 +2754,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                   child: Text(
                     'Kabul Edenler',
                     style: TextStyle(
-                      color: Colors.green[900],
-                      fontSize: 14,
+                      color: _palette.foreground(SeyirTokens.accept),
+                      fontSize: SeyirTokens.typeTitle,
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.2,
                     ),
@@ -2901,16 +2765,17 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green[700],
-                    borderRadius: BorderRadius.circular(12),
+                    color: SeyirTokens.accept,
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                   ),
                   child: Text(
                     '${activeParticipants.length}',
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
+                      color: SeyirTokens.neutral0,
+                      fontSize: SeyirTokens.typeBody,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -2926,9 +2791,11 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 final participant = entry.value;
                 final email = participant['userEmail']?.toString() ?? '';
                 final user = HiveDatabaseService.getRegistrationByEmail(email);
-                final displayName = (participant['displayName'] ?? '').toString().isNotEmpty
-                    ? participant['displayName'].toString()
-                    : user?.judgeName ?? (email.contains('@') ? email.split('@')[0] : email);
+                final displayName =
+                    (participant['displayName'] ?? '').toString().isNotEmpty
+                        ? participant['displayName'].toString()
+                        : user?.judgeName ??
+                            (email.contains('@') ? email.split('@')[0] : email);
                 final initials = _getInitials(displayName);
                 final settings = HiveDatabaseService.getSettings(email);
                 final profileImageUrl = settings?.profileImageUrl;
@@ -2936,7 +2803,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 String? acceptedTimeText;
                 final status = participant['status']?.toString() ?? 'pending';
                 if (status == 'accepted') {
-                  final acceptedAtStr = participant['statusUpdatedAt']?.toString();
+                  final acceptedAtStr =
+                      participant['statusUpdatedAt']?.toString();
                   if (acceptedAtStr != null && acceptedAtStr.isNotEmpty) {
                     try {
                       final acceptedDate = DateTime.parse(acceptedAtStr);
@@ -2947,7 +2815,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                       } else if (difference.inHours > 0) {
                         acceptedTimeText = '${difference.inHours} saat önce';
                       } else if (difference.inMinutes > 0) {
-                        acceptedTimeText = '${difference.inMinutes} dakika önce';
+                        acceptedTimeText =
+                            '${difference.inMinutes} dakika önce';
                       } else {
                         acceptedTimeText = 'Az önce';
                       }
@@ -2958,18 +2827,19 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 }
 
                 return Container(
-                  margin: EdgeInsets.only(bottom: index < activeParticipants.length - 1 ? 10 : 0),
+                  margin: EdgeInsets.only(
+                      bottom: index < activeParticipants.length - 1 ? 10 : 0),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
+                    color: _palette.card,
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                     border: Border.all(
-                      color: Colors.green[300]!,
+                      color: _palette.tintBorder(SeyirTokens.accept),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.green.withOpacity(0.08),
+                        color: SeyirTokens.accept.withValues(alpha: 0.08),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -2979,23 +2849,26 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                     children: [
                       CircleAvatar(
                         radius: 21,
-                        backgroundColor: Colors.green[400],
-                        backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
+                        backgroundColor: SeyirTokens.accept,
+                        backgroundImage: profileImageUrl != null &&
+                                profileImageUrl.isNotEmpty
                             ? NetworkImage(profileImageUrl)
                             : null,
-                        onBackgroundImageError: profileImageUrl != null && profileImageUrl.isNotEmpty
+                        onBackgroundImageError: profileImageUrl != null &&
+                                profileImageUrl.isNotEmpty
                             ? (exception, stackTrace) {}
                             : null,
-                        child: profileImageUrl != null && profileImageUrl.isNotEmpty
+                        child: profileImageUrl != null &&
+                                profileImageUrl.isNotEmpty
                             ? null
                             : Text(
-                          initials,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                                initials,
+                                style: const TextStyle(
+                                  color: SeyirTokens.neutral0,
+                                  fontSize: SeyirTokens.typeTitle,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -3005,8 +2878,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                             Text(
                               displayName,
                               style: TextStyle(
-                                color: Colors.green[900],
-                                fontSize: 14,
+                                color: _palette.foreground(SeyirTokens.accept),
+                                fontSize: SeyirTokens.typeTitle,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: -0.2,
                               ),
@@ -3017,17 +2890,24 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                             Row(
                               children: [
                                 Icon(
-                                  status == 'accepted' ? Icons.verified_user_outlined : Icons.pending_actions_outlined, // 🎨 GÜNCELLENDİ
+                                  status == 'accepted'
+                                      ? Icons.verified_user_outlined
+                                      : Icons
+                                          .pending_actions_outlined, // 🎨 GÜNCELLENDİ
                                   size: 12,
-                                  color: status == 'accepted' ? Colors.green[600] : Colors.green[600],
+                                  color: status == 'accepted'
+                                      ? SeyirTokens.accept
+                                      : SeyirTokens.accept,
                                 ),
                                 const SizedBox(width: 4),
                                 Flexible(
                                   child: Text(
-                                    status == 'accepted' ? (acceptedTimeText ?? 'Onaylandı') : 'Beklemede',
-                                    style: TextStyle(
-                                      color: Colors.green[600],
-                                      fontSize: 11,
+                                    status == 'accepted'
+                                        ? (acceptedTimeText ?? 'Onaylandı')
+                                        : 'Beklemede',
+                                    style: const TextStyle(
+                                      color: SeyirTokens.accept,
+                                      fontSize: SeyirTokens.typeCaption,
                                       fontWeight: FontWeight.w500,
                                     ),
                                     overflow: TextOverflow.ellipsis,
@@ -3039,9 +2919,10 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                           ],
                         ),
                       ),
-                      Icon(
-                        Icons.check_circle_outline, // 🎨 GÜNCELLENDİ: Outlined versiyon
-                        color: Colors.green[400],
+                      const Icon(
+                        Icons
+                            .check_circle_outline, // 🎨 GÜNCELLENDİ: Outlined versiyon
+                        color: SeyirTokens.accept,
                         size: 20,
                       ),
                     ],
@@ -3089,32 +2970,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       future: _delillerHakkindaFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.only(bottom: 2),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: <Color>[
-                  color.withOpacity(0.06),
-                  color.withOpacity(0.03),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: color.withOpacity(0.2),
-                width: 1.2,
-              ),
-            ),
-            child: const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              ),
-            ),
-          );
+          return const SeyirLoadingBlock();
         }
         if (snapshot.hasError) {
           return _buildDelillerHakkindaPlaceholder(
@@ -3122,7 +2978,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             'Delil yorumları yüklenirken hata oluştu.',
           );
         }
-        final bundle = snapshot.data ?? const _DelillerHakkindaBundle(evidences: [], comments: []);
+        final bundle = snapshot.data ??
+            const _DelillerHakkindaBundle(evidences: [], comments: []);
         final orderedIds = _orderedEvidenceIds(bundle);
         if (orderedIds.isEmpty) {
           return _buildDelillerHakkindaPlaceholder(
@@ -3135,7 +2992,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: orderedIds.map((evidenceId) {
             final titleText = _evidenceTitleFor(bundle, evidenceId);
-            final byEvidence = bundle.comments.where((c) => c.evidenceId == evidenceId).toList();
+            final byEvidence = bundle.comments
+                .where((c) => c.evidenceId == evidenceId)
+                .toList();
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: _buildOneDelilSection(
@@ -3190,44 +3049,10 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   }
 
   Widget _buildDelillerHakkindaPlaceholder(Color color, String message) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOutCubic,
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(bottom: 2),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            color.withOpacity(0.06),
-            color.withOpacity(0.03),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1.2,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.receipt_long_outlined, size: 15, color: color), // 🎨 GÜNCELLENDİ
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                color: color.withOpacity(0.9),
-                fontSize: 12.5,
-                height: 1.5,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
+    return SeyirEmptyState(
+      icon: Icons.inbox_outlined,
+      message: message,
+      accent: color,
     );
   }
 
@@ -3246,19 +3071,19 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   }
 
   Widget _buildOneDelilSection(
-      Color color, {
-        required String delilTitle,
-        required String evidenceId,
-        required List<EvidenceCommentModel> commentsForEvidence,
-      }) {
+    Color color, {
+    required String delilTitle,
+    required String evidenceId,
+    required List<EvidenceCommentModel> commentsForEvidence,
+  }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        color: _palette.card,
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.06),
+            color: color.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -3272,15 +3097,16 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.insert_drive_file_outlined, size: 18, color: color), // 🎨 GÜNCELLENDİ
+                Icon(Icons.insert_drive_file_outlined,
+                    size: 18, color: color), // 🎨 GÜNCELLENDİ
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     delilTitle,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: SeyirTokens.typeTitle,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[900],
+                      color: _palette.textPrimary,
                     ),
                   ),
                 ),
@@ -3288,8 +3114,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
             ),
             const SizedBox(height: 10),
             ...EvidenceCommentRole.allRoles.map((role) {
-              final roleComments =
-              commentsForEvidence.where((c) => c.userRole == role.value).toList();
+              final roleComments = commentsForEvidence
+                  .where((c) => c.userRole == role.value)
+                  .toList();
               roleComments.sort((a, b) {
                 final da = a.updatedAt ?? a.createdAt;
                 final db = b.updatedAt ?? b.createdAt;
@@ -3302,12 +3129,12 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: roleComments.isEmpty
-                        ? Colors.grey[50]
+                        ? _palette.surfaceMuted
                         : role.color.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                     border: Border.all(
                       color: roleComments.isEmpty
-                          ? Colors.grey[200]!
+                          ? _palette.border
                           : role.color.withValues(alpha: 0.25),
                     ),
                   ),
@@ -3316,13 +3143,14 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                     children: [
                       Row(
                         children: [
-                          Icon(_getRoleIcon(role), size: 16, color: role.color), // 🎨 GÜNCELLENDİ
+                          Icon(_getRoleIcon(role),
+                              size: 16, color: role.color), // 🎨 GÜNCELLENDİ
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               role.label,
                               style: TextStyle(
-                                fontSize: 12.5,
+                                fontSize: SeyirTokens.typeBody,
                                 fontWeight: FontWeight.w700,
                                 color: role.color,
                               ),
@@ -3332,50 +3160,49 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                       ),
                       const SizedBox(height: 6),
                       if (roleComments.isEmpty)
-                        Text(
-                          'Henüz yorum yok',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            fontStyle: FontStyle.italic,
-                          ),
+                        SeyirEmptyState(
+                          icon: Icons.chat_bubble_outline,
+                          message: 'Henüz yorum yok',
+                          accent: role.color,
+                          compact: true,
                         )
                       else
                         ...roleComments.map((c) => Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildDelilCriticismBadge(c.criticism),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _delilCommentDisplayName(c.userEmail),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey[700],
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _buildDelilCriticismBadge(c.criticism),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _delilCommentDisplayName(c.userEmail),
+                                          style: TextStyle(
+                                            fontSize: SeyirTokens.typeCaption,
+                                            color: _palette.textSecondary,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    c.commentText,
+                                    style: TextStyle(
+                                      fontSize: SeyirTokens.typeBody,
+                                      color: _palette.textPrimary,
+                                      height: 1.45,
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                c.commentText,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[900],
-                                  height: 1.45,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )),
+                            )),
                     ],
                   ),
                 ),
@@ -3393,26 +3220,26 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     late final IconData icon;
     switch (criticism) {
       case 'positive':
-        clr = Colors.green;
+        clr = SeyirTokens.accept;
         label = 'Olumlu';
         icon = _getCriticismIcon(criticism); // 🎨 GÜNCELLENDİ
         break;
       case 'negative':
-        clr = Colors.red;
+        clr = SeyirTokens.reject;
         label = 'Olumsuz';
         icon = _getCriticismIcon(criticism); // 🎨 GÜNCELLENDİ
         break;
       default:
-        clr = Colors.grey;
+        clr = _palette.textMuted;
         label = 'Nötr';
         icon = _getCriticismIcon(criticism); // 🎨 GÜNCELLENDİ
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: clr.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: clr.withOpacity(0.3)),
+        color: clr.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
+        border: Border.all(color: clr.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -3422,7 +3249,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
           Text(
             label,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: SeyirTokens.typeCaption,
               fontWeight: FontWeight.w600,
               color: clr,
             ),
@@ -3452,9 +3279,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
   }
 
   Map<String, dynamic>? _findParticipantForRole(
-      List<Map<String, dynamic>> participants,
-      String roleValue,
-      ) {
+    List<Map<String, dynamic>> participants,
+    String roleValue,
+  ) {
     for (final p in participants) {
       final mevki = p['mevkii']?.toString() ?? '';
       if (mevki.isEmpty) continue;
@@ -3486,7 +3313,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     final participants = await HiveDatabaseService.getDavaParticipants(davaId);
     Map<String, String> cezaByEmail =
         await HiveDatabaseService.getCezaMapForDavaId(davaId);
-    final String ad = _davaAdi.isNotEmpty ? _davaAdi : (widget.davaAdi ?? '').trim();
+    final String ad =
+        _davaAdi.isNotEmpty ? _davaAdi : (widget.davaAdi ?? '').trim();
     if (ad.isNotEmpty) {
       final altId = 'dava_${ad.hashCode}';
       if (altId != davaId) {
@@ -3498,17 +3326,20 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     }
     final Map<String, String> votesByEmail =
         await HiveDatabaseService.getCezaOyMapForDavaId(davaId);
-    final bool votingOpen = await CezaConsensusService.isVotingPeriodOpen(davaId);
+    final bool votingOpen =
+        await CezaConsensusService.isVotingPeriodOpen(davaId);
     final bool votingClosed = !votingOpen;
     final List<String> roleValues =
         EvidenceCommentRole.allRoles.map((r) => r.value).toList();
-    final Map<String, String> roleCezaMap = CezaConsensusService.buildRoleCezaMap(
+    final Map<String, String> roleCezaMap =
+        CezaConsensusService.buildRoleCezaMap(
       participants: participants,
       cezaByEmailLower: cezaByEmail,
       roleValues: roleValues,
       roleMatcher: _mevkiiMatchesEvidenceRole,
     );
-    final CezaEffectiveResult effective = CezaConsensusService.resolveEffectiveCeza(
+    final CezaEffectiveResult effective =
+        CezaConsensusService.resolveEffectiveCeza(
       roleCezaMap: roleCezaMap,
       votesByEmail: votesByEmail,
       votingPeriodClosed: votingClosed,
@@ -3525,7 +3356,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     );
   }
 
-  bool _isEmailDavaParticipant(String email, List<Map<String, dynamic>> participants) {
+  bool _isEmailDavaParticipant(
+      String email, List<Map<String, dynamic>> participants) {
     final String e = email.trim().toLowerCase();
     if (e.isEmpty) {
       return false;
@@ -3563,7 +3395,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Ceza oyu yalnızca dava üyeleri tarafından verilebilir.'),
+            content:
+                Text('Ceza oyu yalnızca dava üyeleri tarafından verilebilir.'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -3607,7 +3440,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
 
   Future<_HediyelerBundle> _loadHediyelerBundle() async {
     final davaId = widget.davaId ?? '';
-    final String ad = _davaAdi.isNotEmpty ? _davaAdi : (widget.davaAdi ?? '').trim();
+    final String ad =
+        _davaAdi.isNotEmpty ? _davaAdi : (widget.davaAdi ?? '').trim();
     if (davaId.isEmpty) {
       return const _HediyelerBundle(
         participants: [],
@@ -3630,7 +3464,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     if (ad.isNotEmpty) {
       final altId = 'dava_${ad.hashCode}';
       if (altId != davaId) {
-        final altMap = await HiveDatabaseService.getMasrafGiftLineMapForDavaId(altId);
+        final altMap =
+            await HiveDatabaseService.getMasrafGiftLineMapForDavaId(altId);
         for (final e in altMap.entries) {
           hediyeByEmail.putIfAbsent(e.key, () => e.value);
         }
@@ -3638,15 +3473,18 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     }
     final Map<String, String> votesByEmail =
         await HiveDatabaseService.getHediyeOyMapForDavaId(davaId);
-    final bool votingOpen = await HediyeConsensusService.isVotingPeriodOpen(davaId);
+    final bool votingOpen =
+        await HediyeConsensusService.isVotingPeriodOpen(davaId);
     final List<String> roleValues =
         EvidenceCommentRole.allRoles.map((r) => r.value).toList();
-    final Map<String, String> roleHediyeMap = HediyeConsensusService.buildRoleHediyeMap(
+    final Map<String, String> roleHediyeMap =
+        HediyeConsensusService.buildRoleHediyeMap(
       participants: participants,
       hediyeByEmailLower: hediyeByEmail,
       roleValues: roleValues,
     );
-    final HediyeEffectiveResult effective = HediyeConsensusService.resolveEffectiveHediye(
+    final HediyeEffectiveResult effective =
+        HediyeConsensusService.resolveEffectiveHediye(
       roleHediyeMap: roleHediyeMap,
       votesByEmail: votesByEmail,
       votingPeriodClosed: !votingOpen,
@@ -3686,7 +3524,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Hediye oyu yalnızca dava üyeleri tarafından verilebilir.'),
+            content: Text(
+                'Hediye oyu yalnızca dava üyeleri tarafından verilebilir.'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -3734,32 +3573,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       future: _uygunCezalarFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.only(bottom: 2),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: <Color>[
-                  color.withOpacity(0.06),
-                  color.withOpacity(0.03),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: color.withOpacity(0.2),
-                width: 1.2,
-              ),
-            ),
-            child: const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              ),
-            ),
-          );
+          return const SeyirLoadingBlock();
         }
         if (snapshot.hasError) {
           return _buildDelillerHakkindaPlaceholder(
@@ -3783,9 +3597,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
               votingOpen: true,
             );
         final String voterEmail = widget.userEmail?.trim().toLowerCase() ?? '';
-        final String? userVotedRole = voterEmail.isNotEmpty
-            ? bundle.votesByEmail[voterEmail]
-            : null;
+        final String? userVotedRole =
+            voterEmail.isNotEmpty ? bundle.votesByEmail[voterEmail] : null;
         final roles = EvidenceCommentRole.allRoles;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3798,26 +3611,33 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                   'En çok oy alan ceza, süre sonunda Ceza Onayı\'nda nihai olur. '
                   'Yargıç veya temyiz hakimi atanmışsa cezası geçici önceliklidir; halk oyu bunu değiştirebilir.',
                   style: TextStyle(
-                    fontSize: 11.5,
-                    color: Colors.grey[700],
+                    fontSize: SeyirTokens.typeCaption,
+                    color: _palette.textSecondary,
                     height: 1.4,
                   ),
                 ),
               ),
             ...roles.map((role) {
-              final p = _findParticipantForRole(bundle.participants, role.value);
-              final email = (p?['userEmail']?.toString() ?? '').trim().toLowerCase();
+              final p =
+                  _findParticipantForRole(bundle.participants, role.value);
+              final email =
+                  (p?['userEmail']?.toString() ?? '').trim().toLowerCase();
               String displayName = '—';
               if (p != null) {
                 final dn = (p['displayName'] ?? '').toString().trim();
                 if (dn.isNotEmpty) {
                   displayName = dn;
                 } else if (email.isNotEmpty) {
-                  displayName = HiveDatabaseService.getRegistrationByEmail(email)?.judgeName ??
-                      (email.contains('@') ? email.split('@').first : email);
+                  displayName =
+                      HiveDatabaseService.getRegistrationByEmail(email)
+                              ?.judgeName ??
+                          (email.contains('@')
+                              ? email.split('@').first
+                              : email);
                 }
               }
-              final ceza = email.isNotEmpty ? bundle.cezaByEmailLower[email] : null;
+              final ceza =
+                  email.isNotEmpty ? bundle.cezaByEmailLower[email] : null;
               final bool hasCeza = ceza != null && ceza.trim().isNotEmpty;
               final cezaText = hasCeza
                   ? ceza.trim()
@@ -3825,7 +3645,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                       ? 'Bu göreve atanmış kullanıcı yok.'
                       : 'Henüz ceza seçilmedi (Ceza panelinden mühürleme bekleniyor).');
               final bool userVotedHere = userVotedRole == role.value;
-              final int voteCount = bundle.effective.voteCountsByRole[role.value] ?? 0;
+              final int voteCount =
+                  bundle.effective.voteCountsByRole[role.value] ?? 0;
               final bool canVote = bundle.votingOpen && hasCeza;
 
               return Padding(
@@ -3836,7 +3657,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                     onTap: canVote
                         ? () => _onCezaRoleVote(role: role, bundle: bundle)
                         : null,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -3845,12 +3666,13 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: userVotedHere
-                                ? const Color(0xFFE8F5E9)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
+                                ? _palette.brandSoft
+                                : _palette.card,
+                            borderRadius:
+                                BorderRadius.circular(SeyirTokens.radiusMd),
                             border: Border.all(
                               color: userVotedHere
-                                  ? Colors.green.shade300
+                                  ? SeyirTokens.brand
                                   : role.color.withValues(alpha: 0.28),
                               width: userVotedHere ? 1.5 : 1,
                             ),
@@ -3867,13 +3689,14 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                             children: [
                               Row(
                                 children: [
-                                  Icon(_getRoleIcon(role), size: 16, color: role.color),
+                                  Icon(_getRoleIcon(role),
+                                      size: 16, color: role.color),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       role.label,
                                       style: TextStyle(
-                                        fontSize: 12.5,
+                                        fontSize: SeyirTokens.typeBody,
                                         fontWeight: FontWeight.w700,
                                         color: role.color,
                                       ),
@@ -3886,18 +3709,20 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.green.shade50,
-                                        borderRadius: BorderRadius.circular(8),
+                                        color: _palette.brandSoft,
+                                        borderRadius: BorderRadius.circular(
+                                            SeyirTokens.radiusSm),
                                         border: Border.all(
-                                          color: Colors.green.shade200,
+                                          color: _palette
+                                              .tintBorder(SeyirTokens.brand),
                                         ),
                                       ),
                                       child: Text(
                                         '$voteCount oy',
-                                        style: TextStyle(
-                                          fontSize: 10,
+                                        style: const TextStyle(
+                                          fontSize: SeyirTokens.typeCaption,
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.green.shade800,
+                                          color: SeyirTokens.brandDeep,
                                         ),
                                       ),
                                     ),
@@ -3907,9 +3732,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                               Text(
                                 displayName,
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: SeyirTokens.typeBody,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.grey[800],
+                                  color: _palette.textPrimary,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -3918,10 +3743,12 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                               Text(
                                 cezaText,
                                 style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: Colors.grey[900],
+                                  fontSize: SeyirTokens.typeBody,
+                                  color: _palette.textPrimary,
                                   height: 1.45,
-                                  fontStyle: hasCeza ? FontStyle.italic : FontStyle.normal,
+                                  fontStyle: hasCeza
+                                      ? FontStyle.italic
+                                      : FontStyle.normal,
                                 ),
                               ),
                             ],
@@ -3934,14 +3761,14 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
-                                color: Colors.green.shade100,
+                                color: _palette.brandSoft,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.green.shade400),
+                                border: Border.all(color: SeyirTokens.brand),
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 MdiIcons.gavel,
                                 size: 16,
-                                color: Colors.green.shade800,
+                                color: SeyirTokens.brandDeep,
                               ),
                             ),
                           ),
@@ -3963,29 +3790,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       future: _uygunCezalarFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.only(bottom: 2),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: <Color>[
-                  color.withOpacity(0.06),
-                  color.withOpacity(0.03),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: color.withOpacity(0.2), width: 1.2),
-            ),
-            child: const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              ),
-            ),
-          );
+          return const SeyirLoadingBlock();
         }
         if (snapshot.hasError) {
           return _buildDelillerHakkindaPlaceholder(
@@ -4017,12 +3822,13 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                color.withOpacity(0.08),
-                color.withOpacity(0.03),
+                color.withValues(alpha: 0.08),
+                color.withValues(alpha: 0.03),
               ],
             ),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withOpacity(0.25), width: 1.2),
+            borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+            border:
+                Border.all(color: color.withValues(alpha: 0.25), width: 1.2),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -4033,9 +3839,11 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      votingOpen ? 'Geçerli ceza (oylama sürüyor)' : 'Nihai ceza',
+                      votingOpen
+                          ? 'Geçerli ceza (oylama sürüyor)'
+                          : 'Nihai ceza',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: SeyirTokens.typeBody,
                         fontWeight: FontWeight.w700,
                         color: color,
                       ),
@@ -4048,7 +3856,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 Text(
                   'Kaynak: $sourceLabel'
                   '${effective.sourceRole != null ? ' (${effective.sourceRole})' : ''}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  style: TextStyle(
+                      fontSize: SeyirTokens.typeCaption,
+                      color: _palette.textSecondary),
                 ),
               ],
               const SizedBox(height: 10),
@@ -4060,8 +3870,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                             'yargıç veya temyiz hakimi atanmışsa cezası geçici olarak burada görünür.'
                         : '19 gün sona erdi; oy verilmiş veya yargıç/temyiz cezası bulunan bir karar yok.'),
                 style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[900],
+                  fontSize: SeyirTokens.typeBody,
+                  color: _palette.textPrimary,
                   height: 1.5,
                   fontStyle: hasCeza ? FontStyle.italic : FontStyle.normal,
                   fontWeight: hasCeza ? FontWeight.w500 : FontWeight.normal,
@@ -4071,7 +3881,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 const SizedBox(height: 8),
                 Text(
                   '19 günlük oylama tamamlandı; yukarıdaki ceza nihai olarak onaylanır.',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  style: TextStyle(
+                      fontSize: SeyirTokens.typeCaption,
+                      color: _palette.textSecondary),
                 ),
               ],
             ],
@@ -4087,32 +3899,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       future: _hediyelerFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.only(bottom: 2),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: <Color>[
-                  color.withOpacity(0.06),
-                  color.withOpacity(0.03),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: color.withOpacity(0.2),
-                width: 1.2,
-              ),
-            ),
-            child: const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              ),
-            ),
-          );
+          return const SeyirLoadingBlock();
         }
         if (snapshot.hasError) {
           return _buildDelillerHakkindaPlaceholder(
@@ -4136,9 +3923,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
               votingOpen: true,
             );
         final String voterEmail = widget.userEmail?.trim().toLowerCase() ?? '';
-        final String? userVotedRole = voterEmail.isNotEmpty
-            ? bundle.votesByEmail[voterEmail]
-            : null;
+        final String? userVotedRole =
+            voterEmail.isNotEmpty ? bundle.votesByEmail[voterEmail] : null;
         final roles = EvidenceCommentRole.allRoles;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4151,27 +3937,34 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                   'En çok oy alan hediye, süre sonunda Hediye Onayı bölümünde nihai olur. '
                   'Yargıç veya temyiz hakimi atanmışsa hediyesi geçici önceliklidir; halk oyu bunu değiştirebilir.',
                   style: TextStyle(
-                    fontSize: 11.5,
-                    color: Colors.grey[700],
+                    fontSize: SeyirTokens.typeCaption,
+                    color: _palette.textSecondary,
                     height: 1.4,
                   ),
                 ),
               ),
             ...roles.map((role) {
-              final p = _findParticipantForRole(bundle.participants, role.value);
-              final email = (p?['userEmail']?.toString() ?? '').trim().toLowerCase();
+              final p =
+                  _findParticipantForRole(bundle.participants, role.value);
+              final email =
+                  (p?['userEmail']?.toString() ?? '').trim().toLowerCase();
               String displayName = '—';
               if (p != null) {
                 final dn = (p['displayName'] ?? '').toString().trim();
                 if (dn.isNotEmpty) {
                   displayName = dn;
                 } else if (email.isNotEmpty) {
-                  displayName = HiveDatabaseService.getRegistrationByEmail(email)?.judgeName ??
-                      (email.contains('@') ? email.split('@').first : email);
+                  displayName =
+                      HiveDatabaseService.getRegistrationByEmail(email)
+                              ?.judgeName ??
+                          (email.contains('@')
+                              ? email.split('@').first
+                              : email);
                 }
               }
-              final hediyeSatir =
-                  email.isNotEmpty ? bundle.hediyeSatirByEmailLower[email] : null;
+              final hediyeSatir = email.isNotEmpty
+                  ? bundle.hediyeSatirByEmailLower[email]
+                  : null;
               final bool hasHediye =
                   hediyeSatir != null && hediyeSatir.trim().isNotEmpty;
               final hediyeText = hasHediye
@@ -4192,7 +3985,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                     onTap: canVote
                         ? () => _onHediyeRoleVote(role: role, bundle: bundle)
                         : null,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -4201,12 +3994,13 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: userVotedHere
-                                ? const Color(0xFFE8F5E9)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
+                                ? _palette.brandSoft
+                                : _palette.card,
+                            borderRadius:
+                                BorderRadius.circular(SeyirTokens.radiusMd),
                             border: Border.all(
                               color: userVotedHere
-                                  ? Colors.green.shade300
+                                  ? SeyirTokens.brand
                                   : role.color.withValues(alpha: 0.28),
                               width: userVotedHere ? 1.5 : 1,
                             ),
@@ -4230,7 +4024,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                                     child: Text(
                                       role.label,
                                       style: TextStyle(
-                                        fontSize: 12.5,
+                                        fontSize: SeyirTokens.typeBody,
                                         fontWeight: FontWeight.w700,
                                         color: role.color,
                                       ),
@@ -4243,18 +4037,21 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.pink.shade50,
-                                        borderRadius: BorderRadius.circular(8),
+                                        color: _palette
+                                            .tint(SeyirTokens.sectionGift),
+                                        borderRadius: BorderRadius.circular(
+                                            SeyirTokens.radiusSm),
                                         border: Border.all(
-                                          color: Colors.pink.shade200,
+                                          color: _palette.tintBorder(
+                                              SeyirTokens.sectionGift),
                                         ),
                                       ),
                                       child: Text(
                                         '$voteCount oy',
-                                        style: TextStyle(
-                                          fontSize: 10,
+                                        style: const TextStyle(
+                                          fontSize: SeyirTokens.typeCaption,
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.pink.shade800,
+                                          color: SeyirTokens.sectionGift,
                                         ),
                                       ),
                                     ),
@@ -4264,9 +4061,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                               Text(
                                 displayName,
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: SeyirTokens.typeBody,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.grey[800],
+                                  color: _palette.textPrimary,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -4275,11 +4072,12 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                               Text(
                                 hediyeText,
                                 style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: Colors.grey[900],
+                                  fontSize: SeyirTokens.typeBody,
+                                  color: _palette.textPrimary,
                                   height: 1.45,
-                                  fontStyle:
-                                      hasHediye ? FontStyle.italic : FontStyle.normal,
+                                  fontStyle: hasHediye
+                                      ? FontStyle.italic
+                                      : FontStyle.normal,
                                 ),
                               ),
                             ],
@@ -4292,14 +4090,15 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
-                                color: Colors.pink.shade100,
+                                color: _palette.tint(SeyirTokens.sectionGift),
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.pink.shade400),
+                                border:
+                                    Border.all(color: SeyirTokens.sectionGift),
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.card_giftcard,
                                 size: 16,
-                                color: Colors.pink.shade800,
+                                color: SeyirTokens.sectionGift,
                               ),
                             ),
                           ),
@@ -4321,29 +4120,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
       future: _hediyelerFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.only(bottom: 2),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: <Color>[
-                  color.withOpacity(0.06),
-                  color.withOpacity(0.03),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: color.withOpacity(0.2), width: 1.2),
-            ),
-            child: const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              ),
-            ),
-          );
+          return const SeyirLoadingBlock();
         }
         if (snapshot.hasError) {
           return _buildDelillerHakkindaPlaceholder(
@@ -4361,7 +4138,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
               votingPeriodClosed: false,
             );
         final String? hediyeText = effective.hediyeText;
-        final bool hasHediye = hediyeText != null && hediyeText.trim().isNotEmpty;
+        final bool hasHediye =
+            hediyeText != null && hediyeText.trim().isNotEmpty;
         final String sourceLabel = effective.sourceLabel();
         final bool votingOpen = bundle?.votingOpen ?? true;
 
@@ -4375,12 +4153,13 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                color.withOpacity(0.08),
-                color.withOpacity(0.03),
+                color.withValues(alpha: 0.08),
+                color.withValues(alpha: 0.03),
               ],
             ),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withOpacity(0.25), width: 1.2),
+            borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+            border:
+                Border.all(color: color.withValues(alpha: 0.25), width: 1.2),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -4395,7 +4174,7 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                           ? 'Geçerli hediye (oylama sürüyor)'
                           : 'Nihai hediye',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: SeyirTokens.typeBody,
                         fontWeight: FontWeight.w700,
                         color: color,
                       ),
@@ -4408,7 +4187,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 Text(
                   'Kaynak: $sourceLabel'
                   '${effective.sourceRole != null ? ' (${effective.sourceRole})' : ''}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  style: TextStyle(
+                      fontSize: SeyirTokens.typeCaption,
+                      color: _palette.textSecondary),
                 ),
               ],
               const SizedBox(height: 10),
@@ -4420,8 +4201,8 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                             'yargıç veya temyiz hakimi atanmışsa hediyesi geçici olarak burada görünür.'
                         : '19 gün sona erdi; oy verilmiş veya yargıç/temyiz hediyesi bulunan bir karar yok.'),
                 style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[900],
+                  fontSize: SeyirTokens.typeBody,
+                  color: _palette.textPrimary,
                   height: 1.5,
                   fontStyle: hasHediye ? FontStyle.italic : FontStyle.normal,
                   fontWeight: hasHediye ? FontWeight.w500 : FontWeight.normal,
@@ -4431,7 +4212,9 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
                 const SizedBox(height: 8),
                 Text(
                   '19 günlük oylama tamamlandı; yukarıdaki hediye nihai olarak onaylanır.',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  style: TextStyle(
+                      fontSize: SeyirTokens.typeCaption,
+                      color: _palette.textSecondary),
                 ),
               ],
             ],
@@ -4441,4 +4224,3 @@ class _IlgililerinSeyirDefteriWidgetiState extends State<IlgililerinSeyirDefteri
     );
   }
 }
-
