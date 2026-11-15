@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -18,9 +19,16 @@ import 'package:its19/widgets/common_header_widgets.dart';
 import 'package:provider/provider.dart';
 
 /// Dava Aç formunun dolu hali. DAVAAC_SHOT_DIR set ise
-/// `davaac2-<phase>-<brightness>.png` yazar. phase: before | after.
+/// `davaac3-after-*.png` yazar (seçili davalı, fotoğrafsız; ayrıca davacı fotoğraflı).
 const _shotFont = 'DavaAcShot';
 const _email = 'ayse.demir@example.com';
+const _davaliEmail = 'mehmet.kaya@example.com';
+const _silhouetteAsset = 'lib/icons/07_profil_picture_davaci.png';
+const _davaciPhotoAsset = 'lib/icons/03_davala_ana_icon.png';
+
+String? _gavelDataUrlCache;
+String get _gavelDataUrl => _gavelDataUrlCache ??=
+    'data:image/png;base64,${base64Encode(File(_davaciPhotoAsset).readAsBytesSync())}';
 
 String? _packageRoot(String name) {
   final config = File('.dart_tool/package_config.json');
@@ -90,6 +98,20 @@ String get _konu {
   return (sentence * 8).trim();
 }
 
+Future<void> _setProfilePhoto(String email, String? url) async {
+  final existing = await HiveDatabaseService.getOrCreateSettings(email);
+  await HiveDatabaseService.saveSettings(
+    SettingsModel(
+      userEmail: email,
+      privacySettings: Map<String, bool>.from(existing.privacySettings),
+      stringSettings: Map<String, String>.from(existing.stringSettings),
+      profileImageUrl: url,
+    ),
+  );
+}
+
+Future<void> _setDavaciPhoto(String? url) => _setProfilePhoto(_email, url);
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -125,13 +147,34 @@ void main() {
         ),
       );
     }
+    if (HiveDatabaseService.getRegistrationByEmail(_davaliEmail) == null) {
+      await HiveDatabaseService.addRegistration(
+        RegistrationModel(
+          id: 'shot-mehmet',
+          judgeName: 'Mehmet Kaya',
+          email: _davaliEmail,
+          password: 'shot',
+          country: 'Türkiye',
+          oath: true,
+          createdAt: DateTime(2024, 1, 2),
+          lastLoginAt: DateTime(2024, 6, 2),
+        ),
+      );
+    }
+    await _setDavaciPhoto(null);
+    await _setProfilePhoto(_davaliEmail, null);
   });
 
   Future<void> pumpForm(
     WidgetTester tester,
     ThemeData theme, {
     required bool collapsed,
+    bool davaciPhoto = false,
   }) async {
+    await tester.runAsync(() async {
+      await _setDavaciPhoto(davaciPhoto ? _gavelDataUrl : null);
+      await _setProfilePhoto(_davaliEmail, null);
+    });
     tester.view.physicalSize = const Size(420, 1080);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -171,10 +214,52 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  Future<void> saveShot(WidgetTester tester, String brightness) async {
+  Future<void> awaitImages(WidgetTester tester) async {
+    final context = tester.element(find.byType(MaterialApp));
+    final providers = <ImageProvider<Object>>{
+      const AssetImage(_silhouetteAsset),
+      const AssetImage(_davaciPhotoAsset),
+    };
+    for (final avatar in tester.widgetList<CircleAvatar>(find.byType(CircleAvatar))) {
+      final image = avatar.backgroundImage;
+      if (image != null) providers.add(image);
+    }
+    for (final image in tester.widgetList<Image>(find.byType(Image))) {
+      providers.add(image.image);
+    }
+    await tester.runAsync(() async {
+      for (final provider in providers) {
+        await precacheImage(provider, context);
+      }
+      final pending = <Future<void>>[];
+      for (final element in find.byType(Image).evaluate()) {
+        final image = element.widget as Image;
+        final stream = image.image.resolve(createLocalImageConfiguration(element));
+        final done = Completer<void>();
+        late ImageStreamListener listener;
+        listener = ImageStreamListener(
+          (ImageInfo _, bool __) {
+            stream.removeListener(listener);
+            if (!done.isCompleted) done.complete();
+          },
+          onError: (Object _, StackTrace? __) {
+            stream.removeListener(listener);
+            if (!done.isCompleted) done.complete();
+          },
+        );
+        stream.addListener(listener);
+        pending.add(done.future);
+      }
+      await Future.wait(pending);
+    });
+    await tester.pump();
+    await tester.pump();
+  }
+
+  Future<void> saveShot(WidgetTester tester, String filename) async {
     final dir = Platform.environment['DAVAAC_SHOT_DIR'];
-    final phase = Platform.environment['DAVAAC_SHOT_PHASE'];
-    if (dir == null || dir.isEmpty || phase == null || phase.isEmpty) return;
+    if (dir == null || dir.isEmpty) return;
+    await awaitImages(tester);
     final boundary = tester.renderObject<RenderRepaintBoundary>(
       find.byKey(const Key('dava-ac-shot')),
     );
@@ -183,16 +268,29 @@ void main() {
       final data = await image.toByteData(format: ui.ImageByteFormat.png);
       return data!.buffer.asUint8List();
     });
-    final file = File('$dir/davaac2-$phase-$brightness.png');
+    final file = File('$dir/$filename');
     file.parent.createSync(recursive: true);
     file.writeAsBytesSync(bytes!);
+  }
+
+  Finder assetImage(String asset) {
+    return find.byWidgetPredicate((widget) {
+      if (widget is! Image) return false;
+      final provider = widget.image;
+      return provider is AssetImage && provider.assetName == asset;
+    });
   }
 
   void expectFilledForm(WidgetTester tester) {
     expect(find.text('Dava Aç'), findsOneWidget);
     expect(find.text('Dava  Aç '), findsNothing);
     expect(find.text('Ayşe Demir'), findsWidgets);
-    expect(find.text('A'), findsOneWidget);
+    expect(find.text('A'), findsNothing);
+    expect(assetImage(_silhouetteAsset), findsNWidgets(2));
+    expect(
+      tester.widgetList<CircleAvatar>(find.byType(CircleAvatar)).where((avatar) => avatar.radius == 22),
+      hasLength(2),
+    );
     expect(find.text('DAVALA'), findsOneWidget);
     expect(find.text('Gece gürültüsü'), findsWidgets);
     expect(find.text('Mehmet Kaya'), findsOneWidget);
@@ -228,13 +326,13 @@ void main() {
   testWidgets('expanded filled form light', (tester) async {
     await pumpForm(tester, _shotTheme(Brightness.light), collapsed: false);
     expectFilledForm(tester);
-    await saveShot(tester, 'light');
+    await saveShot(tester, 'davaac3-after-light.png');
   });
 
   testWidgets('expanded filled form dark', (tester) async {
     await pumpForm(tester, _shotTheme(Brightness.dark), collapsed: false);
     expectFilledForm(tester);
-    await saveShot(tester, 'dark');
+    await saveShot(tester, 'davaac3-after-dark.png');
   });
 
   testWidgets('collapsed header uses the page title', (tester) async {
@@ -263,12 +361,10 @@ void main() {
     );
   });
 
-  testWidgets('profile photo replaces the initial', (tester) async {
+  testWidgets('profile photo replaces the silhouette', (tester) async {
     await tester.runAsync(() async {
-      await HiveDatabaseService.updateProfileInfo(
-        _email,
-        profileImageUrl: 'lib/icons/03_davala_ana_icon.png',
-      );
+      await _setDavaciPhoto(_davaciPhotoAsset);
+      await _setProfilePhoto(_davaliEmail, null);
     });
     tester.view.physicalSize = const Size(420, 900);
     tester.view.devicePixelRatio = 1;
@@ -277,9 +373,11 @@ void main() {
     final davaAdi = TextEditingController(text: 'Gece gürültüsü');
     final davali = TextEditingController(text: 'Mehmet Kaya');
     final detay = TextEditingController(text: _konu);
+    final focus = FocusNode();
     addTearDown(davaAdi.dispose);
     addTearDown(davali.dispose);
     addTearDown(detay.dispose);
+    addTearDown(focus.dispose);
     await tester.pumpWidget(
       MaterialApp(
         theme: _shotTheme(Brightness.light),
@@ -291,7 +389,7 @@ void main() {
               davali: 'Mehmet Kaya',
               mevkii: 'Davalı',
               kalanSure: '.../.../.....',
-              profilResmi: 'lib/icons/03_davala_ana_icon.png',
+              profilResmi: _davaciPhotoAsset,
               davaKonusu: _konu,
               davaKategorisi: 'Komşuluk > Gürültü',
               davaci: 'Ayşe Demir',
@@ -313,7 +411,7 @@ void main() {
             davaAdiErrorText: null,
             showDavaliError: false,
             davaliErrorText: null,
-            davaliFocusNode: FocusNode(),
+            davaliFocusNode: focus,
           ),
         ),
       ),
@@ -321,6 +419,24 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('A'), findsNothing);
-    expect(find.byType(Image), findsWidgets);
+    expect(assetImage(_davaciPhotoAsset), findsOneWidget);
+    expect(assetImage(_silhouetteAsset), findsOneWidget);
+  });
+
+  testWidgets('expanded form with davacı photo', (tester) async {
+    await pumpForm(
+      tester,
+      _shotTheme(Brightness.light),
+      collapsed: false,
+      davaciPhoto: true,
+    );
+    expect(find.text('A'), findsNothing);
+    expect(find.text('Mehmet Kaya'), findsOneWidget);
+    expect(assetImage(_silhouetteAsset), findsOneWidget);
+    expect(
+      find.byWidgetPredicate((widget) => widget is Image && widget.image is MemoryImage),
+      findsOneWidget,
+    );
+    await saveShot(tester, 'davaac3-after-photo-light.png');
   });
 }
