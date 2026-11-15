@@ -1,9 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../screens/delil_ekle_page.dart';
 import '../services/hive_database_service.dart';
-import '../utils/app_theme.dart';
+import '../theme/seyir_tokens.dart';
 import 'modern_dava_form_widgets.dart';
 
 // Eski Dava modeli
@@ -31,6 +33,61 @@ class Dava {
     this.davaci = '', // Varsayılan boş değer
     this.isOpened = false,
   });
+}
+
+/// Varsayılan silüet bir profil fotoğrafı sayılmaz.
+const String _placeholderProfileAsset = 'lib/icons/07_profil_picture_davaci.png';
+
+class _DavaciFace {
+  const _DavaciFace({required this.name, this.image});
+
+  final String name;
+  final ImageProvider<Object>? image;
+}
+
+/// Açık temada mevcut gri/beyaz yüzeyler, koyu temada [SeyirPalette].
+class _CaseTone {
+  const _CaseTone(this.palette);
+
+  final SeyirPalette palette;
+
+  bool get dark => palette.isDark;
+
+  Color get sectionFill => dark ? palette.surfaceMuted : const Color(0xFFFAFAFA);
+  Color get sectionBorder => dark ? palette.border : const Color(0xFFEEEEEE);
+  Color get label => dark ? palette.textSecondary : const Color(0xFF9E9E9E);
+  Color get field => dark ? palette.card : const Color(0xFFFFFFFF);
+  Color get fieldMuted => dark ? palette.surfaceMuted : const Color(0xFFFAFAFA);
+  Color get fieldBorder => dark ? palette.border : const Color(0xFFE0E0E0);
+  Color get fieldBorderStrong => dark ? palette.border : const Color(0xFFBDBDBD);
+  Color get ink => dark ? palette.textPrimary : const Color(0xDD000000);
+  Color get inkMuted => dark ? palette.textSecondary : const Color(0xFF757575);
+  Color get hint => dark ? palette.textMuted : const Color(0xFF9E9E9E);
+  Color get hintFaint => dark ? palette.textMuted : const Color(0xFFBDBDBD);
+  Color get title => dark ? palette.textPrimary : const Color(0xFF424242);
+  Color get body => dark ? palette.textPrimary : const Color(0xFF1A1A1A);
+  Color get focus => dark ? SeyirTokens.brand : const Color(0xFF059669);
+  Color get suggestion => dark ? palette.card : const Color(0xFFFFFFFF);
+  Color get disabledFill => dark ? palette.surfaceMuted : const Color(0xFFF5F5F5);
+  Color get counterMuted => dark ? palette.textMuted : const Color(0xFF9CA3AF);
+  Color get davalaOffBg => dark ? palette.surfaceMuted : SeyirTokens.neutral200;
+  Color get davalaOffFg => dark ? palette.textPrimary : SeyirTokens.neutral700;
+  Color get saveIcon => dark ? palette.textPrimary : const Color(0xFF455A64);
+  Color get saveBg =>
+      dark ? palette.surfaceMuted : const Color(0xFF455A64).withValues(alpha: 0.10);
+  Color get addIcon => dark ? SeyirTokens.brand : const Color(0xFF1976D2);
+  Color get addBg => dark ? palette.brandSoft : const Color(0xFF1976D2).withValues(alpha: 0.10);
+  Color get iconOff => palette.textSecondary;
+  Color get iconOffBg => dark ? palette.surfaceMuted : const Color(0xFF9E9E9E).withValues(alpha: 0.16);
+
+  static const TextStyle labelStyleBase = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.bold,
+  );
+
+  TextStyle labelStyle() => labelStyleBase.copyWith(color: label);
+
+  static const double labelWidth = 76;
 }
 
 class FiveCardCaseInformation extends StatelessWidget {
@@ -83,6 +140,7 @@ class FiveCardCaseInformation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tone = _CaseTone(SeyirPalette.of(context));
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -100,38 +158,24 @@ class FiveCardCaseInformation extends StatelessWidget {
               Center(
                 child: CircleAvatar(
                   radius: 22,
-                  backgroundColor: Colors.grey[100],
-                  child: userEmail != null
-                      ? FutureBuilder<String?>(
-                    future: _getUserProfileImage(userEmail!),
+                  backgroundColor: tone.palette.brandSoft,
+                  child: FutureBuilder<_DavaciFace>(
+                    future: _loadDavaciFace(userEmail),
                     builder: (context, snapshot) {
-                      if (snapshot.hasData && snapshot.data != null) {
-                        return Image.asset(
-                          snapshot.data!,
-                          width: 36,
-                          height: 36,
+                      final face = snapshot.data;
+                      final name = (face?.name ?? dava.davaci).trim();
+                      final image = face?.image;
+                      if (image != null) {
+                        return Image(
+                          image: image,
+                          width: 44,
+                          height: 44,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Image.asset(
-                            'lib/icons/07_profil_picture_davaci.png',
-                            width: 36,
-                            height: 36,
-                            fit: BoxFit.cover,
-                          ),
+                          errorBuilder: (_, __, ___) => _avatarLetter(name, tone),
                         );
                       }
-                      return Image.asset(
-                        'lib/icons/07_profil_picture_davaci.png',
-                        width: 36,
-                        height: 36,
-                        fit: BoxFit.cover,
-                      );
+                      return _avatarLetter(name, tone);
                     },
-                  )
-                      : Image.asset(
-                    'lib/icons/07_profil_picture_davaci.png',
-                    width: 36,
-                    height: 36,
-                    fit: BoxFit.cover,
                   ),
                 ),
               ),
@@ -141,29 +185,29 @@ class FiveCardCaseInformation extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
+                  color: tone.sectionFill,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[200]!, width: 1),
+                  border: Border.all(color: tone.sectionBorder, width: 1),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // 1. Davacı
-                    _buildDavaciRow(),
+                    _buildDavaciRow(context),
                     const SizedBox(height: 10),
                     // 2. Dava Adı
-                    _buildInfoRow('Dava Adı', dava.adi, true),
+                    _buildInfoRow(context, 'Dava Adı', dava.adi, true),
                     const SizedBox(height: 10),
                     // 3. Davalı
-                    _buildDavaliRow(),
+                    _buildDavaliRow(context),
                     const SizedBox(height: 10),
                     // 4. Kategori (sadece metin, input değil)
                     if (dava.davaKategorisi.isNotEmpty) ...[
-                      _buildKategoriRow(dava.davaKategorisi),
+                      _buildKategoriRow(context, dava.davaKategorisi),
                       const SizedBox(height: 10),
                     ],
                     // Dava Açılış Tarihi — sadece dava açıldıysa
-                    if (dava.isOpened) _buildInfoRow('Dava Açılış Tarihi', dava.kalanSure, false),
+                    if (dava.isOpened) _buildInfoRow(context, 'Dava Açılış Tarihi', dava.kalanSure, false),
                   ],
                 ),
               ),
@@ -185,40 +229,61 @@ class FiveCardCaseInformation extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
+                            color: tone.title,
                           ),
                         ),
                       ),
-                      TextField(
-                        controller: davaDetayController,
-                        maxLines: 16,
-                        maxLength: 77401,
-                        enabled: !dava.isOpened,
-                        decoration: InputDecoration(
-                          hintText: 'Davanızı detaylı anlatın (en az 285, en fazla 77401 karakter)',
-                          hintStyle: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
+                      Stack(
+                        children: [
+                          TextField(
+                            controller: davaDetayController,
+                            maxLines: 16,
+                            maxLength: 77401,
+                            enabled: !dava.isOpened,
+                            decoration: InputDecoration(
+                              hintText: 'Davanızı detaylı anlatın (en az 285, en fazla 77401 karakter)',
+                              hintStyle: TextStyle(
+                                fontSize: 14,
+                                color: tone.hint,
+                              ),
+                              filled: true,
+                              fillColor: dava.isOpened ? tone.disabledFill : tone.fieldMuted,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: tone.fieldBorder),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: tone.fieldBorder),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: tone.focus, width: 1.5),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              counterText: '', // 0/6346 göstergesi kaldırıldı, alan daha geniş
+                            ),
+                            style: TextStyle(fontSize: 15, height: 1.4, color: tone.body),
+                            onChanged: (value) {},
                           ),
-                          filled: true,
-                          fillColor: dava.isOpened ? Colors.grey[100] : Colors.grey[50],
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          Positioned(
+                            right: 10,
+                            bottom: 8,
+                            child: IgnorePointer(
+                              child: Text(
+                                '${davaDetayController.text.length} / 285',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  height: 1,
+                                  fontWeight: FontWeight.w500,
+                                  color: davaDetayController.text.length >= 285
+                                      ? SeyirTokens.brand
+                                      : tone.counterMuted,
+                                ),
+                              ),
+                            ),
                           ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.grey[300]!),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFF059669), width: 1.5),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          counterText: '', // 0/6346 göstergesi kaldırıldı, alan daha geniş
-                        ),
-                        style: const TextStyle(fontSize: 15, height: 1.4),
-                        onChanged: (value) {},
+                        ],
                       ),
 
                     ],
@@ -234,17 +299,12 @@ class FiveCardCaseInformation extends StatelessWidget {
                       message: 'Kaydet',
                       child: IconButton(
                         onPressed: !dava.isOpened ? onSaveDava : null,
-                        icon: Icon(
-                          Icons.save_outlined,
-                          size: 24,
-                          color: !dava.isOpened ? Colors.blueGrey[700] : Colors.grey[500],
-                        ),
-                        style: IconButton.styleFrom(
-                          backgroundColor: !dava.isOpened
-                              ? Colors.blueGrey.withOpacity(0.10)
-                              : Colors.grey.withOpacity(0.08),
-                          padding: const EdgeInsets.all(10),
-                          minimumSize: const Size(48, 48),
+                        icon: const Icon(Icons.save_outlined, size: 24),
+                        style: _actionIconStyle(
+                          tone,
+                          enabled: !dava.isOpened,
+                          foreground: tone.saveIcon,
+                          background: tone.saveBg,
                         ),
                       ),
                     ),
@@ -264,14 +324,12 @@ class FiveCardCaseInformation extends StatelessWidget {
                             ),
                           );
                         } : null,
-                        icon: Icon(
-                          Icons.add_circle_outline_outlined,
-                          size: 28,
-                          color: !dava.isOpened ? Colors.blue[700] : Colors.grey[400],
-                        ),
-                        style: IconButton.styleFrom(
-                          backgroundColor: !dava.isOpened ? Colors.blue.withOpacity(0.1) : null,
-                          padding: const EdgeInsets.all(10),
+                        icon: const Icon(Icons.add_circle_outline_outlined, size: 24),
+                        style: _actionIconStyle(
+                          tone,
+                          enabled: !dava.isOpened,
+                          foreground: tone.addIcon,
+                          background: tone.addBg,
                         ),
                       ),
                     ),
@@ -280,23 +338,18 @@ class FiveCardCaseInformation extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: (canDavala && !dava.isOpened) ? onOpenDava : null,
                         icon: const Icon(Icons.gavel_outlined, size: 19),
-                        label: const Text(
+                        label: Text(
                           'DAVALA',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                        ),
-                        style: (canDavala && !dava.isOpened)
-                            ? AppTheme.accentButtonStyle.copyWith(
-                          textStyle: MaterialStateProperty.all(const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                          minimumSize: MaterialStateProperty.all(const Size(120, 48)),
-                        )
-                            : ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.textMuted,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          minimumSize: const Size(120, 48),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: Theme.of(context).textTheme.bodyLarge?.fontFamily,
                           ),
+                        ),
+                        style: _davalaButtonStyle(
+                          tone,
+                          canDavala && !dava.isOpened,
+                          Theme.of(context).textTheme.bodyLarge?.fontFamily,
                         ),
                       ),
                     ),
@@ -312,16 +365,86 @@ class FiveCardCaseInformation extends StatelessWidget {
     );
   }
 
+  ButtonStyle _actionIconStyle(
+    _CaseTone tone, {
+    required bool enabled,
+    required Color foreground,
+    required Color background,
+  }) {
+    return IconButton.styleFrom(
+      foregroundColor: foreground,
+      disabledForegroundColor: tone.iconOff,
+      backgroundColor: enabled ? background : tone.iconOffBg,
+      disabledBackgroundColor: tone.iconOffBg,
+      padding: const EdgeInsets.all(10),
+      minimumSize: const Size(48, 48),
+      fixedSize: const Size(48, 48),
+      maximumSize: const Size(48, 48),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+
+  ButtonStyle _davalaButtonStyle(_CaseTone tone, bool enabled, String? fontFamily) {
+    final Color enabledFg = tone.palette.onSolid(SeyirTokens.brand);
+    return ButtonStyle(
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (!enabled || states.contains(WidgetState.disabled)) {
+          return tone.davalaOffBg;
+        }
+        return SeyirTokens.brand;
+      }),
+      foregroundColor: WidgetStateProperty.resolveWith((states) {
+        if (!enabled || states.contains(WidgetState.disabled)) {
+          return tone.davalaOffFg;
+        }
+        return enabledFg;
+      }),
+      elevation: WidgetStateProperty.resolveWith((states) {
+        if (!enabled || states.contains(WidgetState.disabled)) return 0;
+        return 2;
+      }),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      ),
+      minimumSize: const WidgetStatePropertyAll(Size(120, 48)),
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      textStyle: WidgetStatePropertyAll(
+        TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          fontFamily: fontFamily,
+        ),
+      ),
+      overlayColor: WidgetStatePropertyAll(
+        SeyirTokens.neutral900.withValues(alpha: 0.06),
+      ),
+    );
+  }
+
+  Widget _avatarLetter(String name, _CaseTone tone) {
+    return Text(
+      _initialLetter(name),
+      style: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: tone.dark ? SeyirTokens.brand : SeyirTokens.brandDeep,
+      ),
+    );
+  }
+
   /// 1. Davacı — alt alta sırada birinci alan (estetik, diğer satırlarla hizalı).
-  Widget _buildDavaciRow() {
+  Widget _buildDavaciRow(BuildContext context) {
+    final tone = _CaseTone(SeyirPalette.of(context));
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(
-          width: 76,
+          width: _CaseTone.labelWidth,
           child: Text(
             'Davacı: ',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey),
+            style: tone.labelStyle(),
           ),
         ),
         const SizedBox(width: 8),
@@ -333,17 +456,17 @@ class FiveCardCaseInformation extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                 constraints: const BoxConstraints(minHeight: 36),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: tone.field,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(color: tone.fieldBorder),
                 ),
                 alignment: Alignment.centerLeft,
                 child: Text(
                   snapshot.data ?? 'Bilinmeyen Yargıç',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: tone.ink,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -355,20 +478,17 @@ class FiveCardCaseInformation extends StatelessWidget {
     );
   }
 
-  /// 4. Kategori — input değil, sadece metin; küçük punto, diğer etiketlerle hizalı.
-  Widget _buildKategoriRow(String kategoriValue) {
+  /// 4. Kategori — input değil, sadece metin; diğer etiketlerle aynı stil ve genişlik.
+  Widget _buildKategoriRow(BuildContext context, String kategoriValue) {
+    final tone = _CaseTone(SeyirPalette.of(context));
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(
-          width: 76,
+          width: _CaseTone.labelWidth,
           child: Text(
             'Kategori: ',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
-            ),
+            style: tone.labelStyle(),
           ),
         ),
         const SizedBox(width: 8),
@@ -377,7 +497,7 @@ class FiveCardCaseInformation extends StatelessWidget {
             kategoriValue,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[800],
+              color: tone.dark ? tone.ink : const Color(0xFF424242),
             ),
           ),
         ),
@@ -385,17 +505,18 @@ class FiveCardCaseInformation extends StatelessWidget {
     );
   }
 
-  Widget _buildDavaliRow() {
+  Widget _buildDavaliRow(BuildContext context) {
+    final tone = _CaseTone(SeyirPalette.of(context));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const SizedBox(
-              width: 76, // Sabit genişlik - diğer satırlarla aynı
+            SizedBox(
+              width: _CaseTone.labelWidth,
               child: Text(
                 'Davalı: ',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+                style: tone.labelStyle(),
               ),
             ),
             const SizedBox(width: 8),
@@ -410,25 +531,33 @@ class FiveCardCaseInformation extends StatelessWidget {
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'[\s\S]')),
                   ],
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: tone.ink),
                   decoration: InputDecoration(
-                    hintText: isWhoboomUser ? 'üye ara... (en az 4 karakter)' : 'Bir isim yaz',
+                    hintText: isWhoboomUser ? 'Üye ara (en az 4 harf)' : 'Bir isim yaz',
+                    hintStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: tone.hint,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey[400]!, width: 1.5),
+                      borderSide: BorderSide(color: tone.fieldBorderStrong, width: 1.5),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey[400]!, width: 1.5),
+                      borderSide: BorderSide(color: tone.fieldBorderStrong, width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.blue[600]!, width: 2),
+                      borderSide: BorderSide(
+                        color: tone.dark ? SeyirTokens.brand : const Color(0xFF1E88E5),
+                        width: 2,
+                      ),
                     ),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: tone.fieldMuted,
                     prefixIcon: Container(
                       margin: const EdgeInsets.only(right: 8),
                       child: Container(
@@ -460,9 +589,9 @@ class FiveCardCaseInformation extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
+                    color: tone.fieldMuted,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[400]!, width: 1.5),
+                    border: Border.all(color: tone.fieldBorderStrong, width: 1.5),
                   ),
                   child: Center(
                     child: Text(
@@ -470,7 +599,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey[600],
+                        color: tone.inkMuted,
                       ),
                     ),
                   ),
@@ -483,13 +612,13 @@ class FiveCardCaseInformation extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              const SizedBox(width: 76),
+              const SizedBox(width: _CaseTone.labelWidth),
               const SizedBox(width: 8),
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEFFDF4),
+                    color: tone.dark ? tone.palette.brandSoft : const Color(0xFFEFFDF4),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFF16A34A)),
                   ),
@@ -527,14 +656,14 @@ class FiveCardCaseInformation extends StatelessWidget {
             !filteredUsers.contains(davaliController.text)) ...[
           const SizedBox(height: 8),
           Container(
-            margin: const EdgeInsets.only(left: 84), // Davalı: yazısının hizası
+            margin: const EdgeInsets.only(left: _CaseTone.labelWidth + 8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: tone.suggestion,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[300]!, width: 1),
+              border: Border.all(color: tone.fieldBorder, width: 1),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: tone.palette.shadow,
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -640,15 +769,18 @@ class FiveCardCaseInformation extends StatelessWidget {
     );
   }
 
-  // Kullanıcının profil resmini al
-  Future<String?> _getUserProfileImage(String email) async {
+  Future<_DavaciFace> _loadDavaciFace(String? email) async {
+    final name = await _getDisplayName(email);
+    if (email == null || email.isEmpty) {
+      return _DavaciFace(name: name);
+    }
     try {
+      final settings = HiveDatabaseService.getSettings(email);
       final user = HiveDatabaseService.getRegistrationByEmail(email);
-      // Şimdilik varsayılan profil resmi döndürüyoruz
-      // İleride kullanıcı modelinde profil resmi alanı eklenebilir
-      return 'lib/icons/07_profil_picture_davaci.png';
-    } catch (e) {
-      return 'lib/icons/07_profil_picture_davaci.png';
+      final raw = _realProfilePhoto(settings?.profileImageUrl, user?.profileImage);
+      return _DavaciFace(name: name, image: _profileImageProvider(raw));
+    } catch (_) {
+      return _DavaciFace(name: name);
     }
   }
 
@@ -680,8 +812,9 @@ class FiveCardCaseInformation extends StatelessWidget {
     }
   }
 
-  Widget _buildInfoRow(String label, String value, bool isEditable) {
+  Widget _buildInfoRow(BuildContext context, String label, String value, bool isEditable) {
     final bool isDavaAdiField = label == 'Dava Adı';
+    final tone = _CaseTone(SeyirPalette.of(context));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -690,10 +823,10 @@ class FiveCardCaseInformation extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(
-              width: 76, // Sabit genişlik
+              width: _CaseTone.labelWidth,
               child: Text(
                 '$label: ',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey),
+                style: tone.labelStyle(),
               ),
             ),
             const SizedBox(width: 8),
@@ -707,31 +840,38 @@ class FiveCardCaseInformation extends StatelessWidget {
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(RegExp(r'[\s\S]')),
                         ],
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: tone.ink),
                         decoration: InputDecoration(
                           hintText: value,
-                          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                          hintStyle: TextStyle(color: tone.hintFaint, fontSize: 13),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.green[300]!),
+                            borderSide: BorderSide(color: tone.dark ? tone.focus : const Color(0xFF81C784)),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.grey[300]!),
+                            borderSide: BorderSide(color: tone.fieldBorder),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: const BorderRadius.all(Radius.circular(10)),
-                            borderSide: BorderSide(color: Colors.green, width: 2),
+                            borderSide: BorderSide(color: tone.focus, width: 2),
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          fillColor: tone.field,
                           contentPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
                           counterText: '',
                           isDense: true,
-                          suffixIcon: isDavaAdiField
-                              ? CharacterCounterBadge(
-                                  current: davaAdiController.text.length,
-                                  max: 171,
+                          suffix: isDavaAdiField
+                              ? SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: FittedBox(
+                                    fit: BoxFit.contain,
+                                    child: CharacterCounterBadge(
+                                      current: davaAdiController.text.length,
+                                      max: 171,
+                                    ),
+                                  ),
                                 )
                               : null,
                         ),
@@ -742,10 +882,12 @@ class FiveCardCaseInformation extends StatelessWidget {
                       constraints: const BoxConstraints(minHeight: 36),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [Colors.grey[100]!, Colors.grey[50]!],
+                          colors: tone.dark
+                              ? [tone.disabledFill, tone.fieldMuted]
+                              : const [Color(0xFFF5F5F5), Color(0xFFFAFAFA)],
                         ),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey[300]!),
+                        border: Border.all(color: tone.fieldBorder),
                       ),
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -753,7 +895,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: !dava.isOpened ? Colors.black87 : Colors.grey[600],
+                          color: !dava.isOpened ? tone.ink : tone.inkMuted,
                         ),
                       ),
                     ),
@@ -764,7 +906,7 @@ class FiveCardCaseInformation extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              const SizedBox(width: 76),
+              const SizedBox(width: _CaseTone.labelWidth),
               const SizedBox(width: 8),
               Expanded(
                 child: Stack(
@@ -773,7 +915,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEFFDF4),
+                        color: tone.dark ? tone.palette.brandSoft : const Color(0xFFEFFDF4),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: const Color(0xFF16A34A)),
                       ),
@@ -808,4 +950,41 @@ class FiveCardCaseInformation extends StatelessWidget {
       ],
     );
   }
+}
+
+String _initialLetter(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return '?';
+  return trimmed.substring(0, 1).toUpperCase();
+}
+
+String? _realProfilePhoto(String? primary, String? fallback) {
+  for (final raw in [primary, fallback]) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty || value == _placeholderProfileAsset) continue;
+    return value;
+  }
+  return null;
+}
+
+ImageProvider<Object>? _profileImageProvider(String? raw) {
+  if (raw == null) return null;
+  if (raw.startsWith('data:image')) {
+    try {
+      final parts = raw.split(',');
+      if (parts.length < 2) return null;
+      final bytes = base64Decode(parts[1]);
+      if (bytes.isEmpty) return null;
+      return MemoryImage(bytes);
+    } catch (_) {
+      return null;
+    }
+  }
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    return NetworkImage(raw);
+  }
+  if (raw.startsWith('assets/') || raw.startsWith('lib/')) {
+    return AssetImage(raw);
+  }
+  return null;
 }
