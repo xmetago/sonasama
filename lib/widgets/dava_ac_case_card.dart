@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../models/registration_model.dart';
 import '../screens/delil_ekle_page.dart';
 import '../services/hive_database_service.dart';
 import '../theme/seyir_tokens.dart';
@@ -37,13 +38,6 @@ class Dava {
 
 /// Varsayılan silüet bir profil fotoğrafı sayılmaz.
 const String _placeholderProfileAsset = 'lib/icons/07_profil_picture_davaci.png';
-
-class _DavaciFace {
-  const _DavaciFace({required this.name, this.image});
-
-  final String name;
-  final ImageProvider<Object>? image;
-}
 
 /// Açık temada mevcut gri/beyaz yüzeyler, koyu temada [SeyirPalette].
 class _CaseTone {
@@ -154,30 +148,19 @@ class FiveCardCaseInformation extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profil görseli (kompakt)
-              Center(
-                child: CircleAvatar(
-                  radius: 22,
-                  backgroundColor: tone.palette.brandSoft,
-                  child: FutureBuilder<_DavaciFace>(
-                    future: _loadDavaciFace(userEmail),
-                    builder: (context, snapshot) {
-                      final face = snapshot.data;
-                      final name = (face?.name ?? dava.davaci).trim();
-                      final image = face?.image;
-                      if (image != null) {
-                        return Image(
-                          image: image,
-                          width: 44,
-                          height: 44,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _avatarLetter(name, tone),
-                        );
-                      }
-                      return _avatarLetter(name, tone);
-                    },
+              // Davacı solda, seçilen davalı sağda. Gerçek fotoğraf yoksa silüet.
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _MemberAvatar(
+                    token: userEmail ?? '',
+                    load: () => _loadProfileByEmail(userEmail),
                   ),
-                ),
+                  _MemberAvatar(
+                    token: davaliController.text,
+                    load: () => _loadDavaliProfile(davaliController.text),
+                  ),
+                ],
               ),
               const SizedBox(height: 14),
 
@@ -419,17 +402,6 @@ class FiveCardCaseInformation extends StatelessWidget {
       ),
       overlayColor: WidgetStatePropertyAll(
         SeyirTokens.neutral900.withValues(alpha: 0.06),
-      ),
-    );
-  }
-
-  Widget _avatarLetter(String name, _CaseTone tone) {
-    return Text(
-      _initialLetter(name),
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        color: tone.dark ? SeyirTokens.brand : SeyirTokens.brandDeep,
       ),
     );
   }
@@ -769,19 +741,50 @@ class FiveCardCaseInformation extends StatelessWidget {
     );
   }
 
-  Future<_DavaciFace> _loadDavaciFace(String? email) async {
-    final name = await _getDisplayName(email);
-    if (email == null || email.isEmpty) {
-      return _DavaciFace(name: name);
-    }
+  /// Davacı: e-posta ile ayar ve kayıttaki gerçek profil fotoğrafı.
+  Future<ImageProvider<Object>?> _loadProfileByEmail(String? email) async {
+    final value = email?.trim() ?? '';
+    if (value.isEmpty) return null;
     try {
-      final settings = HiveDatabaseService.getSettings(email);
-      final user = HiveDatabaseService.getRegistrationByEmail(email);
+      final settings = HiveDatabaseService.getSettings(value);
+      final user = HiveDatabaseService.getRegistrationByEmail(value);
       final raw = _realProfilePhoto(settings?.profileImageUrl, user?.profileImage);
-      return _DavaciFace(name: name, image: _profileImageProvider(raw));
+      return _profileImageProvider(raw);
     } catch (_) {
-      return _DavaciFace(name: name);
+      return null;
     }
+  }
+
+  /// Davalı: seçilen üyenin e-posta veya id'sinden aynı fotoğraf yolu.
+  /// Seçim yoksa, eşleşme yoksa veya hata olursa silüet gösterilir.
+  Future<ImageProvider<Object>?> _loadDavaliProfile(String raw) async {
+    try {
+      final email = _emailForDavali(raw);
+      if (email == null) return null;
+      return await _loadProfileByEmail(email);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _emailForDavali(String raw) {
+    final key = raw.trim();
+    if (key.isEmpty) return null;
+    if (key.contains('@')) {
+      final exact = HiveDatabaseService.getRegistrationByEmail(key);
+      if (exact != null) return exact.email;
+      final lower = key.toLowerCase();
+      for (final RegistrationModel user in HiveDatabaseService.getAllRegistrations()) {
+        if (user.email.toLowerCase() == lower) return user.email;
+      }
+      return key;
+    }
+    final byName = HiveDatabaseService.getRegistrationByJudgeName(key);
+    if (byName != null) return byName.email;
+    for (final RegistrationModel user in HiveDatabaseService.getAllRegistrations()) {
+      if (user.id == key) return user.email;
+    }
+    return null;
   }
 
   // Kullanıcının görünüm adını al (gizlilik ayarlarına göre)
@@ -952,10 +955,75 @@ class FiveCardCaseInformation extends StatelessWidget {
   }
 }
 
-String _initialLetter(String name) {
-  final trimmed = name.trim();
-  if (trimmed.isEmpty) return '?';
-  return trimmed.substring(0, 1).toUpperCase();
+/// Yarıçap 22 daire. Fotoğraf yokken 36px silüet, nötr zemin.
+/// [token] değişince (başka davalı seçilince) fotoğraf yeniden okunur.
+class _MemberAvatar extends StatefulWidget {
+  const _MemberAvatar({required this.token, required this.load});
+
+  final String token;
+  final Future<ImageProvider<Object>?> Function() load;
+
+  @override
+  State<_MemberAvatar> createState() => _MemberAvatarState();
+}
+
+class _MemberAvatarState extends State<_MemberAvatar> {
+  late Future<ImageProvider<Object>?> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.load();
+  }
+
+  @override
+  void didUpdateWidget(_MemberAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.token != widget.token) {
+      _future = widget.load();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = _CaseTone(SeyirPalette.of(context));
+    final Color background = tone.dark ? tone.palette.surface : Colors.grey[100]!;
+    return FutureBuilder<ImageProvider<Object>?>(
+      future: _future,
+      builder: (context, snapshot) {
+        final image = snapshot.data;
+        return CircleAvatar(
+          radius: 22,
+          backgroundColor: background,
+          child: ClipOval(
+            child: image == null
+                ? const _Silhouette()
+                : Image(
+                    image: image,
+                    width: 44,
+                    height: 44,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const _Silhouette(),
+                  ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _Silhouette extends StatelessWidget {
+  const _Silhouette();
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      _placeholderProfileAsset,
+      width: 36,
+      height: 36,
+      fit: BoxFit.cover,
+    );
+  }
 }
 
 String? _realProfilePhoto(String? primary, String? fallback) {
@@ -967,15 +1035,21 @@ String? _realProfilePhoto(String? primary, String? fallback) {
   return null;
 }
 
+final Map<String, MemoryImage> _memoryImages = {};
+
 ImageProvider<Object>? _profileImageProvider(String? raw) {
   if (raw == null) return null;
   if (raw.startsWith('data:image')) {
     try {
+      final cached = _memoryImages[raw];
+      if (cached != null) return cached;
       final parts = raw.split(',');
       if (parts.length < 2) return null;
       final bytes = base64Decode(parts[1]);
       if (bytes.isEmpty) return null;
-      return MemoryImage(bytes);
+      final image = MemoryImage(bytes);
+      _memoryImages[raw] = image;
+      return image;
     } catch (_) {
       return null;
     }
