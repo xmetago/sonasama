@@ -19,6 +19,7 @@ import '../widgets/ilgililerin_seyir_defteri_widgeti.dart';
 import '../widgets/actigim_dava_sayilari_section.dart';
 import '../services/actigim_dava_istatistik_service.dart';
 import '../utils/dava_map_utils.dart';
+import '../theme/seyir_tokens.dart';
 
 class ActigimDavalarPage extends StatefulWidget {
   final String? userEmail;
@@ -297,15 +298,16 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
     final bool isOpened = davaData['isOpened'] == true;
     final bool isBeklemede = adi == 'Beklemede' && !isOpened;
 
+    final palette = SeyirPalette.of(context);
     Widget card = Container(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE6E6E6)),
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+        border: Border.all(color: palette.border),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: palette.shadow,
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -473,8 +475,9 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
         return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: palette.surface,
       body: ActigimPageChrome(
         userEmail: widget.userEmail,
         initiallyCollapsed: widget.initiallyCollapsed,
@@ -495,20 +498,27 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
                     Container(
                       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red.shade300, width: 2),
+                        color: palette.tint(SeyirTokens.reject),
+                        borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
+                        border: Border.all(
+                          color: palette.tintBorder(SeyirTokens.reject),
+                          width: 2,
+                        ),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.cancel, color: Colors.red.shade700, size: 24),
+                          Icon(
+                            Icons.cancel,
+                            color: palette.foreground(SeyirTokens.reject),
+                            size: 24,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'RED EDİLEN DAVALAR (${rejectedDavaList.length})',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: SeyirTokens.typeTitle,
                               fontWeight: FontWeight.bold,
-                              color: Colors.red.shade700,
+                              color: palette.foreground(SeyirTokens.reject),
                               letterSpacing: 1,
                             ),
                           ),
@@ -535,29 +545,29 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
             ),
             if (_actigimDavalar.isEmpty)
               Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(SeyirTokens.space6),
                 child: Column(
                   children: [
                     Icon(
                       Icons.folder_open,
                       size: 64,
-                      color: Colors.grey[400],
+                      color: palette.textMuted,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'Henüz dava açmadınız',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
+                      style: palette.title(
+                        weight: FontWeight.w500,
+                        color: palette.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Davacı olarak açtığınız davalar burada, ilgililerin seyir defteri ile görünür',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
+                      style: palette.body(
+                        weight: FontWeight.w400,
+                        color: palette.textMuted,
                       ),
                     ),
                     const SizedBox(height: 20),
