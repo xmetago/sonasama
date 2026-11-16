@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import 'package:provider/provider.dart';
+import '../providers/dava_provider.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/home_haykir_card.dart';
 import '../widgets/shared/shared.dart';
 
 /// ✅ Step-2: Kaydedilen haykırları gösteren sayfa
@@ -65,7 +69,9 @@ class _SavedHaykirlarPageState extends State<SavedHaykirlarPage> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Scaffold(
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -120,7 +126,7 @@ class _SavedHaykirlarPageState extends State<SavedHaykirlarPage> {
             sliver: SliverList(
               delegate: SliverChildListDelegate(
                 [
-                  const AppAccentSectionHeader(title: 'Kaydedilen Haykırlar'),
+                  _SavedSectionHeader(title: 'Kaydedilen Haykırlar'),
                   const SizedBox(height: 12),
                   AppSearchField(
                     hintText: 'Haykır ara...',
@@ -166,6 +172,37 @@ class _SavedHaykirlarPageState extends State<SavedHaykirlarPage> {
 }
 
 /// Kaydedilen haykır kartı
+class _SavedSectionHeader extends StatelessWidget {
+  const _SavedSectionHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Colors.purple,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: SeyirTokens.space3),
+          Text(
+            title,
+            style: palette.headline(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SavedHaykirTile extends StatelessWidget {
   const _SavedHaykirTile({
     required this.haykir,
@@ -177,8 +214,65 @@ class _SavedHaykirTile extends StatelessWidget {
   final String? userEmail;
   final VoidCallback onRefresh;
 
+  void _openDetail(BuildContext context) {
+    final provider = Provider.of<DavaProvider>(context, listen: false);
+    final haykirId = haykir['id']?.toString() ?? '';
+    final stats = haykir['stats'] as Map<String, dynamic>? ?? {};
+    final createdAt = haykir['createdAt']?.toString() ?? '';
+    final author = haykir['userEmail']?.toString() ?? userEmail;
+    final adi = haykir['adi']?.toString() ?? 'Haykır';
+    final payload = <String, dynamic>{
+      'haykirId': haykirId,
+      'adi': adi,
+      'slogan': haykir['slogan']?.toString() ?? '',
+      'direme': haykir['direme']?.toString() ?? '',
+      'detaylar': haykir['detaylar']?.toString() ?? '',
+      'createdAt': createdAt,
+      'shareCount': stats['shareCount'] ?? 0,
+      'commentCount': stats['commentCount'] ?? 0,
+      'retweetCount': stats['retweetCount'] ?? 0,
+      'likeCount': stats['likeCount'] ?? 0,
+      'kinaCount': stats['kinaCount'] ?? 0,
+      'isSaved': true,
+      'isLiked': false,
+    };
+    final post = <String, dynamic>{
+      'id': 'haykir_$haykirId',
+      'type': 'haykir',
+      'createdAt': createdAt,
+      'authorEmail': author,
+      'payload': payload,
+    };
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) {
+          final palette = SeyirPalette.of(context);
+          return Scaffold(
+            backgroundColor: palette.surface,
+            appBar: AppBar(
+              title: Text(adi, style: palette.headline()),
+            ),
+            body: ListView(
+              padding: const EdgeInsets.all(SeyirTokens.space4),
+              children: [
+                HaykirCardWidget(
+                  post: post,
+                  payload: payload,
+                  davaProvider: provider,
+                  userEmail: userEmail,
+                  showCloseButton: false,
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     final stats = haykir['stats'] as Map<String, dynamic>? ?? {};
     final likeCount = stats['likeCount'] ?? 0;
     final kinaCount = stats['kinaCount'] ?? 0;
@@ -193,15 +287,14 @@ class _SavedHaykirTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
       elevation: 0,
+      color: palette.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey[200]!, width: 1),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
+        side: BorderSide(color: palette.border, width: 1),
       ),
       child: InkWell(
-        onTap: () {
-          // Haykır detayına git (home_page'deki gibi)
-        },
-        borderRadius: BorderRadius.circular(16),
+        onTap: () => _openDetail(context),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -216,12 +309,7 @@ class _SavedHaykirTile extends StatelessWidget {
                       children: [
                         Text(
                           adi,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Colors.grey[900],
-                            height: 1.3,
-                          ),
+                          style: palette.title(),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -229,10 +317,7 @@ class _SavedHaykirTile extends StatelessWidget {
                           const SizedBox(height: 8),
                           Text(
                             slogan,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[700],
-                            ),
+                            style: palette.body(color: palette.textSecondary),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -241,10 +326,7 @@ class _SavedHaykirTile extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             direme,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                            ),
+                            style: palette.body(color: palette.textMuted),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -253,6 +335,11 @@ class _SavedHaykirTile extends StatelessWidget {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Kaydı kaldır',
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     icon: Icon(
                       MdiIcons.bookmark,
                       color: Colors.purple,
@@ -279,7 +366,6 @@ class _SavedHaykirTile extends StatelessWidget {
                         }
                       }
                     },
-                    tooltip: 'Kaydı kaldır',
                   ),
                 ],
               ),
@@ -296,7 +382,7 @@ class _SavedHaykirTile extends StatelessWidget {
                   AppStatBadge(
                     icon: Icons.thumb_down_rounded,
                     count: kinaCount,
-                    color: Colors.grey[600]!,
+                    color: palette.isDark ? SeyirTokens.neutral400 : SeyirTokens.neutral500,
                   ),
                   AppStatBadge(
                     icon: Icons.comment_rounded,
@@ -314,10 +400,7 @@ class _SavedHaykirTile extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   _formatDate(createdAt),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
+                  style: palette.caption(color: palette.textMuted),
                 ),
               ],
             ],

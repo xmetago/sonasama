@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/dava_provider.dart';
 import '../screens/saved_widgets_page.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
 import 'expandable_comment_text.dart';
 import 'shared/app_snack.dart';
 
@@ -306,12 +307,37 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
     }
   }
 
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Silmek istediğine emin misin?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('İptal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      widget.onClose?.call();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Card(
       elevation: 4,
+      color: palette.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
+        side: BorderSide(color: palette.border),
       ),
       child: InkWell(
         onTap: widget.onTap,
@@ -328,12 +354,41 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                   // Close butonu — yalnızca henüz yayınlanmamış haykırlarda
                   if (widget.onClose != null && !isHaykirPressed)
                     IconButton(
+                      tooltip: 'Sil',
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                        fixedSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: EdgeInsets.zero,
+                      ),
                       icon: const Icon(Icons.close, color: Colors.red),
-                      onPressed: widget.onClose,
-                      tooltip: 'Haykırışı sil',
+                      onPressed: _confirmDelete,
                     )
                   else
                     const SizedBox.shrink(),
+                  if (!isHaykirPressed) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: SeyirTokens.space2,
+                        vertical: SeyirTokens.space1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: palette.tint(Colors.orange.shade700),
+                        borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
+                        border: Border.all(
+                          color: palette.tintBorder(Colors.orange.shade700),
+                        ),
+                      ),
+                      child: Text(
+                        'Taslak',
+                        style: palette.caption(
+                          weight: FontWeight.w800,
+                          color: palette.foreground(Colors.orange.shade700),
+                        ),
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   // HAYKIR butonu — yalnızca sahibi yayınlayabilir
                   if (_isHaykirOwner || isHaykirPressed)
@@ -399,12 +454,15 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                       ),
                       label: Text(
                         isHaykirPressed ? 'YAYINLANDI' : 'HAYKIR',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: SeyirTokens.typeBody,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isHaykirPressed ? Colors.green.shade700 : Colors.orange.shade600,
                         foregroundColor: Colors.white,
-                        minimumSize: const Size(0, 40),
+                        minimumSize: const Size(0, SeyirTokens.tapTarget),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         shape: RoundedRectangleBorder(
@@ -423,9 +481,9 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                  color: palette.tint(Colors.orange.shade700),
+                  borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
+                  border: Border.all(color: palette.tintBorder(Colors.orange.shade700)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -437,11 +495,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                         Expanded(
                           child: Text(
                             widget.haykir.adi,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
+                            style: palette.title(),
                           ),
                         ),
                       ],
@@ -449,16 +503,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(MdiIcons.formatQuoteOpen, size: 30, color: Colors.grey[600]),
+                        Icon(MdiIcons.formatQuoteOpen, size: 30, color: palette.textSecondary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             widget.haykir.slogan,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.black,
-                              fontStyle: FontStyle.normal,
-                            ),
+                            style: palette.body(color: palette.textSecondary),
                           ),
                         ),
                       ],
@@ -471,11 +521,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                         Expanded(
                           child: Text(
                             widget.haykir.direme,
-                            style: const TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black,
-                            ),
+                            style: palette.headline(weight: FontWeight.w600),
                           ),
                         ),
                       ],
@@ -488,10 +534,9 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
                         Expanded(
                           child: Text(
                             'KalanSure: ${widget.haykir.kalanSure}, ::: ${_formatHaykirBaslangicTarihi()}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black,
+                            style: palette.caption(
+                              weight: FontWeight.w600,
+                              color: palette.textPrimary,
                             ),
                           ),
                         ),

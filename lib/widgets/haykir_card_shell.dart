@@ -237,6 +237,7 @@ class HaykirCardShell extends StatelessWidget {
     if (variant == HaykirCardShellVariant.feed) {
       return _buildFeedCard(context);
     }
+    final palette = SeyirPalette.of(context);
     final time = _timeInfo();
     final muted = isExpired || time.isExpired;
 
@@ -244,22 +245,19 @@ class HaykirCardShell extends StatelessWidget {
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
         gradient: LinearGradient(
           colors: muted
-              ? [Colors.grey.shade100, Colors.grey.shade50]
-              : isExpanded
-                  ? [_primary.shade50, _secondary.withValues(alpha: 0.06)]
-                  : [Colors.white, _primary.shade50.withValues(alpha: 0.35)],
+              ? [palette.surfaceMuted, palette.surface]
+              : [
+                  palette.tint(_primary),
+                  palette.card,
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         border: Border.all(
-          color: muted
-              ? Colors.grey.shade300
-              : isExpanded
-                  ? _primary.shade300
-                  : _primary.shade100,
+          color: muted ? palette.border : palette.tintBorder(_primary),
           width: isExpanded ? 1.5 : 1,
         ),
         boxShadow: [
@@ -283,27 +281,29 @@ class HaykirCardShell extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildTopRow(time),
+                    _buildTopRow(context, time),
                     const SizedBox(height: 12),
-                    _buildProgressBar(time),
+                    _buildProgressBar(context, time),
                     const SizedBox(height: 14),
                     Text(
                       adi,
                       style: TextStyle(
-                        fontSize: isExpanded ? 18 : 16,
+                        fontSize: isExpanded
+                            ? SeyirTokens.typeHeadline
+                            : SeyirTokens.typeTitle,
                         fontWeight: FontWeight.bold,
-                        color: muted ? Colors.grey.shade700 : Colors.grey.shade900,
+                        color: muted ? palette.textSecondary : palette.textPrimary,
                       ),
                     ),
                     if (slogan.isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      _buildSlogan(muted),
+                      _buildSlogan(context, muted),
                     ],
                     const SizedBox(height: 12),
-                    _buildAuthorRow(muted),
+                    _buildAuthorRow(context, muted),
                     if (!isExpanded && direme.isNotEmpty) ...[
                       const SizedBox(height: 10),
-                      _buildDiremeChip(compact: true),
+                      _buildDiremeChip(context, compact: true),
                     ],
                   ],
                 ),
@@ -313,7 +313,7 @@ class HaykirCardShell extends StatelessWidget {
                 if (direme.isNotEmpty)
                   Row(
                     children: [
-                      Expanded(child: _buildDiremeChip()),
+                      Expanded(child: _buildDiremeChip(context)),
                       if (trailingAction != null) ...[
                         const SizedBox(width: 8),
                         trailingAction!,
@@ -333,6 +333,7 @@ class HaykirCardShell extends StatelessWidget {
   }
 
   Widget _buildTopRow(
+    BuildContext context,
     ({bool isExpired, double progress, String label, Color accent}) time,
   ) {
     return Row(
@@ -370,8 +371,8 @@ class HaykirCardShell extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: time.isExpired
-                ? Colors.grey.shade200
-                : time.accent.withValues(alpha: 0.12),
+                ? SeyirPalette.of(context).surfaceMuted
+                : time.accent.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: time.isExpired ? Colors.grey.shade400 : time.accent,
@@ -382,7 +383,9 @@ class HaykirCardShell extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: time.isExpired ? Colors.grey.shade700 : time.accent,
+              color: time.isExpired
+                  ? SeyirPalette.of(context).textSecondary
+                  : time.accent,
             ),
           ),
         ),
@@ -421,7 +424,7 @@ class HaykirCardShell extends StatelessWidget {
           Text(
             time.label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: SeyirTokens.typeCaption,
               fontWeight: FontWeight.w600,
               color: time.accent,
             ),
@@ -439,6 +442,7 @@ class HaykirCardShell extends StatelessWidget {
   }
 
   Widget _buildProgressBar(
+    BuildContext context,
     ({bool isExpired, double progress, String label, Color accent}) time,
   ) {
     return ClipRRect(
@@ -446,7 +450,7 @@ class HaykirCardShell extends StatelessWidget {
       child: LinearProgressIndicator(
         value: time.isExpired ? 0 : time.progress,
         minHeight: 5,
-        backgroundColor: _primary.shade100,
+        backgroundColor: SeyirPalette.of(context).surfaceMuted,
         valueColor: AlwaysStoppedAnimation<Color>(
           time.isExpired ? Colors.grey.shade400 : time.accent,
         ),
@@ -454,19 +458,16 @@ class HaykirCardShell extends StatelessWidget {
     );
   }
 
-  Widget _buildSlogan(bool muted) {
+  Widget _buildSlogan(BuildContext context, bool muted) {
+    final palette = SeyirPalette.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: muted
-            ? Colors.grey.shade100
-            : _secondary.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
+        color: muted ? palette.surfaceMuted : palette.tint(_secondary),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
         border: Border.all(
-          color: muted
-              ? Colors.grey.shade300
-              : _secondary.withValues(alpha: 0.18),
+          color: muted ? palette.border : palette.tintBorder(_secondary),
         ),
       ),
       child: Row(
@@ -475,7 +476,7 @@ class HaykirCardShell extends StatelessWidget {
           Icon(
             MdiIcons.formatQuoteOpen,
             size: 20,
-            color: muted ? Colors.grey : _secondary,
+            color: muted ? palette.textMuted : palette.foreground(_secondary),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -483,11 +484,9 @@ class HaykirCardShell extends StatelessWidget {
               slogan,
               maxLines: isExpanded ? null : 1,
               overflow: isExpanded ? null : TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
+              style: palette.body(
+                color: muted ? palette.textMuted : palette.textSecondary,
                 fontStyle: FontStyle.italic,
-                color: muted ? Colors.grey.shade600 : Colors.grey.shade800,
-                height: 1.4,
               ),
             ),
           ),
@@ -496,7 +495,8 @@ class HaykirCardShell extends StatelessWidget {
     );
   }
 
-  Widget _buildAuthorRow(bool muted) {
+  Widget _buildAuthorRow(BuildContext context, bool muted) {
+    final palette = SeyirPalette.of(context);
     final initial =
         authorDisplayName.isNotEmpty ? authorDisplayName[0].toUpperCase() : '?';
 
@@ -504,13 +504,12 @@ class HaykirCardShell extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 16,
-          backgroundColor: muted ? Colors.grey.shade200 : _primary.shade100,
+          backgroundColor: muted ? palette.surfaceMuted : palette.tint(_primary),
           child: Text(
             initial,
-            style: TextStyle(
-              color: muted ? Colors.grey.shade700 : _primary.shade800,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+            style: palette.body(
+              weight: FontWeight.w800,
+              color: muted ? palette.textSecondary : palette.foreground(_primary),
             ),
           ),
         ),
@@ -521,16 +520,15 @@ class HaykirCardShell extends StatelessWidget {
             children: [
               Text(
                 authorDisplayName,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: muted ? Colors.grey.shade700 : Colors.black87,
+                style: palette.body(
+                  weight: FontWeight.w600,
+                  color: muted ? palette.textSecondary : palette.textPrimary,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
                 authorSubtitle,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: palette.caption(color: palette.textMuted),
               ),
             ],
           ),
@@ -538,27 +536,29 @@ class HaykirCardShell extends StatelessWidget {
         Icon(
           Icons.campaign_outlined,
           size: 18,
-          color: muted ? Colors.grey.shade400 : _primary.shade400,
+          color: muted ? palette.textMuted : _primary.shade400,
         ),
       ],
     );
   }
 
-  Widget _buildDiremeChip({bool compact = false}) {
+  Widget _buildDiremeChip(BuildContext context, {bool compact = false}) {
+    final palette = SeyirPalette.of(context);
+    final ink = palette.foreground(SeyirTokens.reject);
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 10 : 12,
         vertical: compact ? 6 : 8,
       ),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: palette.tint(SeyirTokens.reject),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: palette.tintBorder(SeyirTokens.reject)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(MdiIcons.flag, size: compact ? 14 : 16, color: Colors.red.shade700),
+          Icon(MdiIcons.flag, size: compact ? 14 : 16, color: ink),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
@@ -566,9 +566,9 @@ class HaykirCardShell extends StatelessWidget {
               maxLines: compact ? 1 : 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: compact ? 12 : 14,
+                fontSize: compact ? SeyirTokens.typeCaption : SeyirTokens.typeBody,
                 fontWeight: FontWeight.w600,
-                color: Colors.red.shade800,
+                color: ink,
               ),
             ),
           ),

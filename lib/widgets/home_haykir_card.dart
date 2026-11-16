@@ -173,10 +173,10 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
       return iconChild(Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.grey.shade200,
+          color: SeyirPalette.of(context).surfaceMuted,
           shape: BoxShape.circle,
         ),
-        child: Icon(MdiIcons.accountGroup, size: 26, color: Colors.grey.shade600),
+        child: Icon(MdiIcons.accountGroup, size: 26, color: SeyirPalette.of(context).textSecondary),
       ));
     }
 
@@ -262,7 +262,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                         borderRadius: BorderRadius.circular(8),
                       ),
                       filled: true,
-                      fillColor: Colors.grey[50],
+                      fillColor: palette.card,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 8,
@@ -315,7 +315,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                 child: Center(
                   child: Text(
                     'Henüz yorum yok. İlk yorumu siz yapın!',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    style: palette.body(color: palette.textMuted),
                   ),
                 ),
               )
@@ -325,9 +325,9 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
+                    color: palette.surfaceMuted,
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
+                    border: Border.all(color: palette.border),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,29 +352,22 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                           Expanded(
                             child: Text(
                               comment['userName']?.toString() ?? 'Bilinmeyen',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
+                              style: palette.caption(
+                                weight: FontWeight.w800,
+                                color: palette.textPrimary,
                               ),
                             ),
                           ),
                           Text(
                             _formatCommentTime(comment['createdAt']?.toString()),
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.grey[600],
-                            ),
+                            style: palette.caption(color: palette.textMuted),
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
                       ExpandableCommentText(
                         text: comment['commentText']?.toString() ?? '',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black87,
-                        ),
+                        style: palette.body(color: palette.textPrimary),
                         maxLines: 4,
                       ),
                     ],
@@ -419,10 +412,11 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                 const SizedBox(width: 6),
                 Text(
                   isSuccess ? 'Etkileşim başarılı' : 'Etkileşim başarısız',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isSuccess ? Colors.amber.shade900 : Colors.red.shade700,
+                  style: SeyirPalette.of(context).caption(
+                    weight: FontWeight.w600,
+                    color: isSuccess
+                        ? SeyirPalette.of(context).foreground(Colors.amber.shade800)
+                        : SeyirPalette.of(context).foreground(SeyirTokens.reject),
                   ),
                 ),
               ],
@@ -1012,10 +1006,12 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
   ) {
     return Container(
       decoration: BoxDecoration(
-        color: selectedOption == value ? color.withOpacity(0.1) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: selectedOption == value
+            ? color.withValues(alpha: 0.18)
+            : SeyirPalette.of(context).card,
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
         border: Border.all(
-          color: selectedOption == value ? color : Colors.grey[300]!,
+          color: selectedOption == value ? color : SeyirPalette.of(context).border,
           width: selectedOption == value ? 2 : 1,
         ),
       ),
@@ -1040,17 +1036,16 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: selectedOption == value ? color : Colors.black87,
+                    style: SeyirPalette.of(context).title(
+                      color: selectedOption == value
+                          ? color
+                          : SeyirPalette.of(context).textPrimary,
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                    style: SeyirPalette.of(context).caption(
+                      color: SeyirPalette.of(context).textMuted,
                     ),
                   ),
                 ],

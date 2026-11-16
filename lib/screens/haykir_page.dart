@@ -7,6 +7,7 @@ import '../services/itibar_endeksi_service.dart';
 import '../utils/dialog_utils.dart';
 import '../data/direm_data.dart';
 import '../providers/dava_provider.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/haykir_duration.dart';
 
 import '../widgets/haykir_case_card.dart';
@@ -19,11 +20,15 @@ export '../widgets/haykir_case_card.dart' show Haykir, FiveCardCaseInformation, 
 class HaykirPage extends StatefulWidget {
   final String? userEmail; // Kullanıcı e-posta adresi
   final bool initialShowForm; // Sayfa açıldığında formu otomatik aç
+  final String? initialSlogan;
+  final String? initialDetay;
 
   const HaykirPage({
     super.key, 
     this.userEmail,
     this.initialShowForm = false,
+    this.initialSlogan,
+    this.initialDetay,
   });
 
   @override
@@ -50,6 +55,14 @@ class _HaykirPageState extends State<HaykirPage> {
     // Eğer initialShowForm true ise formu otomatik aç
     if (widget.initialShowForm) {
       showCreateForm = true;
+    }
+    final slogan = widget.initialSlogan;
+    final detay = widget.initialDetay;
+    if (slogan != null && slogan.isNotEmpty) {
+      _sloganController.text = slogan;
+    }
+    if (detay != null && detay.isNotEmpty) {
+      _detayController.text = detay;
     }
   }
   
@@ -198,6 +211,7 @@ class _HaykirPageState extends State<HaykirPage> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 600;
 
@@ -248,7 +262,7 @@ class _HaykirPageState extends State<HaykirPage> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: AppExpandableIconMenu(
           expandBody: true,
@@ -259,7 +273,14 @@ class _HaykirPageState extends State<HaykirPage> {
             AppExpandableIconMenuItem(
               onTap: () {},
               customChild: IconButton(
-                icon: Icon(Icons.campaign, size: 24, color: Colors.black54),
+                tooltip: 'Ekle',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                  fixedSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                ),
+                icon: Icon(Icons.campaign, size: 24, color: palette.textSecondary),
                 onPressed: () {
                   setState(() {
                     showCreateForm = !showCreateForm;
@@ -287,7 +308,7 @@ class _HaykirPageState extends State<HaykirPage> {
               children: [
             // Header Section
             Container(
-              color: Colors.white,
+              color: palette.surface,
               child: Column(
                 children: [
                   ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
@@ -307,17 +328,18 @@ class _HaykirPageState extends State<HaykirPage> {
 
             // Tab Section
             Container(
-              color: Colors.white,
+              color: palette.surface,
               padding: const EdgeInsets.symmetric(horizontal: 53.0, vertical: 8.0),
               child: Row(
                 children: [
-                  // Menü ikonu - tıklanabilir
                   Expanded(
                     child: Container(
+                      constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+                      alignment: Alignment.center,
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
                       decoration: BoxDecoration(
                         color: Colors.orangeAccent,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                       ),
                       child: const Text(
                         'HAYKIR',
@@ -325,7 +347,7 @@ class _HaykirPageState extends State<HaykirPage> {
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          fontSize: SeyirTokens.typeTitle,
                         ),
                       ),
                     ),
@@ -345,8 +367,9 @@ class _HaykirPageState extends State<HaykirPage> {
                             if (showCreateForm)
                               Card(
                                 elevation: 4,
+                                color: palette.card,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(20.0),
@@ -358,17 +381,26 @@ class _HaykirPageState extends State<HaykirPage> {
                                         children: [
                                           Icon(Icons.add_circle, color: Colors.orange.shade700, size: 28),
                                           const SizedBox(width: 12),
-                                          const Text(
+                                          Text(
                                             'Yeni Haykırış Oluştur',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.black87,
-                                            ),
+                                            style: palette.headline(),
                                           ),
                                           const Spacer(),
                                           IconButton(
-                                            icon: const Icon(Icons.close),
+                                            tooltip: 'Kapat',
+                                            style: IconButton.styleFrom(
+                                              minimumSize: const Size(
+                                                SeyirTokens.tapTarget,
+                                                SeyirTokens.tapTarget,
+                                              ),
+                                              fixedSize: const Size(
+                                                SeyirTokens.tapTarget,
+                                                SeyirTokens.tapTarget,
+                                              ),
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              padding: EdgeInsets.zero,
+                                            ),
+                                            icon: Icon(Icons.close, color: palette.textSecondary),
                                             onPressed: () {
                                               setState(() => showCreateForm = false);
                                             },
@@ -381,10 +413,10 @@ class _HaykirPageState extends State<HaykirPage> {
                                       Container(
                                         padding: const EdgeInsets.all(16),
                                         decoration: BoxDecoration(
-                                          color: Colors.orange.shade50,
-                                          borderRadius: BorderRadius.circular(12),
+                                          color: palette.tint(Colors.orange.shade700),
+                                          borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                                           border: Border.all(
-                                            color: Colors.orange.shade200,
+                                            color: palette.tintBorder(Colors.orange.shade700),
                                             width: 1.5,
                                           ),
                                         ),
@@ -398,11 +430,12 @@ class _HaykirPageState extends State<HaykirPage> {
                                                 hintText: 'Haykırışınızın adını girin',
                                                 prefixIcon: const Icon(Icons.campaign),
                                                 border: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
+                                                  borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                                                 ),
                                                 filled: true,
-                                                fillColor: Colors.white,
+                                                fillColor: palette.card,
                                               ),
+                                              style: palette.title(weight: FontWeight.w500),
                                               onChanged: (_) => setState(() {}),
                                             ),
                                             const SizedBox(height: 19),
@@ -413,11 +446,12 @@ class _HaykirPageState extends State<HaykirPage> {
                                                 hintText: 'Sloganınızı girin',
                                                 prefixIcon: const Icon(Icons.format_quote),
                                                 border: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
+                                                  borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                                                 ),
                                                 filled: true,
-                                                fillColor: Colors.white,
+                                                fillColor: palette.card,
                                               ),
+                                              style: palette.body(),
                                               maxLines: 2,
                                               onChanged: (_) => setState(() {}),
                                             ),
@@ -428,10 +462,9 @@ class _HaykirPageState extends State<HaykirPage> {
                                                   children: [
                                                     const Expanded(child: Divider(height: 24, thickness: 1)),Text(
                                                       'Seçilen Diren:',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: Colors.orange.shade700,
+                                                      style: palette.caption(
+                                                        weight: FontWeight.w800,
+                                                        color: palette.foreground(Colors.orange.shade700),
                                                       ),
                                                     ),
                                                     Padding(
@@ -464,12 +497,10 @@ class _HaykirPageState extends State<HaykirPage> {
                                                             _selectedDireme ?? (_ozelDiremController.text.trim().isNotEmpty
                                                                 ? _ozelDiremController.text.trim()
                                                                 : 'Henüz direm seçilmedi'),
-                                                            style: TextStyle(
-                                                              fontSize: 14,
-                                                              fontWeight: FontWeight.w500,
+                                                            style: palette.body(
                                                               color: (_selectedDireme != null || _ozelDiremController.text.trim().isNotEmpty)
-                                                                  ? Colors.black87
-                                                                  : Colors.grey,
+                                                                  ? palette.textPrimary
+                                                                  : palette.textMuted,
                                                             ),
                                                           ),
                                                         ],
@@ -487,10 +518,10 @@ class _HaykirPageState extends State<HaykirPage> {
                                       Container(
                                         padding: const EdgeInsets.all(16),
                                         decoration: BoxDecoration(
-                                          color: Colors.green.shade50,
-                                          borderRadius: BorderRadius.circular(12),
+                                          color: palette.tint(Colors.green.shade700),
+                                          borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                                           border: Border.all(
-                                            color: Colors.green.shade200,
+                                            color: palette.tintBorder(Colors.green.shade700),
                                             style: BorderStyle.solid,
                                             width: 2,
                                           ),
@@ -498,13 +529,9 @@ class _HaykirPageState extends State<HaykirPage> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            const Text(
+                                            Text(
                                               'DİREN',
-                                              style: TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.black87,
-                                              ),
+                                              style: palette.headline(),
                                             ),
                                             const SizedBox(height: 12),
 
@@ -517,7 +544,7 @@ class _HaykirPageState extends State<HaykirPage> {
                                                 separatorBuilder: (context, index) => VerticalDivider(
                                                   width: 16,
                                                   thickness: 1,
-                                                  color: Colors.grey.shade400,
+                                                  color: palette.border,
                                                 ),
                                                 itemBuilder: (context, index) {
                                                   final category = allCategories[index];
@@ -530,9 +557,9 @@ class _HaykirPageState extends State<HaykirPage> {
                                                         const SizedBox(width: 4),
                                                         Text(
                                                           category.name,
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                          style: palette.caption(
+                                                            weight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                                                            color: palette.textPrimary,
                                                           ),
                                                         ),
                                                       ],
@@ -546,11 +573,11 @@ class _HaykirPageState extends State<HaykirPage> {
                                                         }
                                                       });
                                                     },
-                                                    selectedColor: category.color.withOpacity(0.3),
+                                                    selectedColor: category.color.withValues(alpha: 0.3),
                                                     checkmarkColor: category.color,
-                                                    backgroundColor: Colors.white,
+                                                    backgroundColor: palette.card,
                                                     side: BorderSide(
-                                                      color: isSelected ? category.color : Colors.grey.shade300,
+                                                      color: isSelected ? category.color : palette.border,
                                                       width: isSelected ? 2 : 1,
                                                     ),
                                                   );
@@ -583,11 +610,12 @@ class _HaykirPageState extends State<HaykirPage> {
                                                           }
                                                         });
                                                       },
-                                                      selectedColor: category.color.withOpacity(0.3),
+                                                      selectedColor: category.color.withValues(alpha: 0.3),
                                                       checkmarkColor: category.color,
-                                                      backgroundColor: Colors.white,
+                                                      backgroundColor: palette.card,
+                                                      labelStyle: palette.body(),
                                                       side: BorderSide(
-                                                        color: isSelected ? category.color : Colors.grey.shade300,
+                                                        color: isSelected ? category.color : palette.border,
                                                         width: isSelected ? 2 : 1,
                                                       ),
                                                     );
@@ -602,10 +630,10 @@ class _HaykirPageState extends State<HaykirPage> {
                                             Container(
                                               padding: const EdgeInsets.all(12),
                                               decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius: BorderRadius.circular(8),
+                                                color: palette.card,
+                                                borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
                                                 border: Border.all(
-                                                  color: Colors.green.shade300,
+                                                  color: palette.tintBorder(Colors.green.shade700),
                                                   style: BorderStyle.solid,
                                                   width: 1.5,
                                                 ),
@@ -621,11 +649,10 @@ class _HaykirPageState extends State<HaykirPage> {
                                                         border: InputBorder.none,
                                                         isDense: true,
                                                         counterText: '${_ozelDiremController.text.length}/19',
-                                                        counterStyle: TextStyle(
-                                                          fontSize: 10,
+                                                        counterStyle: palette.caption(
                                                           color: _ozelDiremController.text.length > 19
-                                                            ? Colors.red
-                                                            : Colors.grey,
+                                                            ? SeyirTokens.reject
+                                                            : palette.textMuted,
                                                         ),
                                                       ),
                                                       onChanged: (value) {
@@ -680,14 +707,14 @@ class _HaykirPageState extends State<HaykirPage> {
                                                     style: ElevatedButton.styleFrom(
                                                       backgroundColor: Colors.green.shade700,
                                                       foregroundColor: Colors.white,
-                                                      minimumSize: const Size(0, 40),
+                                                      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
                                                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                                       shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(8),
+                                                        borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
                                                       ),
                                                     ),
-                                                    child: const Text('OK'),
+                                                    child: Text('Ekle', style: palette.body(weight: FontWeight.w800, color: Colors.white)),
                                                   ),
                                                 ],
                                               ),
@@ -706,10 +733,10 @@ class _HaykirPageState extends State<HaykirPage> {
                                           hintText: 'En az 19, en fazla 361 karakter',
                                           prefixIcon: const Icon(Icons.description),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                                           ),
                                           filled: true,
-                                          fillColor: Colors.white,
+                                          fillColor: palette.card,
                                           helperText: '${_detayController.text.length}/361 karakter',
                                           errorText: _detayController.text.trim().isNotEmpty && 
                                                      (_detayController.text.trim().length < 19 || 
@@ -719,6 +746,7 @@ class _HaykirPageState extends State<HaykirPage> {
                                                   : 'Detay en fazla 361 karakter olabilir')
                                               : null,
                                         ),
+                                        style: palette.body(),
                                         maxLines: 6,
                                         maxLength: 361, // ✅ En fazla 361 karakter
                                         buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
@@ -726,11 +754,10 @@ class _HaykirPageState extends State<HaykirPage> {
                                             padding: const EdgeInsets.only(top: 8.0),
                                             child: Text(
                                               '$currentLength/$maxLength karakter',
-                                              style: TextStyle(
+                                              style: palette.caption(
                                                 color: currentLength < 19 
-                                                    ? Colors.red 
-                                                    : (currentLength > 361 ? Colors.red : Colors.grey),
-                                                fontSize: 12,
+                                                    ? SeyirTokens.reject 
+                                                    : (currentLength > 361 ? SeyirTokens.reject : palette.textMuted),
                                               ),
                                             ),
                                           );
@@ -748,9 +775,11 @@ class _HaykirPageState extends State<HaykirPage> {
                                                 setState(() => showCreateForm = false);
                                               },
                                               style: OutlinedButton.styleFrom(
+                                                foregroundColor: palette.textPrimary,
+                                                minimumSize: const Size(0, SeyirTokens.tapTarget),
                                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                                 shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(8),
+                                                  borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
                                                 ),
                                               ),
                                               child: const Text('İPTAL'),
@@ -773,14 +802,22 @@ class _HaykirPageState extends State<HaykirPage> {
                                                     }
                                                   : null,
                                               icon: const Icon(Icons.campaign, size: 20),
-                                              label: const Text('HAYKIR'),
+                                              label: const Text(
+                                                'Kartı hazırla',
+                                                style: TextStyle(
+                                                  fontSize: SeyirTokens.typeTitle,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: Colors.orange.shade600,
                                                 foregroundColor: Colors.white,
-                                                minimumSize: const Size(0, 48),
+                                                disabledBackgroundColor: palette.surfaceMuted,
+                                                disabledForegroundColor: palette.textSecondary,
+                                                minimumSize: const Size(0, SeyirTokens.tapTarget),
                                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                                 shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(8),
+                                                  borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
                                                 ),
                                               ),
                                             ),

@@ -7,8 +7,10 @@ import '../services/hive_database_service.dart';
 import '../utils/dialog_utils.dart';
 import '../utils/map_safety.dart'; // âœ… asStringDynamicMap iÃ§in
 import '../providers/dava_provider.dart';
+import '../theme/seyir_tokens.dart';
 import '../widgets/katildigim_haykir_card.dart';
-import 'home_page.dart'; // HaykirCardWidget iÃ§in
+import '../widgets/home_haykir_card.dart';
+import 'haykir_page.dart';
 
 class HaykirislarimPage extends StatefulWidget {
   final String? userEmail; // KullanÄ±cÄ± e-posta adresi
@@ -57,8 +59,21 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
     };
   }
 
+  void _openCreateForm() {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => HaykirPage(
+          userEmail: widget.userEmail,
+          initialShowForm: true,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 600;
     final davaProvider = Provider.of<DavaProvider>(context, listen: false);
@@ -105,7 +120,7 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
         : haykirDataList.isEmpty;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: AppExpandableIconMenu(
           expandBody: true,
@@ -114,10 +129,17 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
           keepGapWhenClosed: !isSmallScreen,
           items: [
             AppExpandableIconMenuItem(
-              onTap: () {},
+              onTap: _openCreateForm,
               customChild: IconButton(
-                icon: const Icon(Icons.campaign, size: 24, color: Colors.black54),
-                onPressed: () {},
+                tooltip: 'Ekle',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                  fixedSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                ),
+                icon: Icon(Icons.campaign, size: 24, color: palette.textSecondary),
+                onPressed: _openCreateForm,
               ),
             ),
             AppExpandableIconMenuItem(
@@ -125,9 +147,9 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
               customChild: Column(
                 children: [
                   const SizedBox(height: 76),
-                  const Icon(Icons.save_as_outlined, size: 24, color: Colors.black54),
+                  Icon(Icons.save_as_outlined, size: 24, color: palette.textSecondary),
                   const SizedBox(height: 76),
-                  const Icon(Icons.edit_document, size: 24, color: Colors.black54),
+                  Icon(Icons.edit_document, size: 24, color: palette.textSecondary),
                   const SizedBox(height: 76),
                   Image.asset('lib/icons/06_left_row_ahizelitelefon_icon.png', width: 24, height: 24),
                 ],
@@ -140,7 +162,7 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
               children: [
             // Header Section
             Container(
-              color: Colors.white,
+              color: palette.surface,
               child: Column(
                 children: [
                   ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
@@ -160,16 +182,22 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
             
             // Tab Section
             Container(
-              color: Colors.white,
+              color: palette.surface,
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  // MenÃ¼ ikonu - tÄ±klanabilir
-                  GestureDetector(
-                    onTap: toggle,
-                    child: Icon(
+                  IconButton(
+                    tooltip: 'Menü',
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                      fixedSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: EdgeInsets.zero,
+                    ),
+                    onPressed: toggle,
+                    icon: const Icon(
                       MdiIcons.menuOpen,
-                      size: 34,
+                      size: 28,
                       color: Colors.red,
                     ),
                   ),
@@ -188,6 +216,8 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                                 });
                               },
                               child: Container(
+                                constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+                                alignment: Alignment.center,
                                 padding: const EdgeInsets.symmetric(vertical: 12.0),
                                 decoration: BoxDecoration(
                                   gradient: isHaykirislarim
@@ -197,7 +227,7 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                                           end: Alignment.bottomRight,
                                         )
                                       : null,
-                                  color: isHaykirislarim ? null : Colors.grey[300],
+                                  color: isHaykirislarim ? null : palette.surfaceMuted,
                                   borderRadius: const BorderRadius.only(
                                     topLeft: Radius.circular(12),
                                     bottomLeft: Radius.circular(12),
@@ -205,7 +235,7 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                                   boxShadow: isHaykirislarim
                                       ? [
                                           BoxShadow(
-                                            color: Colors.orange.withOpacity(0.4),
+                                            color: Colors.orange.withValues(alpha: 0.4),
                                             blurRadius: 8,
                                             spreadRadius: 1,
                                           ),
@@ -218,16 +248,16 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                                     Icon(
                                       Icons.campaign,
                                       size: 18,
-                                      color: isHaykirislarim ? Colors.white : Colors.grey[600],
+                                      color: isHaykirislarim ? Colors.white : palette.textSecondary,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      'HAYKIRIÅLARIM',
+                                      'HAYKIRIŞLARIM',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        color: isHaykirislarim ? Colors.white : Colors.grey[600],
+                                        color: isHaykirislarim ? Colors.white : palette.textSecondary,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 14,
+                                        fontSize: SeyirTokens.typeBody,
                                         letterSpacing: 0.5,
                                       ),
                                     ),
@@ -248,16 +278,18 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                                 });
                               },
                               child: Container(
+                                constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+                                alignment: Alignment.center,
                                 padding: const EdgeInsets.symmetric(vertical: 12.0),
                                 decoration: BoxDecoration(
                                   gradient: !isHaykirislarim
-                                      ? LinearGradient(
-                                          colors: [Colors.black87, Colors.black54],
+                                      ? const LinearGradient(
+                                          colors: [Color(0xFF1A1A1A), Color(0xFF374151)],
                                           begin: Alignment.topLeft,
                                           end: Alignment.bottomRight,
                                         )
                                       : null,
-                                  color: !isHaykirislarim ? null : Colors.grey[300],
+                                  color: !isHaykirislarim ? null : palette.surfaceMuted,
                                   borderRadius: const BorderRadius.only(
                                     topRight: Radius.circular(12),
                                     bottomRight: Radius.circular(12),
@@ -265,7 +297,7 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                                   boxShadow: !isHaykirislarim
                                       ? [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.3),
+                                            color: palette.shadow,
                                             blurRadius: 8,
                                             spreadRadius: 1,
                                           ),
@@ -278,16 +310,16 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                                     Icon(
                                       Icons.group,
                                       size: 18,
-                                      color: !isHaykirislarim ? Colors.white : Colors.grey[600],
+                                      color: !isHaykirislarim ? Colors.white : palette.textSecondary,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      'KATILDIÄIM',
+                                      'KATILDIĞIM',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        color: !isHaykirislarim ? Colors.white : Colors.grey[600],
+                                        color: !isHaykirislarim ? Colors.white : palette.textSecondary,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 14,
+                                        fontSize: SeyirTokens.typeBody,
                                         letterSpacing: 0.5,
                                       ),
                                     ),
@@ -309,81 +341,59 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
           },
           body: isEmpty
                           ? Center(
-                              child: Container(
-                                padding: const EdgeInsets.all(32),
-                                margin: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: isHaykirislarim
-                                      ? Colors.orange.shade50
-                                      : Colors.teal.shade50,
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: isHaykirislarim
-                                        ? Colors.orange.shade200
-                                        : Colors.teal.shade200,
-                                    width: 2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: (isHaykirislarim
-                                              ? Colors.orange
-                                              : Colors.teal)
-                                          .withOpacity(0.15),
-                                      blurRadius: 10,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(SeyirTokens.space6),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(20),
-                                      decoration: BoxDecoration(
-                                        color: isHaykirislarim
-                                            ? Colors.orange.shade100
-                                            : Colors.teal.shade100,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        isHaykirislarim
-                                            ? Icons.campaign_outlined
-                                            : Icons.group_outlined,
-                                        size: 64,
-                                        color: isHaykirislarim
-                                            ? Colors.orange.shade700
-                                            : Colors.teal.shade700,
-                                      ),
+                                    Icon(
+                                      isHaykirislarim
+                                          ? Icons.campaign_outlined
+                                          : Icons.group_outlined,
+                                      size: 64,
+                                      color: palette.textMuted,
                                     ),
-                                    const SizedBox(height: 24),
+                                    const SizedBox(height: SeyirTokens.space4),
                                     Text(
                                       isHaykirislarim
-                                          ? 'HenÃ¼z haykÄ±rÄ±ÅŸÄ±nÄ±z yok!'
-                                          : 'HenÃ¼z katÄ±ldÄ±ÄŸÄ±nÄ±z haykÄ±rÄ±ÅŸ yok.',
+                                          ? 'Henüz haykırışınız yok!'
+                                          : 'Henüz katıldığınız haykırış yok.',
                                       textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: isHaykirislarim
-                                            ? Colors.orange.shade700
-                                            : Colors.teal.shade700,
+                                      style: palette.title(
+                                        weight: FontWeight.w500,
+                                        color: palette.textSecondary,
                                       ),
                                     ),
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: SeyirTokens.space2),
                                     Text(
                                       isHaykirislarim
-                                          ? 'Yeni bir haykÄ±rÄ±ÅŸ oluÅŸturarak\nsesinizi duyurun!'
-                                          : 'HaykÄ±rÄ±ÅŸlara katÄ±larak\netkileÅŸime geÃ§in!',
+                                          ? 'Yeni bir haykırış oluşturarak\nsesinizi duyurun!'
+                                          : 'Haykırışlara katılarak\netkileşime geçin!',
                                       textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: isHaykirislarim
-                                            ? Colors.orange.shade600
-                                            : Colors.teal.shade600,
-                                        height: 1.5,
+                                      style: palette.body(
+                                        weight: FontWeight.w400,
+                                        color: palette.textMuted,
                                       ),
                                     ),
+                                    if (isHaykirislarim) ...[
+                                      const SizedBox(height: SeyirTokens.space4),
+                                      FilledButton.icon(
+                                        onPressed: _openCreateForm,
+                                        icon: const Icon(Icons.campaign),
+                                        label: const Text(
+                                          'Haykır oluştur',
+                                          style: TextStyle(
+                                            fontSize: SeyirTokens.typeTitle,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: Colors.orange.shade600,
+                                          foregroundColor: Colors.white,
+                                          minimumSize: const Size(0, SeyirTokens.tapTarget),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
