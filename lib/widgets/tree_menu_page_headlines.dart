@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
+import '../theme/seyir_tokens.dart';
+
 class TreeMenuPageheadlines extends StatelessWidget {
   final VoidCallback? onMenuPressed;
   final Widget? menuButton;
@@ -18,13 +20,6 @@ class TreeMenuPageheadlines extends StatelessWidget {
   /// Kaydedilen dava düzenleme ikonu (Katıldığım Davalar gibi sayfalarda false).
   final bool showSavedDavalarIcon;
 
-  static const TextStyle _titleStyle = TextStyle(
-    fontSize: 17,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.5,
-    color: Color(0xFF2F3E35),
-  );
-
   const TreeMenuPageheadlines({
     super.key,
     this.onMenuPressed,
@@ -34,7 +29,7 @@ class TreeMenuPageheadlines extends StatelessWidget {
     this.hasPendingSavedDava = false,
     this.isCollapsed = false,
     this.onToggleCollapse,
-    this.headlineText = 'AÇTIĞIM DAVALAR',
+    this.headlineText = 'Açtığım Davalar',
     this.headlineAssetPath = 'lib/icons/06_left_row_actigim_davalar_icon.png',
     this.headlineDavaCount,
     this.showSavedDavalarIcon = true,
@@ -42,13 +37,18 @@ class TreeMenuPageheadlines extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final bool saveActive = highlightSaveIcon || hasPendingSavedDava;
+    final TextStyle titleStyle = palette.headline(
+      weight: FontWeight.w600,
+    ).copyWith(letterSpacing: 0.5);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
         children: [
           menuButton ??
               IconButton(
-                icon: Icon(
+                icon: const Icon(
                   MdiIcons.menuOpen,
                   size: 34,
                   color: Colors.red,
@@ -62,7 +62,7 @@ class TreeMenuPageheadlines extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('|| $headlineText ||', style: _titleStyle),
+                Text(headlineText, style: titleStyle),
                 if (headlineDavaCount != null && headlineDavaCount! > 0) ...[
                   const SizedBox(width: 7),
                   _HeadlineDavaCountBadge(count: headlineDavaCount!),
@@ -75,35 +75,35 @@ class TreeMenuPageheadlines extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                       onTap: onShowSavedDavalar,
                       child: Padding(
-                        padding: EdgeInsets.all(4.0),
+                        padding: const EdgeInsets.all(4.0),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: highlightSaveIcon || hasPendingSavedDava
-                                ? const Color(0xFF4CAF50).withOpacity(0.08)
+                            color: saveActive
+                                ? palette.brandSoft
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: highlightSaveIcon || hasPendingSavedDava
-                                  ? const Color(0xFF4CAF50)
+                              color: saveActive
+                                  ? SeyirTokens.brand
                                   : Colors.transparent,
                               width: highlightSaveIcon ? 3 : (hasPendingSavedDava ? 1.5 : 0),
                             ),
                             boxShadow: highlightSaveIcon
                                 ? [
                                     BoxShadow(
-                                      color: const Color(0xFF4CAF50).withOpacity(0.35),
+                                      color: SeyirTokens.brand.withValues(alpha: 0.35),
                                       blurRadius: 10,
                                       spreadRadius: 2,
                                     ),
                                   ]
                                 : [],
                           ),
-                          child: Icon(
+                          child: const Icon(
                             MdiIcons.contentSaveOutline,
                             size: 24,
-                            color: Colors.green,
+                            color: SeyirTokens.brand,
                           ),
                         ),
                       ),
@@ -118,7 +118,7 @@ class TreeMenuPageheadlines extends StatelessWidget {
               icon: Icon(
                 isCollapsed ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
                 size: 24,
-                color: Colors.black,
+                color: palette.textPrimary,
               ),
               onPressed: onToggleCollapse,
               tooltip: isCollapsed ? 'Arayüzü Aç' : 'Arayüzü Kapat',
@@ -139,14 +139,15 @@ class _HeadlineDavaCountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFF3949AB),
+        color: SeyirTokens.brand,
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
+            color: palette.shadow,
             blurRadius: 3,
             offset: const Offset(0, 1),
           ),
@@ -155,9 +156,9 @@ class _HeadlineDavaCountBadge extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 18, minHeight: 16),
       child: Text(
         count > 99 ? '99+' : count.toString(),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
+        style: TextStyle(
+          color: palette.onSolid(SeyirTokens.brand),
+          fontSize: SeyirTokens.typeCaption,
           fontWeight: FontWeight.bold,
           height: 1.1,
         ),

@@ -10,6 +10,7 @@ import '../services/hive_database_service.dart';
 import '../services/dava_timer_service.dart';
 import 'gelen_davalar_kactane.dart';
 import '../providers/dava_provider.dart';
+import '../theme/seyir_tokens.dart';
 
 export '../widgets/gelen_dava_card.dart' show Dava, FiveCardCaseInformation, DashedLinePainter;
 
@@ -160,7 +161,9 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
               ],
             );
           },
-          body: ListView.builder(
+          body: _davaList.isEmpty
+              ? const _GelenEmptyState()
+              : ListView.builder(
                         itemCount: _davaList.length,
                         itemBuilder: (context, index) {
                           return ListTile(
@@ -206,31 +209,68 @@ class GelenDavalarHeadlineRow extends StatelessWidget {
     required this.menuButton,
   });
 
-  static const TextStyle _titleStyle = TextStyle(
-    fontSize: 19,
-    fontWeight: FontWeight.w600,
-  );
-
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Padding(
       padding: kSeyirHeadlinePadding,
       child: Row(
         children: [
           menuButton,
-          const Expanded(
+          Expanded(
             child: Center(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(' || GELEN DAVALAR ||', style: _titleStyle),
-                  SizedBox(width: 7),
-                  _IncomingDavaCountBadge(),
+                  Text(
+                    'Gelen Davalar',
+                    style: palette.headline(weight: FontWeight.w600),
+                  ),
+                  const SizedBox(width: 7),
+                  const _IncomingDavaCountBadge(),
                 ],
               ),
             ),
           ),
           const SizedBox(width: 48),
+        ],
+      ),
+    );
+  }
+}
+
+class _GelenEmptyState extends StatelessWidget {
+  const _GelenEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(SeyirTokens.space6),
+      child: Column(
+        children: [
+          Icon(
+            Icons.folder_open,
+            size: 64,
+            color: palette.textMuted,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Gelen dava yok',
+            style: palette.title(
+              weight: FontWeight.w500,
+              color: palette.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Size atanan davalar burada görünür',
+            textAlign: TextAlign.center,
+            style: palette.body(
+              weight: FontWeight.w400,
+              color: palette.textMuted,
+            ),
+          ),
         ],
       ),
     );
@@ -243,12 +283,13 @@ class _IncomingDavaCountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Tooltip(
       message: 'Gelen dava özeti',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
           onTap: () {
             Navigator.push(
               context,
@@ -257,52 +298,55 @@ class _IncomingDavaCountBadge extends StatelessWidget {
               ),
             );
           },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  MdiIcons.briefcaseArrowLeftRightOutline,
-                  size: 26,
-                  color: Colors.black54,
-                ),
-                Positioned(
-                  right: -6,
-                  top: -6,
-                  child: Consumer<DavaProvider>(
-                    builder: (context, davaProvider, child) {
-                      final count = davaProvider.incomingDavaCount;
-                      if (count <= 0) return const SizedBox.shrink();
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3949AB),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 3,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        constraints: const BoxConstraints(minWidth: 18, minHeight: 16),
-                        child: Text(
-                          count > 99 ? '99+' : count.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            height: 1.1,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      );
-                    },
+          child: SizedBox(
+            width: SeyirTokens.tapTarget,
+            height: SeyirTokens.tapTarget,
+            child: Center(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    MdiIcons.briefcaseArrowLeftRightOutline,
+                    size: 26,
+                    color: palette.textSecondary,
                   ),
-                ),
-              ],
+                  Positioned(
+                    right: -6,
+                    top: -6,
+                    child: Consumer<DavaProvider>(
+                      builder: (context, davaProvider, child) {
+                        final count = davaProvider.incomingDavaCount;
+                        if (count <= 0) return const SizedBox.shrink();
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: SeyirTokens.brand,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: palette.shadow,
+                                blurRadius: 3,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          constraints: const BoxConstraints(minWidth: 18, minHeight: 16),
+                          child: Text(
+                            count > 99 ? '99+' : count.toString(),
+                            style: TextStyle(
+                              color: palette.onSolid(SeyirTokens.brand),
+                              fontSize: SeyirTokens.typeCaption,
+                              fontWeight: FontWeight.bold,
+                              height: 1.1,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

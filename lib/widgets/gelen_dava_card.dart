@@ -8,6 +8,7 @@ import '../services/dava_appeal_judge_assign_service.dart';
 import '../services/dava_auto_assign_service.dart';
 import '../services/dava_timer_service.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
 import 'countdown_timer_widget.dart';
 
 class Dava {
@@ -87,11 +88,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     final phaseColor = _cardPhaseColor();
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: palette.card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: phaseColor,
@@ -134,10 +136,10 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
                       _isAppealJudgeAssignmentCard()
                           ? 'TEMYİZ HAKİMLİĞİ GÖREVİ'
                           : 'MEVKİNİZİ SEÇİNİZ',
-                      style: TextStyle(
-                        fontSize: 18,
+                      style: const TextStyle(
+                        fontSize: SeyirTokens.typeHeadline,
                         fontWeight: FontWeight.bold,
-                        color: Colors.green.shade700,
+                        color: SeyirTokens.brand,
                         letterSpacing: 1,
                       ),
                     ),
@@ -150,11 +152,10 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
                         'Görevi çift tıklayarak kabul edin; ardından 8-Hüküm sayfasında karar verin. '
                         'Kabul etmezseniz görev başkasına verilmez, dava mevcut haliyle sonuçlanır.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                          height: 1.4,
-                        ),
+                        style: palette.body(
+                          weight: FontWeight.w400,
+                          color: palette.textSecondary,
+                        ).copyWith(height: 1.4),
                       ),
                     ),
                   ],
@@ -170,9 +171,9 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
                     child: Text(
                       'SEÇİLEN MEVKİ',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: SeyirTokens.typeHeadline,
                         fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade700,
+                        color: palette.textPrimary,
                         letterSpacing: 1,
                       ),
                     ),
@@ -242,13 +243,14 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
   }
 
   Widget _buildCaseInfo() {
+    final palette = SeyirPalette.of(context);
     final guest = _davaliIsGuest();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: palette.card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFDCE7E1)),
+        border: Border.all(color: palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,13 +295,14 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
   }
 
   Widget _buildCaseInfoRow(String label, String value, IconData icon) {
+    final palette = SeyirPalette.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
           icon,
           size: 20,
-          color: Colors.green.shade700,
+          color: SeyirTokens.brand,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -308,20 +311,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
             children: [
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
-                ),
+                style: palette.caption(weight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               Text(
                 value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade900,
-                ),
+                style: palette.title(weight: FontWeight.w700),
               ),
             ],
           ),
@@ -362,13 +357,14 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
   }
 
   Widget _buildModernDavaliRow(bool guest) {
+    final palette = SeyirPalette.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
+        const Icon(
           Icons.person_outline,
           size: 20,
-          color: Colors.green.shade700,
+          color: SeyirTokens.brand,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -377,11 +373,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
             children: [
               Text(
                 'Davalı',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
-                ),
+                style: palette.caption(weight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               Row(
@@ -389,11 +381,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
                   Expanded(
                     child: Text(
                       widget.dava.davali.isNotEmpty ? widget.dava.davali : 'Davalı Adı',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade900,
-                      ),
+                      style: palette.title(weight: FontWeight.w700),
                     ),
                   ),
                   if (guest) ...[
@@ -417,13 +405,14 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
   }
 
   Widget _buildStyledCountdownRow() {
+    final palette = SeyirPalette.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
+        const Icon(
           Icons.hourglass_bottom,
           size: 20,
-          color: Colors.green.shade700,
+          color: SeyirTokens.brand,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -432,11 +421,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
             children: [
               Text(
                 'Kalan Süre',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
-                ),
+                style: palette.caption(weight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               _buildCountdownRow(),
@@ -452,6 +437,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
     final openedAt = widget.dava.createdAt ?? DateTime.now();
     final segment = DavaTimerService.buildIncomingListCountdown(openedAt: openedAt);
 
+    final palette = SeyirPalette.of(context);
     if (segment == null) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,20 +446,15 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
             width: 80,
             child: Text(
               'Süre :',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
+              style: palette.body(weight: FontWeight.w700),
             ),
           ),
           Expanded(
             child: Text(
               'Ana süreç ve temyiz penceresi tamamlandı.',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
+              style: palette.body(
+                weight: FontWeight.w600,
+                color: palette.textSecondary,
               ),
             ),
           ),
@@ -488,10 +469,9 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
           padding: const EdgeInsets.only(bottom: 6),
           child: Text(
             segment.phaseLabel,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.redAccent,
+            style: palette.caption(
+              weight: FontWeight.w600,
+              color: SeyirTokens.warning,
             ),
           ),
         ),
@@ -502,11 +482,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
               width: 70,
               child: Text(
                 'Süre :',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
+                style: palette.body(weight: FontWeight.w700),
               ),
             ),
             Expanded(
@@ -618,19 +594,19 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
     required bool isReject,
     required VoidCallback onPressed,
   }) {
+    final palette = SeyirPalette.of(context);
     final isSelected = isReject ? isRejected : isAccepted;
-    
+    final Color tone = isReject ? SeyirTokens.reject : SeyirTokens.accept;
+    final Color fill = isSelected ? tone : palette.card;
+    final Color ink = isSelected ? palette.onSolid(tone) : palette.textPrimary;
+
     return Container(
       height: 50,
       decoration: BoxDecoration(
-        color: isSelected 
-          ? (isReject ? Colors.red.shade50 : Colors.green.shade50)
-          : Colors.white,
+        color: fill,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isSelected 
-            ? (isReject ? Colors.red : Colors.green)
-            : Colors.blue.shade300,
+          color: isSelected ? tone : palette.border,
           width: 2,
         ),
       ),
@@ -645,9 +621,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: isSelected 
-                  ? (isReject ? Colors.red.shade700 : Colors.green.shade700)
-                  : Colors.blue.shade700,
+                color: ink,
               ),
             ),
           ),

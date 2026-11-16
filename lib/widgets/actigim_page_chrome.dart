@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
+import '../theme/seyir_tokens.dart';
+
 import '../screens/davaci_unlulur_page.dart';
 import '../screens/gelen_davalar_page.dart';
 import '../screens/haykirislarim_page.dart';
@@ -49,6 +51,13 @@ class _ActigimPageChromeState extends State<ActigimPageChrome> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final ButtonStyle collapsedTap = IconButton.styleFrom(
+      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+      fixedSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+      padding: EdgeInsets.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
     return SafeArea(
       child: SingleChildScrollView(
         child: AppExpandableIconMenu(
@@ -60,42 +69,40 @@ class _ActigimPageChromeState extends State<ActigimPageChrome> {
               children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
-              height: isHeaderCollapsed ? 40 : null,
+              height: isHeaderCollapsed ? SeyirTokens.tapTarget : null,
               child: isHeaderCollapsed
                   ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: Row(
                         children: [
                           IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
+                            style: collapsedTap,
                             icon: Icon(
                               MdiIcons.menuOpen,
                               size: 18,
-                              color: Colors.black54,
+                              color: palette.textSecondary,
                             ),
                             onPressed: toggle,
                           ),
                           const SizedBox(width: 8),
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               '|| AÇTIĞIM DAVALAR ||',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: SeyirTokens.typeCaption,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.5,
-                                color: Color(0xFF2F3E35),
+                                color: palette.textPrimary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            icon: const Icon(
+                            style: collapsedTap,
+                            icon: Icon(
                               Icons.keyboard_arrow_down,
                               size: 18,
-                              color: Colors.black,
+                              color: palette.textPrimary,
                             ),
                             onPressed: () {
                               setState(() {

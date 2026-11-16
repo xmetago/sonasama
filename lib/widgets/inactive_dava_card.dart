@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
+import '../theme/seyir_tokens.dart';
 import 'actigim_case_card.dart';
 
 /// Modern Dava Kartı Widget'ı - Açtığım Davalar için
@@ -12,6 +13,18 @@ class InactiveDavaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final Color muted = palette.textSecondary;
+    final TextStyle onayla = TextStyle(
+      fontSize: SeyirTokens.typeCaption,
+      fontWeight: FontWeight.bold,
+      color: muted,
+    );
+    final TextStyle field = TextStyle(
+      fontSize: SeyirTokens.typeBody,
+      fontWeight: FontWeight.bold,
+      color: muted,
+    );
     return Opacity(
       opacity: 0.5, // Inaktif görünüm için opacity
       child: Card(
@@ -19,9 +32,9 @@ class InactiveDavaCard extends StatelessWidget {
         elevation: 1,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.red.shade200, width: 2),
+          side: BorderSide(color: palette.tintBorder(SeyirTokens.reject), width: 2),
         ),
-        color: Colors.red.shade50,
+        color: palette.tint(SeyirTokens.reject),
         child: Stack(
           children: [
             // Orijinal FiveCardCaseInformation içeriği
@@ -41,15 +54,11 @@ class InactiveDavaCard extends StatelessWidget {
                             Icon(
                               MdiIcons.homeFlood,
                               size: 19,
-                              color: Colors.grey,
+                              color: muted,
                             ),
-                            const Text(
+                            Text(
                               'Onayla',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                              ),
+                              style: onayla,
                               textAlign: TextAlign.center,
                             ),
                           ],
@@ -64,8 +73,8 @@ class InactiveDavaCard extends StatelessWidget {
                             return Container(
                               width: 60,
                               height: 50,
-                              color: Colors.grey.shade300,
-                              child: Icon(Icons.person, color: Colors.grey.shade600),
+                              color: palette.surfaceMuted,
+                              child: Icon(Icons.person, color: palette.textMuted),
                             );
                           },
                         ),
@@ -74,15 +83,11 @@ class InactiveDavaCard extends StatelessWidget {
                             Icon(
                               MdiIcons.giftOpen,
                               size: 19,
-                              color: Colors.grey,
+                              color: muted,
                             ),
-                            const Text(
+                            Text(
                               'Onayla',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                              ),
+                              style: onayla,
                               textAlign: TextAlign.center,
                             ),
                           ],
@@ -99,23 +104,15 @@ class InactiveDavaCard extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Text(
+                            Text(
                               'Dava Adı    :',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                              ),
+                              style: field,
                             ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 dava.adi,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey,
-                                ),
+                                style: field,
                               ),
                             ),
                           ],
@@ -123,13 +120,9 @@ class InactiveDavaCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Text(
+                            Text(
                               'Davalı         :',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                              ),
+                              style: field,
                             ),
                             const SizedBox(width: 4),
                             Expanded(
@@ -137,15 +130,11 @@ class InactiveDavaCard extends StatelessWidget {
                                 children: [
                                   Text(
                                     dava.davali,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey,
-                                    ),
+                                    style: field,
                                   ),
                                   const Spacer(),
-                                  const Icon(Icons.thumb_down_alt_outlined, size: 25, color: Colors.grey),
-                                  const Icon(Icons.thumb_up_alt_outlined, size: 25, color: Colors.grey),
+                                  Icon(Icons.thumb_down_alt_outlined, size: 25, color: muted),
+                                  Icon(Icons.thumb_up_alt_outlined, size: 25, color: muted),
                                 ],
                               ),
                             ),
@@ -154,23 +143,15 @@ class InactiveDavaCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Text(
+                            Text(
                               'Mevkii        :',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                              ),
+                              style: field,
                             ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 dava.mevkii,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey,
-                                ),
+                                style: field,
                               ),
                             ),
                           ],
@@ -178,23 +159,15 @@ class InactiveDavaCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(MdiIcons.timerAlertOutline, size: 19, color: Colors.grey),
-                            const Text(
+                            Icon(MdiIcons.timerAlertOutline, size: 19, color: muted),
+                            Text(
                               'Kalan Süre :',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                              ),
+                              style: field,
                             ),
                             const SizedBox(width: 5),
                             Text(
                               dava.kalanSure,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                              ),
+                              style: field,
                             ),
                           ],
                         ),
@@ -211,26 +184,30 @@ class InactiveDavaCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade700,
+                  color: SeyirTokens.reject,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.red.withValues(alpha: 0.3),
+                      color: SeyirTokens.reject.withValues(alpha: 0.3),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cancel, color: Colors.white, size: 14),
-                    SizedBox(width: 4),
+                    Icon(
+                      Icons.cancel,
+                      color: palette.onSolid(SeyirTokens.reject),
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
                       'RED EDİLDİ',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
+                        color: palette.onSolid(SeyirTokens.reject),
+                        fontSize: SeyirTokens.typeCaption,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
                       ),

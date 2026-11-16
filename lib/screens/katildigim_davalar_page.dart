@@ -16,6 +16,7 @@ import '../providers/auth_provider.dart';
 import '../providers/dava_provider.dart';
 import '../widgets/katildigim_dava_sayilari_section.dart';
 import '../widgets/ilgililerin_seyir_defteri_widgeti.dart';
+import '../theme/seyir_tokens.dart';
 export '../widgets/katildigim_case_card.dart' show FiveCardCaseInformation;
 
 class Dava {
@@ -115,15 +116,16 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
     }
     final bool collapsed = _seyirDefteriCollapsedByDavaId[davaId] ?? true;
 
+    final palette = SeyirPalette.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE6E6E6)),
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+        border: Border.all(color: palette.border),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: palette.shadow,
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -222,8 +224,15 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
           }
         }
 
+        final palette = SeyirPalette.of(context);
+        final ButtonStyle collapsedTap = IconButton.styleFrom(
+          minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+          fixedSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+          padding: EdgeInsets.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        );
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: palette.surface,
           body: SafeArea(
             child: SingleChildScrollView(
               child: AppExpandableIconMenu(
@@ -233,42 +242,40 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
                 headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
-                    height: isHeaderCollapsed ? 40 : null,
+                    height: isHeaderCollapsed ? SeyirTokens.tapTarget : null,
                     child: isHeaderCollapsed
                         ? Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
                             child: Row(
                               children: <Widget>[
                                 IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
+                                  style: collapsedTap,
                                   icon: Icon(
                                     MdiIcons.menuOpen,
                                     size: 18,
-                                    color: Colors.black54,
+                                    color: palette.textSecondary,
                                   ),
                                   onPressed: toggle,
                                 ),
                                 const SizedBox(width: 8),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
                                     '|| KATILDIĞIM DAVALAR ||',
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: SeyirTokens.typeCaption,
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.5,
-                                      color: Color(0xFF2F3E35),
+                                      color: palette.textPrimary,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  icon: const Icon(
+                                  style: collapsedTap,
+                                  icon: Icon(
                                     Icons.keyboard_arrow_down,
                                     size: 18,
-                                    color: Colors.black,
+                                    color: palette.textPrimary,
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -302,7 +309,7 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
                                 },
                                 isCollapsed: isHeaderCollapsed,
                                 showSavedDavalarIcon: false,
-                                headlineText: 'KATILDIĞIM DAVALAR',
+                                headlineText: 'Katıldığım Davalar',
                                 headlineAssetPath: 'lib/icons/06_left_row_katildigim_davalar_icon.png',
                                 headlineDavaCount: _katildigimDavalar.length,
                               ),
@@ -324,29 +331,29 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
                               ),
                               if (_katildigimDavalar.isEmpty)
                                 Padding(
-                                  padding: const EdgeInsets.all(32),
+                                  padding: const EdgeInsets.all(SeyirTokens.space6),
                                   child: Column(
                                     children: <Widget>[
                                       Icon(
                                         Icons.folder_open,
                                         size: 64,
-                                        color: Colors.grey[400],
+                                        color: palette.textMuted,
                                       ),
                                       const SizedBox(height: 16),
                                       Text(
                                         'Henüz rol ile katıldığınız dava yok',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey[600],
+                                        style: palette.title(
+                                          weight: FontWeight.w500,
+                                          color: palette.textSecondary,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
                                         'Jüri, yargıç, temyiz hakimi, şahit veya avukat olarak kabul ettiğiniz davalar burada görünür',
                                         textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[500],
+                                        style: palette.body(
+                                          weight: FontWeight.w400,
+                                          color: palette.textMuted,
                                         ),
                                       ),
                                     ],
