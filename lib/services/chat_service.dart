@@ -160,6 +160,19 @@ class ChatService {
       String userId1, String userId2) {
     return ChatServiceFirestore.watchConversation(userId1, userId2);
   }
+
+  /// Sohbet ekini yükler. Firebase yoksa yerel yol döner.
+  static Future<String?> storeChatFile({
+    required String filePath,
+    required String conversationId,
+    required String messageId,
+  }) {
+    return ChatServiceFirestore.storeChatFile(
+      filePath: filePath,
+      conversationId: conversationId,
+      messageId: messageId,
+    );
+  }
 }
 
 

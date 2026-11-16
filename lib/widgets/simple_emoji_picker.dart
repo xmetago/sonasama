@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+import 'delil_surface.dart';
+
 /// Basit emoji picker widget'ı
 /// Popüler emojileri gösterir
 class SimpleEmojiPicker extends StatelessWidget {
@@ -39,44 +42,42 @@ class SimpleEmojiPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Container(
       height: 300,
-      color: Colors.white,
+      color: palette.card,
       child: Column(
         children: [
-          // Başlık
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: SeyirTokens.space4,
+              vertical: SeyirTokens.space2,
+            ),
             decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: Colors.grey.shade200),
+                bottom: BorderSide(color: palette.border),
               ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Emoji Seç',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('Emoji Seç', style: palette.headline()),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  tooltip: 'Kapat',
+                  style: delilIconButtonStyle(foreground: palette.textPrimary),
+                  icon: Icon(Icons.close, color: palette.textPrimary),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
           ),
-          // Emoji grid
           Expanded(
             child: GridView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(SeyirTokens.space4),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 8,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
+                crossAxisSpacing: SeyirTokens.space2,
+                mainAxisSpacing: SeyirTokens.space2,
               ),
               itemCount: _emojis.length,
               itemBuilder: (context, index) {
@@ -85,16 +86,17 @@ class SimpleEmojiPicker extends StatelessWidget {
                     onEmojiSelected(_emojis[index]);
                     Navigator.pop(context);
                   },
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: SeyirTokens.radiusSmAll,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
+                      color: palette.surfaceMuted,
+                      borderRadius: SeyirTokens.radiusSmAll,
+                      border: Border.all(color: palette.border),
                     ),
                     child: Center(
                       child: Text(
                         _emojis[index],
-                        style: const TextStyle(fontSize: 28),
+                        style: const TextStyle(fontSize: 24),
                       ),
                     ),
                   ),

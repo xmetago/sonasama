@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'dart:async';
+import '../theme/seyir_tokens.dart';
+import 'delil_surface.dart';
 
 /// Sesli mesaj oynatıcı widget'ı
 /// Sesli mesajları oynatmak için kullanılır
@@ -109,27 +112,32 @@ class _AudioMessagePlayerState extends State<AudioMessagePlayer> {
         ? _position.inMilliseconds / displayDuration.inMilliseconds
         : 0.0;
 
+    final palette = SeyirPalette.of(context);
+    const sentBlue = Color(0xFF1976D2);
+    final accent = widget.isSent ? sentBlue : palette.textSecondary;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space2,
+        vertical: SeyirTokens.space1,
+      ),
       decoration: BoxDecoration(
-        color: widget.isSent ? Colors.blue.shade50 : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
+        color: widget.isSent ? palette.tint(sentBlue) : palette.surfaceMuted,
+        borderRadius: SeyirTokens.radiusLgAll,
+        border: Border.all(color: palette.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Oynat/Duraklat butonu
           IconButton(
+            tooltip: _isPlaying ? 'Duraklat' : 'Oynat',
+            style: delilIconButtonStyle(foreground: accent),
             icon: Icon(
               _isPlaying ? Icons.pause : Icons.play_arrow,
-              color: widget.isSent ? Colors.blue : Colors.grey.shade700,
+              color: accent,
             ),
             onPressed: _togglePlayPause,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
-          const SizedBox(width: 8),
-          // İlerleme çubuğu
+          const SizedBox(width: SeyirTokens.space2),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,31 +145,22 @@ class _AudioMessagePlayerState extends State<AudioMessagePlayer> {
               children: [
                 LinearProgressIndicator(
                   value: progress.clamp(0.0, 1.0),
-                  backgroundColor: Colors.grey.shade300,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    widget.isSent ? Colors.blue : Colors.grey.shade600,
-                  ),
+                  backgroundColor: palette.border,
+                  valueColor: AlwaysStoppedAnimation<Color>(accent),
                   minHeight: 4,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: SeyirTokens.space1),
                 Text(
                   _formatDuration(_position),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: widget.isSent ? Colors.blue.shade700 : Colors.grey.shade700,
-                  ),
+                  style: palette.caption(color: accent),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          // Toplam süre
+          const SizedBox(width: SeyirTokens.space2),
           Text(
             _formatDuration(displayDuration),
-            style: TextStyle(
-              fontSize: 12,
-              color: widget.isSent ? Colors.blue.shade700 : Colors.grey.shade700,
-            ),
+            style: palette.caption(color: accent),
           ),
         ],
       ),
