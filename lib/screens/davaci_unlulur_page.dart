@@ -387,7 +387,11 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const DelilleriIncelePage()),
+                    MaterialPageRoute(
+                      builder: (context) => DelilleriIncelePage(
+                        userEmail: widget.userEmail,
+                      ),
+                    ),
                   );
                 },
               ),

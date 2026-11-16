@@ -7,18 +7,24 @@ import '../models/evidence_model.dart';
 import '../services/evidence_service.dart';
 import '../services/hive_database_service.dart';
 import 'delil_detay_page.dart';
+import '../theme/seyir_tokens.dart';
+import '../utils/dialog_utils.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/shared/app_snack.dart';
 
 class DelilEklePage extends StatefulWidget {
   final String? userEmail;
   final String davaId; // Hangi davaya delil ekleneceği
   final String davaAdi; // Dava adı
+  /// Test: sayılar yüklenemesin, yeniden deneme görünsün.
+  final bool forceLoadError;
 
   const DelilEklePage({
     super.key,
     this.userEmail,
     required this.davaId,
     required this.davaAdi,
+    this.forceLoadError = false,
   });
 
   @override
@@ -36,6 +42,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
 
   bool _isLoading = false;
   bool _isDavaOpened = false; // Dava açılıp açılmadığını kontrol etmek için
+  String? _loadError;
 
   @override
   void initState() {
@@ -51,21 +58,30 @@ class _DelilEklePageState extends State<DelilEklePage> {
   }
 
   Future<void> _initializeData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
+      if (widget.forceLoadError) {
+        throw Exception('Delil sayıları yüklenemedi');
+      }
       await _evidenceService.initialize();
       _loadEvidenceData();
       _checkDavaStatus(); // Dava durumunu kontrol et
     } catch (e) {
       print('❌ Veri başlatılırken hata: $e');
+      if (mounted) {
+        setState(() => _loadError = 'Delil sayıları yüklenemedi');
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _loadEvidenceData() {
     _evidences = _evidenceService.getEvidenceByDavaId(widget.davaId);
-    _evidenceCounts = _evidenceService.getEvidenceCountsByDavaId(widget.davaId);
+    _evidenceCounts = _evidenceService.loadEvidenceCounts(widget.davaId);
     setState(() {});
   }
 
@@ -93,9 +109,17 @@ class _DelilEklePageState extends State<DelilEklePage> {
     }
   }
 
+  void _openSavedDavalar() {
+    final email = widget.userEmail;
+    if (email == null || email.isEmpty) return;
+    showSavedDavalarDialog(context, email);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Scaffold(
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -113,7 +137,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
               padding: const EdgeInsets.all(4.0),
               child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                 userEmail: widget.userEmail,
-                onShowSavedDavalar: () {},
+                onShowSavedDavalar: _openSavedDavalar,
               ),
             ),
 
@@ -123,40 +147,40 @@ class _DelilEklePageState extends State<DelilEklePage> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    tooltip: 'Geri',
+                    style: delilIconButtonStyle(foreground: palette.textPrimary),
+                    icon: const Icon(Icons.arrow_back),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const SizedBox(width: 1),
                   Expanded(
                     child: Container(
                       alignment: Alignment.center,
+                      constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(10),
+                        color: palette.brandSoft,
+                        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                       ),
                       child: Text(
-                        "DELİL EKLE ", // Parametre varsa onu kullan, yoksa varsayılan
-                        style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+                        'DELİL EKLE',
+                        style: palette.headline(weight: FontWeight.w600),
                       ),
                     ),
                   ),
-                  const SizedBox(width:1 ),
-                  Tooltip(
-                    message: 'Delil Ekle',
-                    child: IconButton(
-                      onPressed: !_isDavaOpened ? () => _openEvidenceAddSheet('image') : null,
+                  IconButton(
+                      tooltip: 'Delil Ekle',
+                      onPressed: !_isDavaOpened ? _openEvidenceTypePicker : null,
                       icon: Icon(
                         Icons.add_circle_outline_outlined,
                         size: 28,
-                        color: !_isDavaOpened ? Colors.blue[700] : Colors.grey[400],
+                        color: !_isDavaOpened ? Colors.blue[700] : palette.textMuted,
                       ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: !_isDavaOpened ? Colors.blue.withOpacity(0.1) : null,
-                        padding: const EdgeInsets.all(6),
+                      style: delilIconButtonStyle().copyWith(
+                        backgroundColor: WidgetStatePropertyAll(
+                          !_isDavaOpened ? Colors.blue.withValues(alpha: 0.1) : null,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -165,6 +189,14 @@ class _DelilEklePageState extends State<DelilEklePage> {
             Expanded(
               child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
+                : _loadError != null
+                ? Padding(
+                    padding: const EdgeInsets.all(SeyirTokens.space4),
+                    child: DelilLoadError(
+                      message: _loadError!,
+                      onRetry: _initializeData,
+                    ),
+                  )
                 : SingleChildScrollView(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -177,9 +209,9 @@ class _DelilEklePageState extends State<DelilEklePage> {
                             padding: const EdgeInsets.all(16),
                             margin: const EdgeInsets.only(bottom: 16),
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
-                              border: Border.all(color: Colors.red, width: 2),
-                              borderRadius: BorderRadius.circular(12),
+                              color: palette.tint(SeyirTokens.reject),
+                              border: Border.all(color: palette.tintBorder(SeyirTokens.reject), width: 2),
+                              borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                             ),
                             child: Row(
                               children: [
@@ -189,20 +221,20 @@ class _DelilEklePageState extends State<DelilEklePage> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
+                                      Text(
                                         'DAVA AÇILDI!',
                                         style: TextStyle(
-                                          color: Colors.red, 
+                                          color: palette.foreground(SeyirTokens.reject),
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 16,
+                                          fontSize: SeyirTokens.typeTitle,
                                         ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         'Dava açıldığı için delil eklenemez veya silinemez. Sadece mevcut delilleri görüntüleyebilirsiniz.',
                                         style: TextStyle(
-                                          color: Colors.red[700], 
-                                          fontSize: 14,
+                                          color: palette.foreground(SeyirTokens.reject),
+                                          fontSize: SeyirTokens.typeBody,
                                         ),
                                       ),
                                     ],
@@ -222,22 +254,20 @@ class _DelilEklePageState extends State<DelilEklePage> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              border: Border.all(color: Colors.grey[300]!),
-                              borderRadius: BorderRadius.circular(8),
+                              color: palette.surfaceMuted,
+                              border: Border.all(color: palette.border),
+                              borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.info_outline, color: Colors.grey[600], size: 20),
+                                Icon(Icons.info_outline, color: palette.textSecondary, size: 20),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'Tüm delil ekleme butonları devre dışı bırakıldı',
-                                    style: TextStyle(
-                                      color: Colors.grey[600], 
-                                      fontSize: 12,
-                                      fontStyle: FontStyle.italic,
-                                    ),
+                                    style: palette.caption(
+                                      color: palette.textSecondary,
+                                    ).copyWith(fontStyle: FontStyle.italic),
                                   ),
                                 ),
                               ],
@@ -248,7 +278,14 @@ class _DelilEklePageState extends State<DelilEklePage> {
                         const SizedBox(height: 24),
 
                         // Mevcut Deliller
-                        if (_evidences.isNotEmpty) _buildExistingEvidence(),
+                        if (_evidences.isEmpty)
+                          const DelilSoftEmpty(
+                            title: 'Henüz delil yok',
+                            message: 'Eklediğiniz deliller burada listelenir',
+                            icon: Icons.folder_open,
+                          )
+                        else
+                          _buildExistingEvidence(),
                       ],
                     ),
                   ),
@@ -266,13 +303,14 @@ class _DelilEklePageState extends State<DelilEklePage> {
     int maxLines = 1,
     bool enabled = true,
   }) {
+    final palette = SeyirPalette.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: SeyirTokens.typeBody,
             fontWeight: FontWeight.bold,
             color: Colors.green,
           ),
@@ -282,23 +320,26 @@ class _DelilEklePageState extends State<DelilEklePage> {
           controller: controller,
           maxLines: maxLines,
           enabled: enabled,
+          style: palette.body(),
           decoration: InputDecoration(
             hintText: hint,
+            filled: true,
+            fillColor: palette.card,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[400]!),
+              borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
+              borderSide: BorderSide(color: palette.border),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[400]!),
+              borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
+              borderSide: BorderSide(color: palette.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
               borderSide: const BorderSide(color: Colors.blue, width: 2),
             ),
             disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
+              borderSide: BorderSide(color: palette.border),
             ),
           ),
         ),
@@ -307,16 +348,17 @@ class _DelilEklePageState extends State<DelilEklePage> {
   }
 
   Widget _buildEvidenceTypes() {
+    final palette = SeyirPalette.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text.rich(
           TextSpan(
             text: "Dava Delilleri ||  ",
-            style: const TextStyle(
-              fontSize: 16,
+            style: TextStyle(
+              fontSize: SeyirTokens.typeTitle,
               fontWeight: FontWeight.bold,
-              color: Colors.black, // Ana metin rengi
+              color: palette.textPrimary,
             ),
             children: [
               TextSpan(
@@ -395,24 +437,31 @@ class _DelilEklePageState extends State<DelilEklePage> {
   }) {
     final isMaxReached = count >= maxCount;
     final isDisabled = _isDavaOpened || isMaxReached;
+    final palette = SeyirPalette.of(context);
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: palette.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+        side: BorderSide(color: palette.border),
+      ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
         onTap: isDisabled ? null : onTap,
-        child: Padding(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+          child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(isDisabled ? 0.3 : 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: color.withValues(alpha: isDisabled ? 0.3 : 0.1),
+                  borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
                 ),
-                child: Icon(icon, color: isDisabled ? Colors.grey : color, size: 24),
+                child: Icon(icon, color: isDisabled ? palette.textMuted : color, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -422,24 +471,24 @@ class _DelilEklePageState extends State<DelilEklePage> {
                     Text(
                       title,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: SeyirTokens.typeTitle,
                         fontWeight: FontWeight.bold,
-                        color: isDisabled ? Colors.grey : Colors.black,
+                        color: isDisabled ? palette.textMuted : palette.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
                       style: TextStyle(
-                        fontSize: 12,
-                        color: isDisabled ? Colors.grey[400] : Colors.grey[600],
+                        fontSize: SeyirTokens.typeBody,
+                        color: isDisabled ? palette.textMuted : palette.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '$count / $maxCount',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: SeyirTokens.typeBody,
                         color: isMaxReached ? Colors.red : Colors.green,
                         fontWeight: FontWeight.bold,
                       ),
@@ -449,17 +498,73 @@ class _DelilEklePageState extends State<DelilEklePage> {
               ),
               IconButton(
                 tooltip: isDisabled ? null : 'Delil ekle',
+                style: delilIconButtonStyle(foreground: isDisabled ? palette.textMuted : color),
                 onPressed: isDisabled ? null : onTap,
                 icon: Icon(
                   isDisabled ? Icons.block : Icons.add_circle_outline,
-                  color: isDisabled ? Colors.grey : color,
+                  color: isDisabled ? palette.textMuted : color,
                   size: 24,
                 ),
               ),
             ],
           ),
+          ),
         ),
       ),
+    );
+  }
+
+  void _openEvidenceTypePicker() {
+    if (_isDavaOpened) {
+      showAppSnack(context, '❌ Dava açıldığı için delil eklenemez');
+      return;
+    }
+
+    const types = <({String type, String title, IconData icon, Color color, int maxCount})>[
+      (type: 'image', title: 'Resim Ekle', icon: Icons.image, color: Colors.blue, maxCount: EvidenceLimits.maxImages),
+      (type: 'video', title: 'Video Ekle', icon: Icons.video_library, color: Colors.red, maxCount: EvidenceLimits.maxVideos),
+      (type: 'text', title: 'PDF Ekle', icon: Icons.description, color: Colors.orange, maxCount: EvidenceLimits.maxPdfs),
+      (type: 'link', title: 'Link Ekle', icon: Icons.link, color: Colors.green, maxCount: EvidenceLimits.maxLinks),
+    ];
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final palette = SeyirPalette.of(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Delil türü',
+                  textAlign: TextAlign.center,
+                  style: palette.headline(),
+                ),
+                const SizedBox(height: SeyirTokens.space2),
+                for (final item in types)
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    minTileHeight: SeyirTokens.tapTarget,
+                    leading: Icon(item.icon, color: item.color),
+                    title: Text(
+                      item.title,
+                      style: palette.title(color: item.color),
+                    ),
+                    enabled: (_evidenceCounts[item.type] ?? 0) < item.maxCount,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _openEvidenceAddSheet(item.type);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -574,15 +679,16 @@ class _DelilEklePageState extends State<DelilEklePage> {
   }
 
   Widget _buildExistingEvidence() {
+    final palette = SeyirPalette.of(context);
     print('🔍 _buildExistingEvidence çağrıldı, delil sayısı: ${_evidences.length}');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               'Mevcut Deliller',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: palette.title(),
             ),
             const SizedBox(width: 8),
             Container(
@@ -593,7 +699,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
               ),
               child: Text(
                 '${_evidences.length}',
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+                style: const TextStyle(color: Colors.white, fontSize: SeyirTokens.typeBody),
               ),
             ),
           ],
@@ -607,14 +713,22 @@ class _DelilEklePageState extends State<DelilEklePage> {
             final evidence = _evidences[index];
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
+              color: palette.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+                side: BorderSide(color: palette.border),
+              ),
               child: ListTile(
+                minTileHeight: SeyirTokens.tapTarget,
                 leading: _getEvidenceIcon(evidence.type),
-                title: Text(evidence.title),
-                subtitle: Text(evidence.description),
+                title: Text(evidence.title, style: palette.title()),
+                subtitle: Text(evidence.description, style: palette.body(color: palette.textSecondary)),
                 onTap: () => _openEvidenceDetail(evidence),
                 trailing: _isDavaOpened
                   ? null
                   : IconButton(
+                      tooltip: 'Sil',
+                      style: delilIconButtonStyle(foreground: Colors.red),
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () => _deleteEvidence(evidence.id),
                     ),
@@ -667,7 +781,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
       case 'link':
         return Colors.green;
       default:
-        return Colors.black54;
+        return SeyirPalette.of(context).textSecondary;
     }
   }
 
@@ -686,12 +800,12 @@ class _DelilEklePageState extends State<DelilEklePage> {
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: SeyirPalette.of(context).card,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: accentColor.withOpacity(0.35), width: 1.4),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: SeyirPalette.of(context).shadow,
                       blurRadius: 18,
                       offset: const Offset(0, 10),
                     ),
@@ -706,18 +820,22 @@ class _DelilEklePageState extends State<DelilEklePage> {
                         Text(
                           'RESIM YUKLE',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: SeyirTokens.typeTitle,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
-                            color: Colors.grey[800],
+                            color: SeyirPalette.of(context).textPrimary,
                           ),
                         ),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () => Navigator.of(context).pop(),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4.0),
-                            child: Icon(Icons.close, size: 18, color: Colors.black54),
+                        IconButton(
+                          tooltip: 'Kapat',
+                          style: delilIconButtonStyle(
+                            foreground: SeyirPalette.of(context).textSecondary,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: Icon(
+                            Icons.close,
+                            size: 18,
+                            color: SeyirPalette.of(context).textSecondary,
                           ),
                         ),
                       ],
@@ -727,9 +845,9 @@ class _DelilEklePageState extends State<DelilEklePage> {
                       'Resmi nereden eklemek istiyorsun?',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: SeyirTokens.typeBody,
                         height: 1.4,
-                        color: Colors.grey[700],
+                        color: SeyirPalette.of(context).textSecondary,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -748,10 +866,11 @@ class _DelilEklePageState extends State<DelilEklePage> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 10),
+                              minimumSize: const Size(0, SeyirTokens.tapTarget),
                             ),
                             child: const Text(
                               'KAMERA',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              style: TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
@@ -769,11 +888,12 @@ class _DelilEklePageState extends State<DelilEklePage> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 10),
+                              minimumSize: const Size(0, SeyirTokens.tapTarget),
                               elevation: 0,
                             ),
                             child: const Text(
                               'GALERI',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                              style: TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.w700),
                             ),
                           ),
                         ),
@@ -792,7 +912,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
                     height: 64,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white,
+                      color: SeyirPalette.of(context).card,
                       boxShadow: [
                         BoxShadow(
                           color: accentColor.withOpacity(0.35),
@@ -845,12 +965,12 @@ class _DelilEklePageState extends State<DelilEklePage> {
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: SeyirPalette.of(context).card,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: accentColor.withOpacity(0.35), width: 1.4),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: SeyirPalette.of(context).shadow,
                       blurRadius: 18,
                       offset: const Offset(0, 10),
                     ),
@@ -865,18 +985,22 @@ class _DelilEklePageState extends State<DelilEklePage> {
                         Text(
                           'VIDEO YUKLE',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: SeyirTokens.typeTitle,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
-                            color: Colors.grey[800],
+                            color: SeyirPalette.of(context).textPrimary,
                           ),
                         ),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () => Navigator.of(context).pop(),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4.0),
-                            child: Icon(Icons.close, size: 18, color: Colors.black54),
+                        IconButton(
+                          tooltip: 'Kapat',
+                          style: delilIconButtonStyle(
+                            foreground: SeyirPalette.of(context).textSecondary,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: Icon(
+                            Icons.close,
+                            size: 18,
+                            color: SeyirPalette.of(context).textSecondary,
                           ),
                         ),
                       ],
@@ -886,9 +1010,9 @@ class _DelilEklePageState extends State<DelilEklePage> {
                       'Videoyu nereden eklemek istiyorsun?',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: SeyirTokens.typeBody,
                         height: 1.4,
-                        color: Colors.grey[700],
+                        color: SeyirPalette.of(context).textSecondary,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -907,10 +1031,11 @@ class _DelilEklePageState extends State<DelilEklePage> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 10),
+                              minimumSize: const Size(0, SeyirTokens.tapTarget),
                             ),
                             child: const Text(
                               'KAMERA',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              style: TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
@@ -928,11 +1053,12 @@ class _DelilEklePageState extends State<DelilEklePage> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 10),
+                              minimumSize: const Size(0, SeyirTokens.tapTarget),
                               elevation: 0,
                             ),
                             child: const Text(
                               'GALERI',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                              style: TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.w700),
                             ),
                           ),
                         ),
@@ -951,7 +1077,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
                     height: 64,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white,
+                      color: SeyirPalette.of(context).card,
                       boxShadow: [
                         BoxShadow(
                           color: accentColor.withOpacity(0.35),
@@ -1004,12 +1130,12 @@ class _DelilEklePageState extends State<DelilEklePage> {
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: SeyirPalette.of(context).card,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: accentColor.withOpacity(0.35), width: 1.4),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: SeyirPalette.of(context).shadow,
                       blurRadius: 18,
                       offset: const Offset(0, 10),
                     ),
@@ -1024,18 +1150,22 @@ class _DelilEklePageState extends State<DelilEklePage> {
                         Text(
                           'PDF YUKLE',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: SeyirTokens.typeTitle,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
-                            color: Colors.grey[800],
+                            color: SeyirPalette.of(context).textPrimary,
                           ),
                         ),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () => Navigator.of(context).pop(),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4.0),
-                            child: Icon(Icons.close, size: 18, color: Colors.black54),
+                        IconButton(
+                          tooltip: 'Kapat',
+                          style: delilIconButtonStyle(
+                            foreground: SeyirPalette.of(context).textSecondary,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: Icon(
+                            Icons.close,
+                            size: 18,
+                            color: SeyirPalette.of(context).textSecondary,
                           ),
                         ),
                       ],
@@ -1045,9 +1175,9 @@ class _DelilEklePageState extends State<DelilEklePage> {
                       'PDF dosyasini cihazindan secip ekleyebilirsin.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: SeyirTokens.typeBody,
                         height: 1.4,
-                        color: Colors.grey[700],
+                        color: SeyirPalette.of(context).textSecondary,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -1065,11 +1195,12 @@ class _DelilEklePageState extends State<DelilEklePage> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 10),
+                          minimumSize: const Size(0, SeyirTokens.tapTarget),
                           elevation: 0,
                         ),
                         child: const Text(
                           'DOSYA SEC',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          style: TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
@@ -1086,7 +1217,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
                     height: 64,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white,
+                      color: SeyirPalette.of(context).card,
                       boxShadow: [
                         BoxShadow(
                           color: accentColor.withOpacity(0.35),
@@ -1139,12 +1270,12 @@ class _DelilEklePageState extends State<DelilEklePage> {
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: SeyirPalette.of(context).card,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: accentColor.withOpacity(0.35), width: 1.4),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: SeyirPalette.of(context).shadow,
                       blurRadius: 18,
                       offset: const Offset(0, 10),
                     ),
@@ -1159,18 +1290,22 @@ class _DelilEklePageState extends State<DelilEklePage> {
                         Text(
                           'LINK EKLE',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: SeyirTokens.typeTitle,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
-                            color: Colors.grey[800],
+                            color: SeyirPalette.of(context).textPrimary,
                           ),
                         ),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () => Navigator.of(context).pop(),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4.0),
-                            child: Icon(Icons.close, size: 18, color: Colors.black54),
+                        IconButton(
+                          tooltip: 'Kapat',
+                          style: delilIconButtonStyle(
+                            foreground: SeyirPalette.of(context).textSecondary,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: Icon(
+                            Icons.close,
+                            size: 18,
+                            color: SeyirPalette.of(context).textSecondary,
                           ),
                         ),
                       ],
@@ -1203,10 +1338,11 @@ class _DelilEklePageState extends State<DelilEklePage> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 10),
+                              minimumSize: const Size(0, SeyirTokens.tapTarget),
                             ),
                             child: const Text(
                               'IPTAL',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              style: TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
@@ -1224,11 +1360,12 @@ class _DelilEklePageState extends State<DelilEklePage> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 10),
+                              minimumSize: const Size(0, SeyirTokens.tapTarget),
                               elevation: 0,
                             ),
                             child: const Text(
                               'EKLE',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                              style: TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.w700),
                             ),
                           ),
                         ),
@@ -1247,7 +1384,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
                     height: 64,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white,
+                      color: SeyirPalette.of(context).card,
                       boxShadow: [
                         BoxShadow(
                           color: accentColor.withOpacity(0.35),
@@ -1508,11 +1645,38 @@ class _DelilEklePageState extends State<DelilEklePage> {
       return;
     }
 
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Silmek istediğine emin misin?'),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('İptal'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+              foregroundColor: SeyirTokens.reject,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
     try {
       await _evidenceService.deleteEvidence(evidenceId);
       _loadEvidenceData();
+      if (!mounted) return;
       showAppSnack(context, '✅ Delil silindi');
     } catch (e) {
+      if (!mounted) return;
       showAppSnack(context, '❌ Delil silinirken hata: $e');
     }
   }

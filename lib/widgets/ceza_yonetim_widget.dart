@@ -108,7 +108,10 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute<void>(
-                            builder: (BuildContext context) => const DelilleriIncelePage(),
+                            builder: (BuildContext context) => DelilleriIncelePage(
+                              userEmail: widget.userEmail,
+                              davaId: widget.davaId,
+                            ),
                           ),
                         );
                       },

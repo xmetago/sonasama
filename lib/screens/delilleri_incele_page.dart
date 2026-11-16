@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../widgets/common_header_widgets.dart';
 import '../widgets/countdown_timer_widget.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/evidence_viewer_widget.dart';
 import '../services/dava_hukum_eligibility_service.dart';
 import '../services/dava_timer_service.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
+import '../utils/dialog_utils.dart';
 
 export '../widgets/delil_case_card.dart' show Dava, FiveCardCaseInformation;
 
@@ -15,11 +18,14 @@ export '../widgets/delil_case_card.dart' show Dava, FiveCardCaseInformation;
 class DelilleriIncelePage extends StatefulWidget {
   final String? userEmail;
   final String? davaId; // Opsiyonel dava ID - null ise kabul edilen davalar gösterilir
+  /// Test: kabul edilen davalar yüklenemesin.
+  final bool forceLoadError;
 
   const DelilleriIncelePage({
     super.key,
     this.userEmail,
     this.davaId,
+    this.forceLoadError = false,
   });
 
   @override
@@ -29,6 +35,7 @@ class DelilleriIncelePage extends StatefulWidget {
 class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
   List<Map<String, dynamic>> _acceptedDavalar = [];
   bool _isLoading = true;
+  String? _loadError;
   String? _selectedDavaId; // Deliller için kullanılan gerçek davaId
   String? _selectedDropdownValue; // Dropdown için benzersiz değer
   /// Yargıla — Dava Künyesi ile aynı daraltılabilir üst panel (sayfa açılışında kapalı)
@@ -46,8 +53,21 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
   }
 
   /// Kabul edilen davaları yükle
+  void _openSavedDavalar() {
+    final email = widget.userEmail;
+    if (email == null || email.isEmpty) return;
+    showSavedDavalarDialog(context, email);
+  }
+
   Future<void> _loadAcceptedDavalar() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
+      if (widget.forceLoadError) {
+        throw Exception('Kabul edilen davalar yüklenemedi');
+      }
       final acceptedDavalar = await HiveDatabaseService.getAcceptedDavalar(
         widget.userEmail ?? '',
       );
@@ -98,8 +118,11 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
       }
     } catch (e) {
       print('❌ Davalar yüklenirken hata: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
+        _loadError = 'Kabul edilen davalar yüklenemedi';
+        _acceptedDavalar = [];
       });
     }
   }
@@ -124,10 +147,7 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                 padding: const EdgeInsets.all(4.0),
                 child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                   userEmail: widget.userEmail,
-                  onShowSavedDavalar: () {
-                    // Delilleri incele sayfasında kaydedilen davalar dialog'u açılamaz
-                    // Bu sayfa sadece delil inceleme işlemleri için
-                  },
+                  onShowSavedDavalar: _openSavedDavalar,
                 ),
               ),
               // Dava Künyesi (Yargıla) ile uyumlu üst panel + delil görüntüleyici
@@ -138,38 +158,22 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                     child: CircularProgressIndicator(),
                   ),
                 )
+              else if (_loadError != null)
+                Padding(
+                  padding: const EdgeInsets.all(SeyirTokens.space4),
+                  child: DelilLoadError(
+                    message: _loadError!,
+                    onRetry: _loadAcceptedDavalar,
+                  ),
+                )
               else if (_acceptedDavalar.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                      child: Column(
-                        children: [
-                        Icon(
-                          MdiIcons.gavel,
-                          size: 80,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Henüz kabul edilmiş dava yok',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Dava kabul ettiğinizde delillerini buradan inceleyebilirsiniz',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        ],
-                      ),
-                    ),
+                const Padding(
+                  padding: EdgeInsets.all(SeyirTokens.space4),
+                  child: DelilSoftEmpty(
+                    title: 'Henüz kabul edilmiş dava yok',
+                    message: 'Dava kabul ettiğinizde delillerini buradan inceleyebilirsiniz',
+                    icon: MdiIcons.gavel,
+                  ),
                 )
               else
                 _buildDelillerMainPanel(context),
@@ -192,25 +196,20 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
 
   /// Yargıla `ModernYargilaCard` / Dava Künyesi ile aynı görsel dil
   Widget _buildDelillerMainPanel(BuildContext context) {
-    const borderColor = Color(0xFFDDE9E2);
-    const innerBorder = Color(0xFFDCE7E1);
-    const dashColor = Color(0xFFD8E5DE);
+    final palette = SeyirPalette.of(context);
+    final borderColor = palette.border;
+    final innerBorder = palette.border;
+    final dashColor = palette.border;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          color: palette.card,
+          borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
           border: Border.all(color: borderColor, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF101815).withValues(alpha: 0.07),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          boxShadow: palette.cardShadow,
         ),
         child: Padding(
           padding: const EdgeInsets.all(10.0),
@@ -220,19 +219,26 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
+                  tooltip: 'Geri',
+                  style: delilIconButtonStyle(
+                    foreground: palette.isDark
+                        ? Colors.green.shade300
+                        : Colors.green.shade700,
+                  ),
                   icon: Icon(
                     Icons.arrow_back,
                     size: 26,
-                    color: Colors.green.shade700,
+                    color: palette.isDark
+                        ? Colors.green.shade300
+                        : Colors.green.shade700,
                   ),
                   onPressed: () => Navigator.pop(context),
-                  tooltip: 'Geri',
                 ),
               ),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  color: palette.card,
+                  borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                   border: Border.all(color: innerBorder),
                 ),
                 clipBehavior: Clip.antiAlias,
@@ -245,7 +251,9 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                         onTap: () {
                           setState(() => _delillerKunyeExpanded = !_delillerKunyeExpanded);
                         },
-                        child: Padding(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+                          child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           child: Row(
                             children: [
@@ -255,15 +263,12 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                                 size: 22,
                               ),
                               const SizedBox(width: 10),
-                              const Expanded(
+                              Expanded(
                                 child: Center(
                                   child: Text(
                                     ' || Delilleri İncele ||',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w800,
+                                    style: palette.title(weight: FontWeight.w800).copyWith(
                                       letterSpacing: 0.2,
-                                      color: Color(0xFF1B2A23),
                                     ),
                                   ),
                                 ),
@@ -274,11 +279,12 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                                 curve: Curves.easeOutCubic,
                                 child: Icon(
                                   Icons.expand_more,
-                                  color: Colors.grey.shade600,
+                                  color: palette.textSecondary,
                                   size: 26,
                                 ),
                               ),
                             ],
+                          ),
                           ),
                         ),
                       ),
@@ -303,8 +309,8 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF6FBF8),
-                    borderRadius: BorderRadius.circular(12),
+                    color: palette.surfaceMuted,
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
                     border: Border.all(color: innerBorder),
                   ),
                   child: DropdownButtonHideUnderline(
@@ -324,10 +330,7 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                           value: uniqueValue,
                           child: Text(
                             dava['adi'] as String? ?? 'İsimsiz Dava',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: palette.body(weight: FontWeight.w600),
                           ),
                         );
                       }).toList(),
@@ -384,7 +387,7 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
     if (d == null) {
       return Text(
         'Dava bilgisi yüklenemedi veya henüz seçilmedi.',
-        style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+        style: SeyirPalette.of(context).body(color: SeyirPalette.of(context).textSecondary),
       );
     }
 
@@ -434,19 +437,26 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
           child: InkWell(
             onTap: () => setState(() => _davaKonusuExpanded = !_davaKonusuExpanded),
             borderRadius: BorderRadius.circular(8),
-            child: Padding(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+              child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
               child: Row(
                 children: [
-                  Icon(Icons.article_outlined, size: 20, color: Colors.green.shade700),
+                  Icon(
+                    Icons.article_outlined,
+                    size: 20,
+                    color: SeyirPalette.of(context).isDark
+                        ? Colors.green.shade300
+                        : Colors.green.shade700,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Dava Konusu',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade600,
+                      style: SeyirPalette.of(context).body(
+                        weight: FontWeight.w600,
+                        color: SeyirPalette.of(context).textSecondary,
                       ),
                     ),
                   ),
@@ -454,9 +464,14 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                     turns: _davaKonusuExpanded ? 0.5 : 0,
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
-                    child: Icon(Icons.expand_more, color: Colors.grey.shade600, size: 22),
+                    child: Icon(
+                      Icons.expand_more,
+                      color: SeyirPalette.of(context).textSecondary,
+                      size: 22,
+                    ),
                   ),
                 ],
+              ),
               ),
             ),
           ),
@@ -470,12 +485,9 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                   padding: const EdgeInsets.fromLTRB(32, 0, 8, 4),
                   child: SelectableText(
                     konusu,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade900,
-                      height: 1.45,
-                    ),
+                    style: SeyirPalette.of(context).body(
+                      weight: FontWeight.w500,
+                    ).copyWith(height: 1.45),
                   ),
                 )
               : const SizedBox.shrink(),
@@ -495,13 +507,15 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
   }
 
   Widget _buildKunyeInfoRow(String label, String value, IconData icon, {bool isHighlight = false}) {
+    final palette = SeyirPalette.of(context);
+    final accent = palette.isDark ? Colors.green.shade300 : Colors.green.shade700;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
           icon,
           size: 20,
-          color: isHighlight ? Colors.red.shade600 : Colors.green.shade700,
+          color: isHighlight ? Colors.red.shade600 : accent,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -510,19 +524,18 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
             children: [
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
+                style: palette.body(
+                  weight: FontWeight.w600,
+                  color: palette.textSecondary,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isHighlight ? Colors.red.shade700 : Colors.grey.shade900,
+                style: palette.body(weight: FontWeight.bold).copyWith(
+                  color: isHighlight
+                      ? palette.foreground(SeyirTokens.reject)
+                      : palette.textPrimary,
                 ),
               ),
             ],
@@ -534,6 +547,7 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
 
   /// Bilgi item widget'ı
   Widget _buildInfoItem(String label, String value, IconData icon) {
+    final palette = SeyirPalette.of(context);
     return Row(
       children: [
         Icon(
@@ -548,17 +562,11 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
             children: [
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
-                ),
+                style: palette.caption(),
               ),
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: palette.body(weight: FontWeight.w600),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -650,10 +658,7 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
             children: [
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
-                ),
+                style: SeyirPalette.of(context).caption(),
               ),
               CountdownTimerWidget(
                 startTime: startTime,

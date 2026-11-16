@@ -194,20 +194,28 @@ class EvidenceService {
     }
   }
 
-  // Delil tipine göre sayıları getir
+  // Delil tipine göre sayıları getir.
+  // Hata yutulmaz; sayfa boş liste yerine yeniden deneme gösterebilsin.
   Map<String, int> getEvidenceCountsByDavaId(String davaId) {
-    try {
-      final evidences = getEvidenceByDavaId(davaId);
-      return {
-        'image': evidences.where((e) => e.type == 'image').length,
-        'video': evidences.where((e) => e.type == 'video').length,
-        'text': evidences.where((e) => e.type == 'text').length,
-        'link': evidences.where((e) => e.type == 'link').length,
-      };
-    } catch (e) {
-      print('❌ Delil sayıları getirilirken hata: $e');
-      return {'image': 0, 'video': 0, 'text': 0, 'link': 0};
-    }
+    return loadEvidenceCounts(davaId);
+  }
+
+  /// Sayfa yüklemesi. Kutu okunamazsa fırlatır, sıfırla boş listeye düşmez.
+  Map<String, int> loadEvidenceCounts(String davaId) {
+    final normalizedDavaId = davaId.trim().toLowerCase();
+    final filtered = _evidenceBox.values
+        .where((evidence) => evidence.davaId.trim().toLowerCase() == normalizedDavaId)
+        .toList();
+    return _countsOf(filtered);
+  }
+
+  Map<String, int> _countsOf(List<EvidenceModel> evidences) {
+    return {
+      'image': evidences.where((e) => e.type == 'image').length,
+      'video': evidences.where((e) => e.type == 'video').length,
+      'text': evidences.where((e) => e.type == 'text').length,
+      'link': evidences.where((e) => e.type == 'link').length,
+    };
   }
 
   // Delil silme
@@ -219,6 +227,11 @@ class EvidenceService {
       print('❌ Delil silinirken hata: $e');
       rethrow;
     }
+  }
+
+  /// Kutu okunamazsa fırlatır.
+  List<EvidenceModel> loadAllEvidence() {
+    return _evidenceBox.values.toList();
   }
 
   // Tüm delilleri getir

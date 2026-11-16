@@ -4,6 +4,8 @@ import '../services/evidence_service.dart';
 import '../services/hive_database_service.dart';
 import '../models/evidence_model.dart';
 import '../screens/delil_detay_page.dart';
+import '../theme/seyir_tokens.dart';
+import 'delil_surface.dart';
 
 /// Modern ve yeniden kullanılabilir Delil Görüntüleme Widget'ı
 /// Hem Seyir Defteri hem de Yargıla sayfasında kullanılabilir
@@ -32,6 +34,9 @@ class EvidenceViewerWidget extends StatefulWidget {
   /// Dava bilgileri card'ı (opsiyonel)
   final Widget? caseInfoCard;
 
+  /// Test: sayılar yüklenemesin.
+  final bool forceLoadError;
+
   const EvidenceViewerWidget({
     super.key,
     required this.davaId,
@@ -40,6 +45,7 @@ class EvidenceViewerWidget extends StatefulWidget {
     this.title,
     this.showCaseInfo = false,
     this.caseInfoCard,
+    this.forceLoadError = false,
   });
 
   @override
@@ -55,6 +61,7 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
     'link': 0,
   };
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -74,9 +81,16 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
 
   /// Delil sayılarını veritabanından yükle
   Future<void> _loadEvidenceCounts() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
+      if (widget.forceLoadError) {
+        throw Exception('Delil sayıları yüklenemedi');
+      }
       await _evidenceService.initialize();
-      final counts = _evidenceService.getEvidenceCountsByDavaId(widget.davaId);
+      final counts = _evidenceService.loadEvidenceCounts(widget.davaId);
       setState(() {
         _evidenceCounts = counts;
         _isLoading = false;
@@ -88,7 +102,11 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
       }
     } catch (e) {
       print('❌ Delil yükleme hatası: $e');
-      setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Delil sayıları yüklenemedi';
+      });
     }
   }
 
@@ -135,9 +153,7 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
             padding: const EdgeInsets.symmetric(vertical: 12.0),
             child: Text(
               widget.title!,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: SeyirPalette.of(context).headline(),
               textAlign: TextAlign.center,
             ),
           ),
@@ -157,31 +173,18 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
 
   /// Delil türleri grid'i
   Widget _buildEvidenceTypesGrid() {
+    final palette = SeyirPalette.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.grey[50]!,
-            Colors.white,
-            Colors.grey[50]!,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: palette.card,
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
         border: Border.all(
-          color: Colors.grey[300]!,
+          color: palette.border,
           width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: palette.cardShadow,
       ),
       child: Column(
         children: [
@@ -197,11 +200,7 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
               const SizedBox(width: 8),
               Text(
                 'Delil Türlerini İncele',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
+                style: palette.title(),
               ),
             ],
           ),
@@ -215,6 +214,11 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
                     child: CircularProgressIndicator(),
                   ),
                 )
+              : _loadError != null
+              ? DelilLoadError(
+                  message: _loadError!,
+                  onRetry: _loadEvidenceCounts,
+                )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: evidenceTypes.map((typeInfo) {
@@ -222,6 +226,14 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
                     return _buildEvidenceTypeIcon(typeInfo, count);
                   }).toList(),
                 ),
+          if (!_isLoading &&
+              _loadError == null &&
+              _evidenceCounts.values.every((count) => count == 0))
+            const DelilSoftEmpty(
+              title: 'Henüz delil yok',
+              message: 'Bu davaya eklenen deliller burada görünür',
+              icon: Icons.folder_open,
+            ),
         ],
       ),
     );
@@ -237,7 +249,9 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
             onTap: () => _openEvidenceList(typeInfo),
-            child: Container(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+              child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12.0),
               decoration: BoxDecoration(
                 color: typeInfo.color.withValues(alpha: 0.1),
@@ -259,7 +273,7 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
                   Text(
                     typeInfo.label,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: SeyirTokens.typeBody,
                       fontWeight: FontWeight.w600,
                       color: typeInfo.color,
                     ),
@@ -281,7 +295,7 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
                     child: Text(
                       '$count',
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: SeyirTokens.typeCaption,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
@@ -289,6 +303,7 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
                   ),
                 ],
               ),
+            ),
             ),
           ),
         ),
@@ -371,6 +386,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
   final EvidenceService _service = EvidenceService();
   List<EvidenceModel> _items = [];
   bool _loading = true;
+  String? _loadError;
   final Map<String, bool> _userLikes = {}; // evidenceId -> isLiked
   final Map<String, bool> _userDislikes = {}; // evidenceId -> isDisliked
   final Map<String, bool> _userNeutral = {}; // evidenceId -> nötr oy
@@ -384,10 +400,14 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       await _service.initialize();
       await _syncVoteLockWithFinalizedHukum();
-      final all = _service.getAllEvidence();
+      final all = _service.loadAllEvidence();
       final targetType = widget.typeInfo.type;
       
       // Filtreleme - trim ve case-insensitive karşılaştırma
@@ -411,6 +431,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
       setState(() {
         _items = filtered;
         _loading = false;
+        _loadError = null;
       });
       
       // Sadece sorun varsa log
@@ -419,9 +440,11 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
       }
     } catch (e) {
       print('❌ Hata: $e');
+      if (!mounted) return;
       setState(() {
         _items = [];
         _loading = false;
+        _loadError = 'Delil sayıları yüklenemedi';
       });
     }
   }
@@ -467,14 +490,22 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final onBar = palette.onSolid(widget.typeInfo.color);
     return Scaffold(
+      backgroundColor: palette.surface,
       appBar: AppBar(
-        title: Text('${widget.typeInfo.label} Delilleri'),
+        title: Text(
+          '${widget.typeInfo.label} Delilleri',
+          style: palette.headline(color: onBar),
+        ),
         backgroundColor: widget.typeInfo.color,
-        foregroundColor: Colors.white,
+        foregroundColor: onBar,
+        iconTheme: IconThemeData(color: onBar),
         elevation: 0,
         actions: [
           IconButton(
+            style: delilIconButtonStyle(foreground: onBar),
             icon: const Icon(Icons.refresh),
             onPressed: _load,
             tooltip: 'Yenile',
@@ -487,14 +518,19 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              widget.typeInfo.color.withValues(alpha: 0.1),
-              Colors.white,
+              palette.tint(widget.typeInfo.color),
+              palette.surface,
             ],
           ),
         ),
         child: _loading
             ? const Center(child: CircularProgressIndicator())
-            : _items.isEmpty
+            : _loadError != null
+                ? DelilLoadError(
+                    message: _loadError!,
+                    onRetry: _load,
+                  )
+                : _items.isEmpty
                 ? _buildEmptyState()
                 : _buildList(),
       ),
@@ -504,33 +540,13 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
   /// Boş durum widget'ı
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.folder_off,
-            size: 80,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Bu türde henüz delil yok',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${widget.typeInfo.label} delilleri eklendiğinde burada görünecek',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(SeyirTokens.space4),
+        child: DelilSoftEmpty(
+          title: 'Bu türde henüz delil yok',
+          message: '${widget.typeInfo.label} delilleri eklendiğinde burada görünecek',
+          icon: Icons.folder_off,
+        ),
       ),
     );
   }
@@ -550,10 +566,13 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
 
   /// Delil kartı
   Widget _buildEvidenceCard(EvidenceModel evidence) {
+    final palette = SeyirPalette.of(context);
     return Card(
       elevation: 2,
+      color: palette.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
+        side: BorderSide(color: palette.border),
       ),
       child: Column(
         children: [
@@ -590,7 +609,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
                         Text(
                           evidence.title.isNotEmpty ? evidence.title : 'Başlıksız',
                           style: const TextStyle(
-                            fontSize: 16,
+                            fontSize: SeyirTokens.typeTitle,
                             fontWeight: FontWeight.bold,
                           ),
                           maxLines: 1,
@@ -602,9 +621,8 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
                         // Açıklama
                         Text(
                           evidence.description,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
+                          style: SeyirPalette.of(context).body(
+                            color: SeyirPalette.of(context).textSecondary,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -624,7 +642,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
                             Text(
                               _formatDate(evidence.createdAt),
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: SeyirTokens.typeCaption,
                                 color: Colors.grey[500],
                               ),
                             ),
@@ -654,7 +672,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
                                     Text(
                                       'Doğrulandı',
                                       style: TextStyle(
-                                        fontSize: 10,
+                                        fontSize: SeyirTokens.typeCaption,
                                         fontWeight: FontWeight.w600,
                                         color: Colors.green[700],
                                       ),
@@ -694,13 +712,14 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
     final isDisliked = _userDislikes[evidence.id] ?? false;
     final isNeutral = _userNeutral[evidence.id] ?? false;
     
+    final palette = SeyirPalette.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: palette.surfaceMuted,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
         border: Border(
-          top: BorderSide(color: Colors.grey[200]!, width: 1),
+          top: BorderSide(color: palette.border, width: 1),
         ),
       ),
       child: Row(
@@ -868,22 +887,25 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
     bool isActive = false,
     bool isDisabled = false,
   }) {
+    final palette = SeyirPalette.of(context);
     return InkWell(
       onTap: isDisabled ? null : onTap,
       borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isDisabled
-              ? Colors.grey[200]
+              ? palette.surfaceMuted
               : isActive
                   ? color.withValues(alpha: 0.15)
-                  : Colors.white,
+                  : palette.card,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isDisabled
-                ? Colors.grey[400]!
+                ? palette.border
                 : isActive
                     ? color
                     : color.withValues(alpha: 0.3),
@@ -910,22 +932,22 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: SeyirTokens.typeCaption,
                     color: isDisabled
-                        ? Colors.grey[600]
+                        ? palette.textMuted
                         : isActive
                             ? color
-                            : Colors.grey[600],
+                            : palette.textSecondary,
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
                 Text(
                   count.toString(),
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: SeyirTokens.typeTitle,
                     fontWeight: FontWeight.bold,
                     color: isDisabled
-                        ? Colors.grey[600]
+                        ? palette.textMuted
                         : isActive
                             ? color
                             : color.withValues(alpha: 0.8),
@@ -935,6 +957,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

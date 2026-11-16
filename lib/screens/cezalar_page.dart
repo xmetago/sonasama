@@ -107,7 +107,10 @@ class _CezalarPageState extends State<CezalarPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute<void>(
-                            builder: (BuildContext context) => const DelilleriIncelePage(),
+                            builder: (BuildContext context) => DelilleriIncelePage(
+                              userEmail: widget.userEmail,
+                              davaId: widget.davaId,
+                            ),
                           ),
                         );
                       },
