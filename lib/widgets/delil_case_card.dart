@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
+import '../theme/seyir_tokens.dart';
+
 // Model class for Dava (delil için de kullanılabilir)
 class Dava {
   final String adi;
@@ -28,12 +30,16 @@ class FiveCardCaseInformation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final label = palette.body(weight: FontWeight.bold);
     return IntrinsicHeight(
       child: Card(
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         elevation: 2,
+        color: palette.card,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+          side: BorderSide(color: palette.border),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -48,7 +54,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Row(
+                      Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
@@ -59,7 +65,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                           SizedBox(width: 4),
                           Text(
                             'Haklı... ',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            style: label,
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -68,7 +74,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                         padding: const EdgeInsets.all(5.0),
                         child: Image.asset(dava.profilResmi, width: 60, height: 50),
                       ),
-                      const Row(
+                      Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
@@ -79,7 +85,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                           SizedBox(width: 4),
                           Text(
                             'Haksız ',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            style: label,
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -96,20 +102,20 @@ class FiveCardCaseInformation extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('Dava Adı    :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text('Dava Adı    :', style: label),
                           const SizedBox(width: 4),
-                          Flexible(child: Text(dava.adi, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                          Flexible(child: Text(dava.adi, style: label)),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Text('Davalı :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text('Davalı :', style: label),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Row(
                               children: [
-                                Flexible(child: Text(dava.davali, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                                Flexible(child: Text(dava.davali, style: label)),
                                 const Spacer(),
                                 const Icon(Icons.thumb_up_alt_outlined, size: 25, color: Colors.green),
                               ],
@@ -121,9 +127,9 @@ class FiveCardCaseInformation extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('Görev        :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text('Görev        :', style: label),
                           const SizedBox(width: 4),
-                          Flexible(child: Text(dava.mevkii, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                          Flexible(child: Text(dava.mevkii, style: label)),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -132,12 +138,12 @@ class FiveCardCaseInformation extends StatelessWidget {
                         children: [
                           Icon(MdiIcons.timerAlertOutline, size: 19, color: Colors.green),
                           const SizedBox(width: 4),
-                          const Text('Kalan Süre :', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text('Kalan Süre :', style: label),
                           const SizedBox(width: 5),
                           Flexible(
                             child: Text(
                               dava.kalanSure,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                              style: label.copyWith(color: Colors.blueAccent),
                             ),
                           ),
                         ],
@@ -152,8 +158,11 @@ class FiveCardCaseInformation extends StatelessWidget {
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                              minimumSize: const Size(60, 30),
+                              textStyle: const TextStyle(
+                                fontSize: SeyirTokens.typeCaption,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
                             ),
                             child:Icon(MdiIcons.gavel, size: 19, color: Colors.black54),
                           ),

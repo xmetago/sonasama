@@ -1992,7 +1992,12 @@ class _DavaAcPageState extends State<DavaAcPage> {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const DelilleriIncelePage()),
+            MaterialPageRoute(
+              builder: (context) => DelilleriIncelePage(
+                userEmail: widget.userEmail,
+                davaId: widget.editDava?.id,
+              ),
+            ),
           );
         },
       ),

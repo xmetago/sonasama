@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import 'delil_surface.dart';
 import 'expandable_comment_text.dart';
 import '../models/evidence_comment_model.dart';
 import '../models/evidence_model.dart';
 import '../services/evidence_comment_service.dart';
 import '../services/evidence_service.dart';
+import '../theme/seyir_tokens.dart';
 
 String _criticismFromEvidenceVote(String? vote) {
   switch (vote) {
@@ -93,10 +95,13 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Card(
       elevation: 4,
+      color: palette.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+        side: BorderSide(color: palette.border),
       ),
       margin: const EdgeInsets.only(top: 24),
       child: Padding(
@@ -113,12 +118,9 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                   size: 24,
                 ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Delili Değerlendirdim : ',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: palette.headline(),
                 ),
                 const Spacer(),
                 if (_isLoading)
@@ -142,7 +144,17 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
             // 8 Rol için yorum kartları
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _buildRoleCommentsGrid(),
+                : Column(
+                    children: [
+                      if (_comments.isEmpty)
+                        const DelilSoftEmpty(
+                          title: 'Henüz yorum yok',
+                          message: 'Bu delil için henüz yorum yazılmadı',
+                          icon: Icons.comment_outlined,
+                        ),
+                      _buildRoleCommentsGrid(),
+                    ],
+                  ),
           ],
         ),
       ),
@@ -177,12 +189,13 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
     final isDisliked = vote == 'dislike';
     final svc = EvidenceService();
 
+    final palette = SeyirPalette.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
+        color: palette.surfaceMuted,
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+        border: Border.all(color: palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,7 +217,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                   }),
                 ),
               ),
-              Container(width: 10, height: 22, color: Colors.grey[300]),
+              Container(width: 10, height: 22, color: palette.border),
               Expanded(
                 child: _buildVoteSegment(
                   icon: Icons.remove,
@@ -219,7 +232,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                   }),
                 ),
               ),
-              Container(width: 10, height: 22, color: Colors.grey[300]),
+              Container(width: 10, height: 22, color: palette.border),
               Expanded(
                 child: _buildVoteSegment(
                   icon: Icons.thumb_down_rounded,
@@ -250,22 +263,25 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
     required bool disabled,
     required VoidCallback onTap,
   }) {
+    final palette = SeyirPalette.of(context);
     return InkWell(
       onTap: disabled ? null : onTap,
       borderRadius: BorderRadius.circular(8),
-      child: AnimatedContainer(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
           color: disabled
-              ? Colors.grey[200]
+              ? palette.surfaceMuted
               : active
                   ? color.withValues(alpha: 0.15)
                   : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: disabled
-                ? Colors.grey[400]!
+                ? palette.border
                 : active
                     ? color
                     : color.withValues(alpha: 0.25),
@@ -296,21 +312,21 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: SeyirTokens.typeCaption,
                       fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                       color: disabled
-                          ? Colors.grey[600]
+                          ? palette.textMuted
                           : active
                               ? color
-                              : Colors.grey[700],
+                              : palette.textSecondary,
                     ),
                   ),
                   Text(
                     '$count',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: SeyirTokens.typeBody,
                       fontWeight: FontWeight.bold,
-                      color: disabled ? Colors.grey[600] : color,
+                      color: disabled ? palette.textMuted : color,
                     ),
                   ),
                 ],
@@ -318,6 +334,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -355,17 +372,18 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
     bool hasComment,
     bool canComment,
   ) {
+    final palette = SeyirPalette.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: hasComment 
             ? role.color.withValues(alpha: 0.1)
-            : Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
+            : palette.surfaceMuted,
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
         border: Border.all(
           color: hasComment 
               ? role.color.withValues(alpha: 0.3)
-              : Colors.grey[300]!,
+              : palette.border,
           width: hasComment ? 2 : 1,
         ),
       ),
@@ -377,7 +395,9 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                 ? () => _showCommentDialog(role, comment, hasComment, canComment)
                 : null,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: Padding(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+              child: Padding(
               padding: const EdgeInsets.all(12.0),
               child: Row(
                 children: [
@@ -403,7 +423,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                         Text(
                           role.label,
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: SeyirTokens.typeTitle,
                             fontWeight: FontWeight.bold,
                             color: role.color,
                           ),
@@ -411,26 +431,17 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                         if (hasComment)
                           Text(
                             'Yorum yazıldı',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
+                            style: palette.caption(),
                           )
                         else if (canComment)
                           Text(
                             'Yorum yazabilirsiniz',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.green[700],
-                            ),
+                            style: palette.caption(color: Colors.green[700]),
                           )
                         else
                           Text(
                             'Henüz yorum yok',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
-                            ),
+                            style: palette.caption(),
                           ),
                       ],
                     ),
@@ -457,6 +468,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                 ],
               ),
             ),
+            ),
           ),
           
           // Yorum varsa önizleme
@@ -464,7 +476,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
             Container(
               padding: const EdgeInsets.all(12.0),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: palette.card,
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
                 border: Border(
                   top: BorderSide(
@@ -482,17 +494,14 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                       const Spacer(),
                       Text(
                         _formatDate(comment.createdAt),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                        ),
+                        style: palette.caption(),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   ExpandableCommentText(
                     text: comment.commentText,
-                    style: const TextStyle(fontSize: 14),
+                    style: palette.body(),
                     maxLines: 2,
                   ),
                 ],
@@ -541,7 +550,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: SeyirTokens.typeCaption,
               fontWeight: FontWeight.w600,
               color: color,
             ),
@@ -674,7 +683,9 @@ class _CommentDialogState extends State<_CommentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return AlertDialog(
+      backgroundColor: palette.card,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -698,13 +709,12 @@ class _CommentDialogState extends State<_CommentDialog> {
           Expanded(
             child: Text(
               '${widget.role.label} Yorumu',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: palette.headline(),
             ),
           ),
           IconButton(
+            tooltip: 'Kapat',
+            style: delilIconButtonStyle(foreground: palette.textPrimary),
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.pop(context),
           ),
@@ -717,12 +727,9 @@ class _CommentDialogState extends State<_CommentDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Eleştiri Türü:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: palette.title(),
               ),
               const SizedBox(height: 8),
               Row(
@@ -759,12 +766,9 @@ class _CommentDialogState extends State<_CommentDialog> {
                 ],
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Yorumunuz:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: palette.title(),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -776,7 +780,7 @@ class _CommentDialogState extends State<_CommentDialog> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
+                  fillColor: palette.surfaceMuted,
                 ),
               ),
             ],
@@ -817,6 +821,7 @@ class _CommentDialogState extends State<_CommentDialog> {
     Color color,
     bool enabled,
   ) {
+    final palette = SeyirPalette.of(context);
     final isSelected = _selectedCriticism == value;
     return InkWell(
       onTap: !enabled
@@ -830,21 +835,23 @@ class _CommentDialogState extends State<_CommentDialog> {
             }
           : () => setState(() => _selectedCriticism = value),
       borderRadius: BorderRadius.circular(8),
-      child: Container(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+        child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: !enabled
-              ? Colors.grey[200]
+              ? palette.surfaceMuted
               : isSelected
               ? color.withValues(alpha: 0.2)
-              : Colors.grey[100],
+              : palette.card,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: !enabled
-                ? Colors.grey[400]!
+                ? palette.border
                 : isSelected
                     ? color
-                    : Colors.grey[300]!,
+                    : palette.border,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -864,17 +871,18 @@ class _CommentDialogState extends State<_CommentDialog> {
             Text(
               enabled ? label : '$label (pasif)',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: SeyirTokens.typeBody,
                 fontWeight: isSelected && enabled ? FontWeight.bold : FontWeight.normal,
                 color: !enabled
                     ? Colors.grey[600]
                     : isSelected
                         ? color
-                        : Colors.grey[700],
+                        : palette.textSecondary,
               ),
             ),
           ],
         ),
+      ),
       ),
     );
   }

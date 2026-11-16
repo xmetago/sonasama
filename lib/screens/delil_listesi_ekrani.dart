@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/seyir_tokens.dart';
 import '../widgets/evidence_viewer_widget.dart';
 
 /// Ana Delil Listesi Ekranı
@@ -16,12 +17,21 @@ class DelilListesiEkrani extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    const barColor = Color(0xFF1565C0);
+    final onBar = palette.onSolid(barColor);
     return Scaffold(
+      backgroundColor: palette.surface,
       appBar: AppBar(
-        title: const Text('Delil Listesi'),
-        backgroundColor: Colors.blue[700],
-        foregroundColor: Colors.white,
+        title: Text(
+          'Delil Listesi',
+          style: palette.headline(color: onBar),
+        ),
+        backgroundColor: barColor,
+        foregroundColor: onBar,
+        iconTheme: IconThemeData(color: onBar),
         elevation: 0,
+        toolbarHeight: SeyirTokens.tapTarget,
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -29,8 +39,8 @@ class DelilListesiEkrani extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.blue[50]!,
-              Colors.white,
+              palette.tint(Colors.blue),
+              palette.surface,
             ],
           ),
         ),

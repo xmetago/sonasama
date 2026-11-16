@@ -10,6 +10,9 @@ import '../widgets/evidence_comment_widget.dart';
 import '../widgets/shared/app_snack.dart';
 import '../services/hive_database_service.dart';
 import '../services/evidence_service.dart';
+import '../theme/seyir_tokens.dart';
+import '../utils/dialog_utils.dart';
+import '../widgets/delil_surface.dart';
 
 class DelilDetayPage extends StatefulWidget {
   final String? userEmail;
@@ -81,9 +84,17 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
     }
   }
 
+  void _openSavedDavalar() {
+    final email = widget.userEmail;
+    if (email == null || email.isEmpty) return;
+    showSavedDavalarDialog(context, email);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Scaffold(
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -101,7 +112,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
               padding: const EdgeInsets.all(4.0),
               child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                 userEmail: widget.userEmail,
-                onShowSavedDavalar: () {},
+                onShowSavedDavalar: _openSavedDavalar,
               ),
             ),
 
@@ -111,18 +122,19 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    tooltip: 'Geri',
+                    style: delilIconButtonStyle(foreground: palette.textPrimary),
+                    icon: const Icon(Icons.arrow_back),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      "DELİL DETAYI",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      'DELİL DETAYI',
+                      style: palette.headline(),
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  const SizedBox(width: 48), // Dengeleme için
+                  const SizedBox(width: SeyirTokens.tapTarget),
                 ],
               ),
             ),
@@ -142,25 +154,12 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(18),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.white.withOpacity(0.72),
-                                Colors.white.withOpacity(0.38),
-                              ],
-                            ),
+                            color: palette.card,
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.55),
+                              color: palette.border,
                               width: 1.1,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF1B2A23).withOpacity(0.10),
-                                blurRadius: 24,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
+                            boxShadow: palette.cardShadow,
                           ),
                           child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -173,7 +172,9 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                                   _delilBilgileriExpanded = !_delilBilgileriExpanded;
                                 });
                               },
-                              child: Padding(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+                                child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                                 child: Row(
                                   children: [
@@ -183,13 +184,9 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Text(
+                                            Text(
                                               '||  Delil Bilgileri  ||  ',
-                                              style: TextStyle(
-                                                fontSize: 17,
-                                                fontWeight: FontWeight.w800,
-                                                color: Color(0xFF1B2A23),
-                                              ),
+                                              style: palette.headline(),
                                             ),
                                             _getEvidenceIcon(_evidence.type),
                                           ],
@@ -202,7 +199,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                                       curve: Curves.easeOutCubic,
                                       child: Icon(
                                         Icons.expand_more,
-                                        color: Colors.grey.shade600,
+                                        color: palette.textSecondary,
                                         size: 26,
                                       ),
                                     ),
@@ -210,6 +207,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                                 ),
                               ),
                             ),
+                          ),
                           ),
                           AnimatedCrossFade(
                             firstCurve: Curves.easeOutCubic,
@@ -231,8 +229,9 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                                       InkWell(
                                         onTap: _showEvidenceInfo,
                                         borderRadius: BorderRadius.circular(20),
-                                        child: const Padding(
-                                          padding: EdgeInsets.all(4.0),
+                                        child: const SizedBox(
+                                          width: SeyirTokens.tapTarget,
+                                          height: SeyirTokens.tapTarget,
                                           child: Icon(
                                             Icons.info_outline_rounded,
                                             size: 24,
@@ -248,7 +247,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                                             Text(
                                               _evidence.title,
                                               style: const TextStyle(
-                                                fontSize: 18,
+                                                fontSize: SeyirTokens.typeHeadline,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
@@ -268,7 +267,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                                   const Text(
                                     'Açıklama:',
                                     style: TextStyle(
-                                      fontSize: 14,
+                                      fontSize: SeyirTokens.typeBody,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF1B2A23),
                                     ),
@@ -276,7 +275,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                                   const SizedBox(height: 6),
                                   Text(
                                     _evidence.description,
-                                    style: const TextStyle(fontSize: 14),
+                                    style: const TextStyle(fontSize: SeyirTokens.typeBody),
                                   ),
                                   const SizedBox(height: 10),
                                   _buildDashedLine(const Color(0xFFD8E5DE)),
@@ -312,7 +311,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                                 const Text(
                                   'Delil İçeriği',
                                   style: TextStyle(
-                                    fontSize: 18,
+                                    fontSize: SeyirTokens.typeHeadline,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -357,14 +356,14 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
               '$label:',
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
+                fontSize: SeyirTokens.typeBody,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: SeyirTokens.typeBody),
             ),
           ),
         ],
@@ -449,7 +448,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
           height: 300,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[300]!),
+            border: Border.all(color: SeyirPalette.of(context).border),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
@@ -458,7 +457,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
-                  color: Colors.grey[200],
+                  color: SeyirPalette.of(context).surfaceMuted,
                   child: const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -500,7 +499,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
           height: 200,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[300]!),
+            border: Border.all(color: SeyirPalette.of(context).border),
             color: Colors.black,
           ),
           child: Stack(
@@ -589,8 +588,8 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
           height: 200,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[300]!),
-            color: Colors.grey[100],
+            border: Border.all(color: SeyirPalette.of(context).border),
+            color: SeyirPalette.of(context).surfaceMuted,
           ),
           child: Stack(
             alignment: Alignment.center,
@@ -601,7 +600,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
                 height: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey[50],
+                  color: SeyirPalette.of(context).card,
                 ),
                 child: const Center(
                   child: Column(
@@ -682,8 +681,8 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[300]!),
-            color: Colors.grey[50],
+            border: Border.all(color: SeyirPalette.of(context).border),
+            color: SeyirPalette.of(context).card,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
