@@ -196,7 +196,7 @@ class _HukukiSurecSliderState extends State<_HukukiSurecSlider> {
               'Hüküm onayı',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: SeyirTokens.typeCaption,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.6,
                 color: Colors.grey.shade700,

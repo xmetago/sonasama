@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
+import '../theme/seyir_tokens.dart';
 import 'countdown_timer_widget.dart';
 
 // Model class for Dava (unchanged)
@@ -71,7 +72,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                           children: [
                             Icon(MdiIcons.checkCircle, size: 24, color: Colors.green),
                             const SizedBox(width: 4),
-                            const Text('Haklı', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
+                            Text('Haklı', style: TextStyle(fontSize: SeyirTokens.typeCaption, fontWeight: FontWeight.bold, color: Colors.green)),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -79,7 +80,7 @@ class FiveCardCaseInformation extends StatelessWidget {
                           children: [
                             Icon(MdiIcons.closeCircle, size: 24, color: Colors.red),
                             const SizedBox(width: 4),
-                            const Text('Haksız', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red)),
+                            Text('Haksız', style: TextStyle(fontSize: SeyirTokens.typeCaption, fontWeight: FontWeight.bold, color: Colors.red)),
                           ],
                         ),
                       ],
@@ -110,10 +111,11 @@ class FiveCardCaseInformation extends StatelessWidget {
                       );
                     },
                     icon: const Icon(Icons.gavel, size: 16),
-                    label: const Text('8-HÜKÜM', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: const Text('8-HÜKÜM', style: TextStyle(fontSize: SeyirTokens.typeCaption, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
+                      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -138,13 +140,13 @@ class FiveCardCaseInformation extends StatelessWidget {
         ],
         Text(
           '$label:',
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+          style: const TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.bold, color: SeyirTokens.neutral500),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: isEditable
               ? TextField(
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.bold),
             decoration: InputDecoration(
               hintText: value,
               border: OutlineInputBorder(
@@ -155,7 +157,7 @@ class FiveCardCaseInformation extends StatelessWidget {
           )
               : Text(
             value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.bold),
           ),
         ),
       ],
@@ -180,7 +182,7 @@ Widget buildYargilaCountdownRow({
         child: Text(
           'Kalan Süre :',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: SeyirTokens.typeBody,
             fontWeight: FontWeight.bold,
             color: Colors.green.shade700,
           ),

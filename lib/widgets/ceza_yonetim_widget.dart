@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../screens/cezalar_page.dart';
 import '../screens/delilleri_incele_page.dart';
+import '../theme/seyir_tokens.dart';
+import '../utils/dialog_utils.dart';
 import 'cezalar_ceza_unified_panel.dart';
 import 'cezalar_page_layout_rails.dart';
 import 'common_header_widgets.dart';
@@ -67,10 +69,11 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
           headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
             return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
-              height: _isHeaderCollapsed ? 40 : null,
+              height: _isHeaderCollapsed ? 48 : null,
               child: _isHeaderCollapsed
                   ? CollapsedWbHeaderRow(
-                      title: 'CEZA YÖNETİMİ ',
+                      title: 'CEZA YÖNETİMİ',
+                      titleStyle: SeyirPalette.of(context).headline(weight: FontWeight.w600),
                       onExpandHeader: () => setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
                       onToggleLeftNav: toggle,
                     )
@@ -87,12 +90,16 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
                           padding: const EdgeInsets.all(4.0),
                           child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                             userEmail: widget.userEmail,
-                            onShowSavedDavalar: () {},
+                            onShowSavedDavalar: () {
+                              final String? email = widget.userEmail;
+                              if (email == null || email.isEmpty) return;
+                              showSavedDavalarDialog(context, email);
+                            },
                           ),
                         ),
                         CezalarMenuTitleRow(
                           onToggleLeftNav: toggle,
-                          title: 'CEZA YÖNETİMİ ',
+                          title: 'CEZA YÖNETİMİ',
                           isHeaderCollapsed: _isHeaderCollapsed,
                           onToggleCollapse: () => setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
                         ),
@@ -119,7 +126,16 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute<void>(
-                            builder: (BuildContext context) => CezalarPage(userEmail: widget.userEmail),
+                            builder: (BuildContext context) => CezalarPage(
+                              userEmail: widget.userEmail,
+                              davaId: widget.davaId,
+                              davaAdi: widget.davaAdi,
+                              davaDavali: widget.davaDavali,
+                              davaDavaci: widget.davaDavaci,
+                              davaGorev: widget.davaGorev,
+                              kalanSure: widget.kalanSure,
+                              davaOpenedAt: widget.davaOpenedAt,
+                            ),
                           ),
                         );
                       },
@@ -127,7 +143,16 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute<void>(
-                            builder: (BuildContext context) => CezalarPage(userEmail: widget.userEmail),
+                            builder: (BuildContext context) => CezalarPage(
+                              userEmail: widget.userEmail,
+                              davaId: widget.davaId,
+                              davaAdi: widget.davaAdi,
+                              davaDavali: widget.davaDavali,
+                              davaDavaci: widget.davaDavaci,
+                              davaGorev: widget.davaGorev,
+                              kalanSure: widget.kalanSure,
+                              davaOpenedAt: widget.davaOpenedAt,
+                            ),
                           ),
                         );
                       },
@@ -135,8 +160,12 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
                     Expanded(
                       child: Card(
                         margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 4),
+                        color: SeyirPalette.of(context).card,
                         elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: SeyirPalette.of(context).border),
+                        ),
                         clipBehavior: Clip.antiAlias,
                         child: CezalarCezaUnifiedPanel(
                           dava: _panelDava,

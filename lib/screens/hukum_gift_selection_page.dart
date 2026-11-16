@@ -15,6 +15,8 @@ import '../services/offline_gift_queue.dart';
 import '../services/play_billing_service.dart';
 import '../services/user_star_balance_store.dart';
 import '../theme/hukum_gift_colors.dart';
+import '../theme/seyir_tokens.dart';
+import '../widgets/delil_surface.dart';
 import '../utils/dialog_utils.dart';
 import '../widgets/common_header_widgets.dart';
 import '../widgets/shared/app_expandable_icon_menu.dart';
@@ -131,7 +133,9 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
       return;
     }
 
-    final bool ok = await globalPlayBilling.init((int stars) async {
+    bool ok = false;
+    try {
+      ok = await globalPlayBilling.init((int stars) async {
       final String? email = widget.userEmail;
       if (email != null && email.isNotEmpty) {
         await UserStarBalanceStore.addYellowStars(email, stars);
@@ -149,6 +153,9 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
         ),
       );
     });
+    } catch (_) {
+      ok = false;
+    }
     if (!mounted) return;
     setState(() => _billingReady = ok);
   }
@@ -363,19 +370,12 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
   }
 
   BoxDecoration _glassCard({bool strong = false}) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return BoxDecoration(
       borderRadius: BorderRadius.circular(20),
-      color: strong
-          ? Colors.white.withValues(alpha: 0.92)
-          : Colors.white.withValues(alpha: 0.72),
-      border: Border.all(color: _border, width: 1.4),
-      boxShadow: <BoxShadow>[
-        BoxShadow(
-          color: const Color(0xFF101815).withValues(alpha: 0.07),
-          blurRadius: 12,
-          offset: const Offset(0, 6),
-        ),
-      ],
+      color: strong ? palette.card : palette.surfaceMuted,
+      border: Border.all(color: palette.border, width: 1.4),
+      boxShadow: palette.cardShadow,
     );
   }
 
@@ -402,10 +402,11 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
               headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
                 return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
-              height: _isHeaderCollapsed ? 40 : null,
+              height: _isHeaderCollapsed ? 48 : null,
               child: _isHeaderCollapsed
                   ? CollapsedWbHeaderRow(
-                      title: 'MASRAF — HEDİYE ',
+                      title: 'MASRAF — HEDİYE',
+                      titleStyle: SeyirPalette.of(context).headline(weight: FontWeight.w600),
                       onExpandHeader: () =>
                           setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
                       onToggleLeftNav: toggle,
@@ -432,7 +433,7 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                         ),
                         CezalarMenuTitleRow(
                           onToggleLeftNav: toggle,
-                          title: ' Masraf Seçimi',
+                          title: 'Masraf Seçimi',
                           isHeaderCollapsed: _isHeaderCollapsed,
                           onToggleCollapse: () =>
                               setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
@@ -447,9 +448,9 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: <Color>[
-                              const Color(0xFFF5FBF7),
-                              Colors.white,
-                              const Color(0xFFE8F5E9).withValues(alpha: 0.45),
+                              SeyirPalette.of(context).surfaceMuted,
+                              SeyirPalette.of(context).surface,
+                              SeyirPalette.of(context).brandSoft,
                             ],
                           ),
                           borderRadius: BorderRadius.circular(12),
@@ -469,7 +470,7 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: SizedBox(
-                                height: 46,
+                                height: SeyirTokens.tapTarget,
                                 child: ListView.separated(
                                   scrollDirection: Axis.horizontal,
                                   itemCount: hukumGiftCategories.length,
@@ -484,13 +485,13 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                                       selected: selected,
                                       onSelected: (_) => _selectCategory(c.id),
                                       showCheckmark: false,
-                                      selectedColor: const Color(0xFFC8E6C9),
-                                      backgroundColor:
-                                          Colors.white.withValues(alpha: 0.75),
+                                      selectedColor: SeyirPalette.of(context).brandSoft,
+                                      backgroundColor: SeyirPalette.of(context).card,
+                                      materialTapTargetSize: MaterialTapTargetSize.padded,
                                       side: BorderSide(
                                         color: selected
                                             ? const Color(0xFF4CAF50)
-                                            : _border,
+                                            : SeyirPalette.of(context).border,
                                       ),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(20),
@@ -504,7 +505,7 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                                 child: SizedBox(
-                                  height: 40,
+                                  height: SeyirTokens.tapTarget,
                                   child: ListView.separated(
                                     scrollDirection: Axis.horizontal,
                                     itemCount: activeCat.subs.length,
@@ -519,7 +520,7 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: SeyirTokens.typeCaption,
                                             fontWeight: sel
                                                 ? FontWeight.w700
                                                 : FontWeight.w500,
@@ -527,15 +528,15 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                                         ),
                                         selected: sel,
                                         onSelected: (_) => _selectSub(sub),
-                                        selectedColor: const Color(0xFFA5D6A7),
-                                        backgroundColor:
-                                            Colors.white.withValues(alpha: 0.8),
+                                        selectedColor: SeyirPalette.of(context).brandSoft,
+                                        backgroundColor: SeyirPalette.of(context).card,
+                                        materialTapTargetSize: MaterialTapTargetSize.padded,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(16),
                                           side: BorderSide(
                                             color: sel
                                                 ? const Color(0xFF2E7D32)
-                                                : _border,
+                                                : SeyirPalette.of(context).border,
                                           ),
                                         ),
                                       );
@@ -565,12 +566,7 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                                             const SizedBox(width: 8),
                                             Text(
                                               'SEÇİLEN MASRAF',
-                                              style: theme.textTheme.labelLarge
-                                                  ?.copyWith(
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 0.6,
-                                                color: const Color(0xFF1B2A23),
-                                              ),
+                                              style: SeyirPalette.of(context).title(),
                                             ),
                                           ],
                                         ),
@@ -583,9 +579,9 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                                               child: Text(
                                                 'Izgara üzerinden bir hediye seçin\n(çift tık: favorilere ekler)',
                                                 textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade600,
-                                                  height: 1.35,
+                                                style: SeyirPalette.of(context).body(
+                                                  weight: FontWeight.w400,
+                                                  color: SeyirPalette.of(context).textSecondary,
                                                 ),
                                               ),
                                             ),
@@ -600,6 +596,7 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                                                 onPressed: () =>
                                                     Navigator.of(context).pop(false),
                                                 style: FilledButton.styleFrom(
+                                                  minimumSize: const Size(0, SeyirTokens.tapTarget),
                                                   padding: const EdgeInsets.symmetric(
                                                       vertical: 14),
                                                   shape: RoundedRectangleBorder(
@@ -618,6 +615,7 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
                                                   backgroundColor:
                                                       const Color(0xFF6A1B9A),
                                                   foregroundColor: Colors.white,
+                                                  minimumSize: const Size(0, SeyirTokens.tapTarget),
                                                   padding: const EdgeInsets.symmetric(
                                                       vertical: 14),
                                                   shape: RoundedRectangleBorder(
@@ -653,21 +651,12 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
     final int giftCrossAxisCount = gridWidth < 400 ? 2 : 3;
     if (_activeCatId == 0) {
       if (_favorites.isEmpty) {
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: _glassCard(),
-              child: Text(
-                'Henüz favori yok.\nBaşka kategoride hediyeye çift tıklayarak ekleyin.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: Colors.grey.shade700,
-                  height: 1.4,
-                ),
-              ),
-            ),
+        return const Padding(
+          padding: EdgeInsets.all(SeyirTokens.space4),
+          child: DelilSoftEmpty(
+            title: 'Henüz favori yok',
+            message: 'Başka kategoride hediyeye çift tıklayarak ekleyin.',
+            icon: Icons.favorite_border,
           ),
         );
       }
@@ -800,8 +789,9 @@ class _MasrafCongratsOverlay extends StatelessWidget {
                       margin: const EdgeInsets.fromLTRB(8, 42, 16, 20),
                       padding: const EdgeInsets.fromLTRB(20, 28, 20, 22),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: SeyirPalette.of(context).card,
                         borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: SeyirPalette.of(context).border),
                         boxShadow: <BoxShadow>[
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.14),
@@ -822,7 +812,7 @@ class _MasrafCongratsOverlay extends StatelessWidget {
                           height: 1.5,
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
-                          color: const Color(0xFF1B2A23),
+                          color: SeyirPalette.of(context).textPrimary,
                         ),
                       ),
                     ),
@@ -881,12 +871,13 @@ class _SelectedGiftPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: HukumGiftColors.selectedAreaBg,
+        color: palette.surfaceMuted,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFDCE8DF)),
+        border: Border.all(color: palette.border),
       ),
       child: Row(
         children: <Widget>[
@@ -894,7 +885,7 @@ class _SelectedGiftPreview extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: palette.card,
               borderRadius: BorderRadius.circular(14),
               boxShadow: <BoxShadow>[
                 BoxShadow(
@@ -914,24 +905,15 @@ class _SelectedGiftPreview extends StatelessWidget {
               children: <Widget>[
                 HukumGiftShortNameText(
                   shortName: gift.shortName,
-                  primaryStyle: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1B2A23),
-                  ),
-                  secondaryStyle: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
-                    height: 1.2,
-                  ),
+                  primaryStyle: palette.title(),
+                  secondaryStyle: palette.caption(weight: FontWeight.w600),
                   textAlign: TextAlign.start,
                   maxLines: 3,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${gift.catName} → ${gift.subName}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  style: palette.caption(),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -941,7 +923,7 @@ class _SelectedGiftPreview extends StatelessWidget {
           Text(
             '⭐ ${gift.price}',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: SeyirTokens.typeHeadline,
               fontWeight: FontWeight.w800,
               color: HukumGiftColors.priceColorForValue(context, gift.price),
             ),
@@ -973,6 +955,7 @@ class _HukumGiftTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Material(
       color: Colors.transparent,
       elevation: isSelected ? 3 : 0,
@@ -995,7 +978,7 @@ class _HukumGiftTile extends StatelessWidget {
               border: Border.all(
                 color: isSelected
                     ? HukumGiftColors.accentGold
-                    : const Color(0xFFDDE9E2),
+                    : palette.border,
                 width: isSelected ? 2.2 : 1.4,
               ),
               boxShadow: <BoxShadow>[
@@ -1022,17 +1005,8 @@ class _HukumGiftTile extends StatelessWidget {
                     const SizedBox(height: 6),
                     HukumGiftShortNameText(
                       shortName: gift.shortName,
-                      primaryStyle: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1B2A23),
-                      ),
-                      secondaryStyle: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey.shade700,
-                        height: 1.2,
-                      ),
+                      primaryStyle: palette.caption(weight: FontWeight.w600, color: palette.textPrimary),
+                      secondaryStyle: palette.caption(),
                       textAlign: TextAlign.center,
                       maxLines: 2,
                     ),
@@ -1049,7 +1023,7 @@ class _HukumGiftTile extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: priceColor,
-                          fontSize: 12,
+                          fontSize: SeyirTokens.typeCaption,
                         ),
                       ),
                     ),

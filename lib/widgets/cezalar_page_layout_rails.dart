@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
+import '../theme/seyir_tokens.dart';
+
 import '../screens/actigim_davalar_page.dart';
 import '../screens/davaci_unlulur_page.dart';
 import '../screens/gelen_davalar_page.dart';
@@ -27,6 +29,7 @@ class CezalarMenuTitleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Row(
@@ -38,12 +41,16 @@ class CezalarMenuTitleRow extends StatelessWidget {
               height: 24,
             ),
             onPressed: onToggleLeftNav,
+            style: IconButton.styleFrom(
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+              tapTargetSize: MaterialTapTargetSize.padded,
+            ),
           ),
           Expanded(
             child: Center(
               child: Text(
                 title,
-                style: const TextStyle(fontSize: 19),
+                style: palette.headline(weight: FontWeight.w600),
               ),
             ),
           ),
@@ -52,7 +59,11 @@ class CezalarMenuTitleRow extends StatelessWidget {
               icon: Icon(
                 isHeaderCollapsed ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
                 size: 24,
-                color: Colors.black,
+                color: palette.textPrimary,
+              ),
+              style: IconButton.styleFrom(
+                minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                tapTargetSize: MaterialTapTargetSize.padded,
               ),
               onPressed: onToggleCollapse,
               tooltip: isHeaderCollapsed ? 'Arayüzü Aç' : 'Arayüzü Kapat',
@@ -90,7 +101,7 @@ class CezalarLeftIconScrollColumn extends StatelessWidget {
             child: Icon(
               MdiIcons.briefcaseArrowLeftRight,
               size: 24,
-              color: Colors.black54,
+              color: SeyirPalette.of(context).textSecondary,
             ),
           ),
         ),
@@ -178,7 +189,7 @@ class CezalarLeftIconScrollColumn extends StatelessWidget {
             child: Icon(
               MdiIcons.trendingUp,
               size: 24,
-              color: Colors.black54,
+              color: SeyirPalette.of(context).textSecondary,
             ),
           ),
         ),

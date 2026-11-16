@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+
 import '../services/dava_consensus_service.dart';
 
 /// 8-Hüküm ekranında çoğunluk sonucunu gösteren bilgi kartı.
@@ -28,9 +30,9 @@ class _HukumConsensusBadgeState extends State<HukumConsensusBadge> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: SeyirPalette.of(context).card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFDCE7E1)),
+        border: Border.all(color: SeyirPalette.of(context).border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -52,7 +54,7 @@ class _HukumConsensusBadgeState extends State<HukumConsensusBadge> {
                       ),
                       child: Row(
                         children: <Widget>[
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               ' Çoğunluk Kararı',
                               textAlign: TextAlign.left,
@@ -60,7 +62,7 @@ class _HukumConsensusBadgeState extends State<HukumConsensusBadge> {
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.2,
-                                color: Color(0xFF1B2A23),
+                                color: SeyirPalette.of(context).textPrimary,
                               ),
                             ),
                           ),
@@ -70,7 +72,7 @@ class _HukumConsensusBadgeState extends State<HukumConsensusBadge> {
                             curve: Curves.easeOutCubic,
                             child: Icon(
                               Icons.expand_more,
-                              color: Colors.grey.shade600,
+                              color: SeyirPalette.of(context).textSecondary,
                               size: 26,
                             ),
                           ),
@@ -157,14 +159,14 @@ class _HukumConsensusBadgeState extends State<HukumConsensusBadge> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade300),
-        color: Colors.grey.shade100,
+        border: Border.all(color: SeyirPalette.of(context).border),
+        color: SeyirPalette.of(context).surfaceMuted,
       ),
       child: Text(
         'Hüküm verisi henüz hazır değil.',
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
+              color: SeyirPalette.of(context).textSecondary,
             ),
       ),
     );
@@ -251,7 +253,7 @@ class _HukumConsensusBadgeState extends State<HukumConsensusBadge> {
           Text(
             decisionText,
             style: baseStyle?.copyWith(
-              fontSize: 14,
+              fontSize: SeyirTokens.typeBody,
               color: Colors.black87,
             ),
           ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../theme/seyir_tokens.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:provider/provider.dart';
@@ -520,19 +522,13 @@ class _ModernHukumCardState extends State<ModernHukumCard>
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 2, 12, 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: SeyirPalette.of(context).card,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: const Color(0xFFDDE9E2),
+            color: SeyirPalette.of(context).border,
             width: 1.4,
           ),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: const Color(0xFF101815).withOpacity(0.07),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          boxShadow: SeyirPalette.of(context).cardShadow,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
@@ -578,11 +574,12 @@ class _ModernHukumCardState extends State<ModernHukumCard>
 
   /// Dava bilgilerini gösteren kutuyu oluşturur.//bu kısmı dava künyesi 2 diyorum.
   Widget _buildDavaInfo() {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: palette.card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFDCE7E1)),
+        border: Border.all(color: palette.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -602,12 +599,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                       child: Text(
                         '|| Dava Künyesi ||',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.2,
-                          color: Color(0xFF1B2A23),
-                        ),
+                        style: palette.title(),
                       ),
                     ),
                     AnimatedRotation(
@@ -616,7 +608,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                       curve: Curves.easeOutCubic,
                       child: Icon(
                         Icons.expand_more,
-                        color: Colors.grey.shade600,
+                        color: palette.textSecondary,
                         size: 26,
                       ),
                     ),
@@ -695,20 +687,12 @@ class _ModernHukumCardState extends State<ModernHukumCard>
             children: <Widget>[
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
-                ),
+                style: SeyirPalette.of(context).caption(weight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               Text(
                 value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade900,
-                ),
+                style: SeyirPalette.of(context).body(weight: FontWeight.w700),
               ),
             ],
           ),
@@ -741,20 +725,12 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                 children: <Widget>[
                   Text(
                     'Dava Açılış Tarihi',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: SeyirPalette.of(context).caption(weight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     openedAtText,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade900,
-                    ),
+                    style: SeyirPalette.of(context).body(weight: FontWeight.w700),
                   ),
 
                   if (openedAt == null && widget.kalanSure.isNotEmpty) ...<Widget>[
@@ -762,7 +738,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                     Text(
                       widget.kalanSure,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: SeyirTokens.typeCaption,
                         fontWeight: FontWeight.w600,
                         color: Colors.blue.shade700,
                       ),
@@ -835,14 +811,16 @@ class _ModernHukumCardState extends State<ModernHukumCard>
             duration: const Duration(milliseconds: 150),
             curve: Curves.easeOut,
             decoration: BoxDecoration(
-              color: inputLocked ? Colors.grey.shade200 : Colors.white,
+              color: inputLocked
+                  ? SeyirPalette.of(context).surfaceMuted
+                  : SeyirPalette.of(context).surface,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: inputLocked
-                    ? Colors.grey.shade400
+                    ? SeyirPalette.of(context).border
                     : (_hukumFocusNode.hasFocus
                     ? const Color(0xFF4CAF50)
-                    : const Color(0xFFDCE8DF)),
+                    : SeyirPalette.of(context).border),
                 width: _hukumFocusNode.hasFocus ? 2 : 1,
               ),
               boxShadow: <BoxShadow>[
@@ -877,10 +855,9 @@ class _ModernHukumCardState extends State<ModernHukumCard>
               },
               decoration: InputDecoration(
                 hintText: 'Hükmünü buraya yazmaya başla...',
-                hintStyle: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
+                hintStyle: SeyirPalette.of(context).body(
+                  weight: FontWeight.w400,
+                  color: SeyirPalette.of(context).textMuted,
                 ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.all(20),
@@ -914,11 +891,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                   ),
                 ),
               ),
-              style: const TextStyle(
-                fontSize: 15,
-                height: 1.6,
-                color: Colors.black87,
-              ),
+              style: SeyirPalette.of(context).title(weight: FontWeight.w500).copyWith(height: 1.6),
             ),
           ),
         ),
@@ -929,7 +902,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
             child: Text(
               '${_extractHukumBody(_hukumController.text).length} / $_hukumBodyMaxChars karakter · en az $_hukumBodyMinChars',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: SeyirTokens.typeCaption,
                 fontWeight: FontWeight.w600,
                 color: _hukumBodyLengthHintColor(),
               ),
@@ -1077,10 +1050,12 @@ class _ModernHukumCardState extends State<ModernHukumCard>
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: SeyirPalette.of(context).card,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: finalizedMode ? Colors.grey.shade300 : primaryAccent.withOpacity(0.15),
+          color: finalizedMode
+              ? SeyirPalette.of(context).border
+              : primaryAccent.withOpacity(0.15),
           width: 1.5,
         ),
         boxShadow: [
@@ -1101,10 +1076,10 @@ class _ModernHukumCardState extends State<ModernHukumCard>
               const SizedBox(width:10),
               Text(
                 'Ceza ve Masraf İşlemleri',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: finalizedMode ? Colors.grey.shade700 : Colors.black87,
+                style: SeyirPalette.of(context).title(
+                  color: finalizedMode
+                      ? SeyirPalette.of(context).textSecondary
+                      : SeyirPalette.of(context).textPrimary,
                 ),
               ),
             ],
@@ -1232,7 +1207,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
             ? (warningDone ? Colors.deepOrange.shade800 : Colors.green.shade600)
             : activeColor);
     final Color bgColor = mutedDisabled
-        ? Colors.grey.shade200
+        ? SeyirPalette.of(context).surfaceMuted
         : (showDone
             ? (warningDone
                 ? Colors.deepOrange.shade50
@@ -1386,7 +1361,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: SeyirTokens.typeBody,
                     fontWeight: FontWeight.bold,
                     color: isLocked
                         ? Colors.white
@@ -1764,7 +1739,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
         SnackBar(
           content: Text(
             message,
-            style: const TextStyle(fontSize: 14),
+            style: const TextStyle(fontSize: SeyirTokens.typeBody),
           ),
           backgroundColor: backgroundColor,
           behavior: SnackBarBehavior.floating,

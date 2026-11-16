@@ -1155,12 +1155,14 @@ class CollapsedWbHeaderRow extends StatelessWidget {
   final String title;
   final VoidCallback onExpandHeader;
   final VoidCallback onToggleLeftNav;
+  final TextStyle? titleStyle;
 
   const CollapsedWbHeaderRow({
     super.key,
     required this.title,
     required this.onExpandHeader,
     required this.onToggleLeftNav,
+    this.titleStyle,
   });
 
   @override
@@ -1194,21 +1196,26 @@ class CollapsedWbHeaderRow extends StatelessWidget {
           IconButton(
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
-            icon: const Icon(Icons.search, size: 16),
+            icon: Icon(Icons.search, size: 16, color: Theme.of(context).colorScheme.onSurface),
             onPressed: () {},
           ),
           const SizedBox(width: 4),
-          Icon(MdiIcons.chatOutline, size: 16, color: Colors.black54),
+          Icon(MdiIcons.chatOutline, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(width: 8),
           GestureDetector(
             onTap: onToggleLeftNav,
-            child: Icon(MdiIcons.menuOpen, size: 16, color: Colors.black54),
+            child: Icon(MdiIcons.menuOpen, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(width: 4),
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+              style: titleStyle ??
+                  TextStyle(
+                    fontSize: SeyirTokens.typeCaption,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -1216,10 +1223,10 @@ class CollapsedWbHeaderRow extends StatelessWidget {
           IconButton(
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
-            icon: const Icon(
+            icon: Icon(
               Icons.keyboard_arrow_down,
               size: 18,
-              color: Colors.black,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
             onPressed: onExpandHeader,
             tooltip: 'Arayüzü Aç',

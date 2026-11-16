@@ -427,9 +427,29 @@ class _DavaciUnlulurPageState extends State<DavaciUnlulurPage> {
               child: IconButton(
                 icon: Icon(MdiIcons.handcuffs, size: 24, color: Colors.black54),
                 onPressed: () {
+                  final Map<String, dynamic>? dava =
+                      _davaList.isEmpty ? null : _davaList.first;
+                  final String id =
+                      (dava?['id'] ?? dava?['davaId'] ?? '').toString().trim();
+                  final String openedRaw = (dava?['openedAt'] ??
+                          dava?['acceptedAt'] ??
+                          dava?['createdAt'] ??
+                          '')
+                      .toString();
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const CezalarPage()),
+                    MaterialPageRoute(
+                      builder: (context) => CezalarPage(
+                        userEmail: widget.userEmail,
+                        davaId: id.isEmpty ? null : id,
+                        davaAdi: (dava?['davaAdi'] ?? dava?['adi'] ?? '').toString(),
+                        davaDavali: (dava?['davali'] ?? '').toString(),
+                        davaDavaci: (dava?['davaci'] ?? '').toString(),
+                        davaGorev: (dava?['mevkii'] ?? '').toString(),
+                        kalanSure: (dava?['kalanSure'] ?? '').toString(),
+                        davaOpenedAt: DateTime.tryParse(openedRaw),
+                      ),
+                    ),
                   );
                 },
               ),

@@ -1,6 +1,8 @@
 import 'dart:math' show pi, sin;
 
 import 'package:flutter/material.dart';
+
+import '../theme/seyir_tokens.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:provider/provider.dart';
 import '../services/hive_database_service.dart';
@@ -577,7 +579,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
             Expanded(
               child: Text(
                 mesaj,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
               ),
             ),
           ],
@@ -718,16 +720,16 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                             turns: _kunyedeGorevHukumAlaniAcik ? 0.5 : 0,
                             duration: const Duration(milliseconds: 200),
                             curve: Curves.easeOutCubic,
-                            child: Icon(Icons.expand_more, size: 20, color: Colors.grey.shade700),
+                            child: Icon(Icons.expand_more, size: 20, color: SeyirPalette.of(context).textSecondary),
                           ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               'Görevinize ait hüküm',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: SeyirTokens.typeCaption,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade800,
+                                color: SeyirPalette.of(context).textPrimary,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -751,7 +753,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
               ? Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                   child: Material(
-                    color: const Color(0xFFF7FAF8),
+                    color: SeyirPalette.of(context).surfaceMuted,
                     borderRadius: BorderRadius.circular(10),
                     child: Padding(
                       padding: const EdgeInsets.all(10),
@@ -760,7 +762,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                             (widget.davaId == null || widget.davaId!.trim().isEmpty
                                 ? 'Bu dava için hüküm kaydı yüklemek üzere dava kimliği gerekir. Yargıla ekranındaki görev rozetinden devam edin.'
                                 : 'Bu görev için henüz kayıtlı hüküm metni bulunamadı veya yükleniyor…'),
-                        style: TextStyle(fontSize: 13, height: 1.45, color: Colors.grey.shade900),
+                        style: TextStyle(fontSize: 13, height: 1.45, color: SeyirPalette.of(context).textPrimary),
                       ),
                     ),
                   ),
@@ -901,10 +903,9 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
               maxWidth: MediaQuery.of(ctx).size.width * 0.9,
             ),
             decoration: BoxDecoration(
+              color: SeyirPalette.of(ctx).card,
               borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                colors: <Color>[Colors.green.shade50, Colors.blue.shade50],
-              ),
+              border: Border.all(color: SeyirPalette.of(ctx).border),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -927,7 +928,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                                   Text(
                                     normalizedRole,
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: SeyirTokens.typeTitle,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.green.shade700,
                                     ),
@@ -942,8 +943,8 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                                               ? displayName
                                               : formattedDate,
                                       style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade600,
+                                        fontSize: SeyirTokens.typeCaption,
+                                        color: SeyirPalette.of(context).textSecondary,
                                         fontStyle: FontStyle.italic,
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -958,7 +959,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                       IconButton(
                         onPressed: () => Navigator.of(ctx).pop(),
                         icon: const Icon(Icons.close),
-                        color: Colors.grey.shade700,
+                        color: SeyirPalette.of(ctx).textSecondary,
                       ),
                     ],
                   ),
@@ -970,13 +971,13 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: SeyirPalette.of(ctx).surfaceMuted,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.shade200),
+                        border: Border.all(color: SeyirPalette.of(ctx).border),
                       ),
                       child: Text(
                         finalHukumText,
-                        style: const TextStyle(fontSize: 14, height: 1.5, color: Colors.black87),
+                        style: TextStyle(fontSize: SeyirTokens.typeBody, height: 1.5, color: SeyirPalette.of(ctx).textPrimary),
                       ),
                     ),
                   ),
@@ -1004,7 +1005,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         backgroundColor: Colors.transparent,
         child: Container(
           decoration: BoxDecoration(
-            color: _MahkemeRenkler.krem,
+            color: SeyirPalette.of(context).surface,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: _MahkemeRenkler.altin, width: 2),
             boxShadow: [
@@ -1037,7 +1038,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                         'MAHKEMENİN KARARI',
                         style: TextStyle(
                           color: _MahkemeRenkler.altin,
-                          fontSize: 16,
+                          fontSize: SeyirTokens.typeTitle,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.5,
                         ),
@@ -1051,11 +1052,11 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       '"Mahkeme-i Kübra"nın tarafsız kararı:',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: _MahkemeRenkler.gri,
+                        fontSize: SeyirTokens.typeCaption,
+                        color: SeyirPalette.of(context).textSecondary,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -1064,7 +1065,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: _MahkemeRenkler.kemik,
+                        color: SeyirPalette.of(context).surfaceMuted,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.5)),
                       ),
@@ -1072,7 +1073,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                         '"$selectedPenaltyText"',
                         textAlign: TextAlign.center,
                         softWrap: true,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: _MahkemeRenkler.ortaKahve,
@@ -1082,12 +1083,12 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       '...cezasının uygulanmasına oy birliğiyle karar verilmiştir.\nBu karar kesindir, temyize gidilmez! 🔨',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 12,
-                        color: _MahkemeRenkler.gri,
+                        fontSize: SeyirTokens.typeCaption,
+                        color: SeyirPalette.of(context).textSecondary,
                         height: 1.5,
                       ),
                     ),
@@ -1104,7 +1105,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                         onPressed: () => Navigator.of(ctx).pop(),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: _MahkemeRenkler.gri,
-                          side: const BorderSide(color: _MahkemeRenkler.gri),
+                          side: BorderSide(color: _MahkemeRenkler.gri),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -1187,7 +1188,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
   Widget _buildMainPanel({ScrollController? scrollController}) {
     return Container(
       decoration: BoxDecoration(
-        color: _MahkemeRenkler.krem,
+        color: SeyirPalette.of(context).surface,
         borderRadius: widget.embeddedMiddlePane
             ? BorderRadius.zero
             : const BorderRadius.vertical(top: Radius.circular(24)),
@@ -1230,9 +1231,9 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         children: <Widget>[
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: SeyirPalette.of(context).card,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFDCE7E1)),
+              border: Border.all(color: SeyirPalette.of(context).border),
             ),
             clipBehavior: Clip.antiAlias,
             child: Column(
@@ -1250,11 +1251,11 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                             child: Text(
                               '|| Dava Künyesi ||',
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.2,
-                                color: Color(0xFF1B2A23),
+                                color: SeyirPalette.of(context).textPrimary,
                               ),
                             ),
                           ),
@@ -1262,7 +1263,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                             turns: _cezaKunyeExpanded ? 0.5 : 0,
                             duration: const Duration(milliseconds: 220),
                             curve: Curves.easeOutCubic,
-                            child: Icon(Icons.expand_more, color: Colors.grey.shade600, size: 26),
+                            child: Icon(Icons.expand_more, color: SeyirPalette.of(context).textSecondary, size: 26),
                           ),
                         ],
                       ),
@@ -1325,13 +1326,13 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
             children: <Widget>[
               Text(
                 label,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: SeyirTokens.typeCaption, fontWeight: FontWeight.w600, color: SeyirPalette.of(context).textSecondary),
               ),
               const SizedBox(height: 4),
               Text(
                 value.isEmpty ? '—' : value,
                 softWrap: true,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey.shade900),
+                style: TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.bold, color: SeyirPalette.of(context).textPrimary),
               ),
             ],
           ),
@@ -1360,18 +1361,18 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                   Text(
                     'Dava Açılış Tarihi',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: SeyirTokens.typeCaption,
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
+                      color: SeyirPalette.of(context).textSecondary,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     openedAtText,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: SeyirTokens.typeBody,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade900,
+                      color: SeyirPalette.of(context).textPrimary,
                     ),
                   ),
                   if (openedAt == null && widget.dava.kalanSure.isNotEmpty) ...<Widget>[
@@ -1379,7 +1380,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                     Text(
                       widget.dava.kalanSure,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: SeyirTokens.typeCaption,
                         fontWeight: FontWeight.w600,
                         color: Colors.blue.shade700,
                       ),
@@ -1412,10 +1413,10 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8F7FF),
+          color: SeyirPalette.of(context).card,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: hasSelection ? _MahkemeRenkler.yesil.withValues(alpha: 0.35) : Colors.grey.shade300,
+            color: hasSelection ? _MahkemeRenkler.yesil.withValues(alpha: 0.35) : SeyirPalette.of(context).border,
             width: 1.2,
           ),
           boxShadow: const <BoxShadow>[
@@ -1436,7 +1437,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                     'Seçtiğin Ceza',
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                      fontSize: SeyirTokens.typeBody,
                       color: _MahkemeRenkler.ortaKahve,
                       letterSpacing: .2,
                     ),
@@ -1451,10 +1452,10 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                     ),
                     child: Text(
                       'CezaNo: $selectedCode',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 11,
-                        color: _MahkemeRenkler.koyu,
+                        color: SeyirPalette.of(context).textPrimary,
                       ),
                     ),
                   ),
@@ -1467,7 +1468,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
               style: TextStyle(
                 fontSize: hasSelection ? 17 : 13,
                 fontWeight: hasSelection ? FontWeight.w800 : FontWeight.w500,
-                color: hasSelection ? _MahkemeRenkler.koyu : Colors.grey.shade600,
+                color: hasSelection ? SeyirPalette.of(context).textPrimary : SeyirPalette.of(context).textSecondary,
                 height: 1.32,
               ),
             ),
@@ -1477,8 +1478,8 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                 selectedDescription,
                 softWrap: true,
                 style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade800,
+                  fontSize: SeyirTokens.typeCaption,
+                  color: SeyirPalette.of(context).textPrimary,
                   height: 1.35,
                 ),
               ),
@@ -1501,10 +1502,10 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: SeyirPalette.of(context).card,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: hasSelection ? _MahkemeRenkler.yesil.withValues(alpha: 0.35) : Colors.grey.shade300,
+            color: hasSelection ? _MahkemeRenkler.yesil.withValues(alpha: 0.35) : SeyirPalette.of(context).border,
             width: 1.2,
           ),
           boxShadow: const <BoxShadow>[
@@ -1525,7 +1526,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                     '📜 Seçtiğin Ceza',
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                      fontSize: SeyirTokens.typeBody,
                       color: _MahkemeRenkler.ortaKahve,
                       letterSpacing: .2,
                     ),
@@ -1540,10 +1541,10 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                     ),
                     child: Text(
                       'CezaNo: $selectedCode',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 11,
-                        color: _MahkemeRenkler.koyu,
+                        color: SeyirPalette.of(context).textPrimary,
                       ),
                     ),
                   ),
@@ -1556,7 +1557,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                   width: 74,
                   height: 74,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F2FA),
+                    color: SeyirPalette.of(context).surfaceMuted,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -1569,7 +1570,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                                   ? Text(
                                       selectedEmoji,
                                       key: ValueKey<String>(selectedEmoji),
-                                      style: const TextStyle(fontSize: 46),
+                                      style: TextStyle(fontSize: 46),
                                     )
                                   : Icon(
                                       selectedIcon,
@@ -1580,7 +1581,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                             ),
                           )
                         : selectedEmoji != null
-                            ? Text(selectedEmoji, style: const TextStyle(fontSize: 46))
+                            ? Text(selectedEmoji, style: TextStyle(fontSize: 46))
                             : Icon(selectedIcon, size: 52, color: _MahkemeRenkler.ortaKahve),
                   ),
                 ),
@@ -1589,9 +1590,9 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                   child: Container(
                     height: 74,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF6F6FA),
+                      color: SeyirPalette.of(context).surfaceMuted,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white),
+                      border: Border.all(color: SeyirPalette.of(context).border),
                     ),
                     child: Row(
                       children: <Widget>[
@@ -1604,7 +1605,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                             child: Text(
                               selectedDisplayName,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                             ),
                           ),
                         ),
@@ -1774,10 +1775,10 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8F8FC),
+          color: SeyirPalette.of(context).card,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: hasSelection ? _MahkemeRenkler.altin.withValues(alpha: 0.45) : Colors.grey.shade300,
+            color: hasSelection ? _MahkemeRenkler.altin.withValues(alpha: 0.45) : SeyirPalette.of(context).border,
             width: 1.2,
           ),
           boxShadow: const <BoxShadow>[
@@ -1796,23 +1797,23 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 13,
-                color: hasSelection ? _MahkemeRenkler.koyu : _MahkemeRenkler.gri,
+                color: hasSelection ? SeyirPalette.of(context).textPrimary : SeyirPalette.of(context).textSecondary,
               ),
             ),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: SeyirPalette.of(context).surfaceMuted,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: SeyirPalette.of(context).border),
               ),
               child: Text(
                 detailText,
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.45,
-                  color: hasSelection ? Colors.grey.shade900 : Colors.grey.shade600,
+                  color: hasSelection ? SeyirPalette.of(context).textPrimary : SeyirPalette.of(context).textSecondary,
                   fontStyle: hasSelection ? FontStyle.normal : FontStyle.italic,
                 ),
               ),
@@ -1859,9 +1860,9 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFF7F6F2),
+          color: SeyirPalette.of(context).surfaceMuted,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFD2CCBB), width: 1.2),
+          border: Border.all(color: SeyirPalette.of(context).border, width: 1.2),
           boxShadow: const <BoxShadow>[
             BoxShadow(
               color: Color(0x12000000),
@@ -1886,7 +1887,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                 style: TextStyle(
 
                   color: _MahkemeRenkler.altin, // Altın rengi bu koyu mavi üzerinde çok şık duracaktır
-                  fontSize: 19,
+                  fontSize: SeyirTokens.typeHeadline,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.7,
                 ),
@@ -1904,7 +1905,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                     style: TextStyle(
                       fontSize: hasSelection ? 14 : 12.5,
                       fontWeight: hasSelection ? FontWeight.w700 : FontWeight.w500,
-                      color: hasSelection ? _MahkemeRenkler.ortaKahve : _MahkemeRenkler.gri,
+                      color: hasSelection ? _MahkemeRenkler.ortaKahve : SeyirPalette.of(context).textSecondary,
                       fontStyle: FontStyle.italic,
                       height: 1.4,
                     ),
@@ -1939,11 +1940,11 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                                     : (_isSealTapInProgress ? 'Mühürleniyor...' : 'Mühürle'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: SeyirTokens.typeBody,
                                   fontWeight: FontWeight.w900,
                                   color: hasSelection
                                       ? const Color(0xFF8B0000)
-                                      : Colors.grey.shade500,
+                                      : SeyirPalette.of(context).textMuted,
                                   letterSpacing: 0.8,
                                 ),
                               ),
@@ -1967,9 +1968,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: hasSelection
-                                        ? const Color(0xFFF5F2EB)
-                                        : const Color(0xFFEBE8E2),
+                                    color: SeyirPalette.of(context).surfaceMuted,
                                     boxShadow: const <BoxShadow>[
                                       BoxShadow(
                                         color: Color(0x18000000),
@@ -2015,7 +2014,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                         size: 20,
                         color: hasSelection
                             ? const Color(0xFF7D2A34)
-                            : Colors.grey.shade400,
+                            : SeyirPalette.of(context).textMuted,
                       ),
                     ),
                   ),
@@ -2044,7 +2043,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 11.5,
-          color: _MahkemeRenkler.gri.withValues(alpha: 0.9),
+          color: SeyirPalette.of(context).textSecondary.withValues(alpha: 0.9),
           fontStyle: FontStyle.italic,
         ),
       ),
@@ -2056,7 +2055,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         IconButton(icon: Icon(icon, color: Colors.green, size: 20), onPressed: onTap),
-        Text('$count', style: const TextStyle(color: Colors.green, fontSize: 13)),
+        Text('$count', style: TextStyle(color: Colors.green, fontSize: 13)),
       ],
     );
   }
@@ -2097,7 +2096,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                   'Ceza Yönetimi',
                   style: TextStyle(
                     color: _MahkemeRenkler.altin,
-                    fontSize: 17,
+                    fontSize: SeyirTokens.typeHeadline,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
                   ),
@@ -2145,11 +2144,11 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         unselectedLabelColor: Color(0xFF8B87B0),
         indicatorColor: _MahkemeRenkler.altin,
         indicatorWeight: 3,
-        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        labelStyle: TextStyle(fontSize: SeyirTokens.typeCaption, fontWeight: FontWeight.bold, letterSpacing: 0.5),
         tabs: const <Widget>[
-          Tab(icon: Text('⚖️', style: TextStyle(fontSize: 16)), text: 'Ceza Seç'),
-          Tab(icon: Text('✍️', style: TextStyle(fontSize: 16)), text: 'Özel Ceza'),
-          Tab(icon: Text('📜', style: TextStyle(fontSize: 16)), text: 'Seçilen'),
+          Tab(icon: Text('⚖️', style: TextStyle(fontSize: SeyirTokens.typeTitle)), text: 'Ceza Seç'),
+          Tab(icon: Text('✍️', style: TextStyle(fontSize: SeyirTokens.typeTitle)), text: 'Özel Ceza'),
+          Tab(icon: Text('📜', style: TextStyle(fontSize: SeyirTokens.typeTitle)), text: 'Seçilen'),
         ],
       ),
     );
@@ -2167,7 +2166,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: _MahkemeRenkler.kemik,
+              color: SeyirPalette.of(context).surfaceMuted,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.5)),
               boxShadow: [
@@ -2187,7 +2186,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
           // Ceza listesi — parşömen tarzı kağıt
           Container(
             decoration: BoxDecoration(
-              color: _MahkemeRenkler.kemik,
+              color: SeyirPalette.of(context).surfaceMuted,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.4)),
               boxShadow: [
@@ -2209,7 +2208,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                         child: Text(
                           activeCategory == 'Hazır Ceza' ? '📋 Resmi Ceza Listesi' : '👥 Üye Kararları',
                           softWrap: true,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: _MahkemeRenkler.altin,
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -2308,6 +2307,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
               child: InkWell(
                 onTap: () => _selectReady(originalIndex),
                 child: Container(
+                  constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
                   padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
                   decoration: BoxDecoration(
                     color: selected ? _MahkemeRenkler.ortaKahve.withValues(alpha: 0.12) : Colors.transparent,
@@ -2344,7 +2344,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                            color: selected ? _MahkemeRenkler.ortaKahve : _MahkemeRenkler.koyu,
+                            color: selected ? _MahkemeRenkler.ortaKahve : SeyirPalette.of(context).textPrimary,
                             height: 1.3,
                           ),
                         ),
@@ -2364,14 +2364,14 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(isLiked ? '❤️' : '🤍', style: const TextStyle(fontSize: 12)),
+                              Text(isLiked ? '❤️' : '🤍', style: TextStyle(fontSize: SeyirTokens.typeCaption)),
                               const SizedBox(width: 3),
                               Text(
                                 likeCount.toString(),
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: isLiked ? _MahkemeRenkler.ortaKahve : _MahkemeRenkler.gri,
+                                  color: isLiked ? _MahkemeRenkler.ortaKahve : SeyirPalette.of(context).textSecondary,
                                 ),
                               ),
                             ],
@@ -2388,7 +2388,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                         const SizedBox(width: 4),
                         Text(
                           _isPenaltyApplied ? '🔒' : '🔓',
-                          style: const TextStyle(fontSize: 16),
+                          style: TextStyle(fontSize: SeyirTokens.typeTitle),
                         ),
                       ],
                     ],
@@ -2402,21 +2402,21 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                 margin: const EdgeInsets.only(left: 52, right: 14, bottom: 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: _MahkemeRenkler.kemik,
+                  color: SeyirPalette.of(context).surfaceMuted,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.4)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('📜', style: TextStyle(fontSize: 14)),
+                    const Text('📜', style: TextStyle(fontSize: SeyirTokens.typeBody)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         description,
                         softWrap: true,
-                        style: const TextStyle(
-                          fontSize: 12,
+                        style: TextStyle(
+                          fontSize: SeyirTokens.typeCaption,
                           color: _MahkemeRenkler.ortaKahve,
                           height: 1.5,
                           fontStyle: FontStyle.italic,
@@ -2445,7 +2445,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
 
         return Container(
           decoration: BoxDecoration(
-            color: _MahkemeRenkler.kemik,
+            color: SeyirPalette.of(context).surfaceMuted,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.4)),
           ),
@@ -2461,19 +2461,19 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
               child: Center(
                 child: Text(
                   memberData['avatar'] as String,
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: _MahkemeRenkler.altin, fontSize: 15),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: _MahkemeRenkler.altin, fontSize: 15),
                 ),
               ),
             ),
             title: Text(
               member,
               softWrap: true,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _MahkemeRenkler.koyu),
+              style: TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.bold, color: SeyirPalette.of(context).textPrimary),
             ),
             subtitle: Text(
               memberData['hashtag'] as String,
               softWrap: true,
-              style: const TextStyle(fontSize: 11, color: _MahkemeRenkler.gri),
+              style: TextStyle(fontSize: 11, color: SeyirPalette.of(context).textSecondary),
             ),
             iconColor: _MahkemeRenkler.altin,
             collapsedIconColor: _MahkemeRenkler.altin,
@@ -2491,6 +2491,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                       child: InkWell(
                         onTap: () => _selectMemberPenalty(member, idx),
                         child: Container(
+                          constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
                           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
                           decoration: BoxDecoration(
                             color: selected ? _MahkemeRenkler.ortaKahve.withValues(alpha: 0.12) : Colors.transparent,
@@ -2500,19 +2501,19 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                               if (_coffinAnimationController != null)
                                 RotationTransition(
                                   turns: _coffinAnimationController!,
-                                  child: const Text('⚰️', style: TextStyle(fontSize: 16)),
+                                  child: const Text('⚰️', style: TextStyle(fontSize: SeyirTokens.typeTitle)),
                                 )
                               else
-                                const Text('⚰️', style: TextStyle(fontSize: 16)),
+                                const Text('⚰️', style: TextStyle(fontSize: SeyirTokens.typeTitle)),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   txt,
                                   softWrap: true,
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: SeyirTokens.typeCaption,
                                     fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                                    color: selected ? _MahkemeRenkler.ortaKahve : _MahkemeRenkler.koyu,
+                                    color: selected ? _MahkemeRenkler.ortaKahve : SeyirPalette.of(context).textPrimary,
                                     height: 1.3,
                                   ),
                                 ),
@@ -2525,7 +2526,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                               if (selected)
                                 Text(
                                   _isPenaltyApplied ? '🔒' : '🔓',
-                                  style: const TextStyle(fontSize: 14),
+                                  style: TextStyle(fontSize: SeyirTokens.typeBody),
                                 ),
                             ],
                           ),
@@ -2537,7 +2538,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                         margin: const EdgeInsets.only(left: 42, right: 14, bottom: 8),
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: _MahkemeRenkler.kemik,
+                          color: SeyirPalette.of(context).surfaceMuted,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.4)),
                         ),
@@ -2550,7 +2551,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                               child: Text(
                                 '$txt — Bu ceza üye tarafından mahkemeye sunulmuştur. Karar üyeye aittir!',
                                 softWrap: true,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   color: _MahkemeRenkler.ortaKahve,
                                   fontStyle: FontStyle.italic,
@@ -2583,7 +2584,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: _MahkemeRenkler.kemik,
+              color: SeyirPalette.of(context).surfaceMuted,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.5)),
             ),
@@ -2604,7 +2605,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                 Text(
                   'Mahkeme listesinde bulamazsanız, kendi cezanızı yaratan büyük hâkim sizsiniz.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: _MahkemeRenkler.gri, height: 1.5),
+                  style: TextStyle(fontSize: 11, color: SeyirPalette.of(context).textSecondary, height: 1.5),
                 ),
                 if (_isCustomPenaltySelected && !_isPenaltyApplied) ...[
                   const SizedBox(height: 8),
@@ -2688,13 +2689,13 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(emoji, style: const TextStyle(fontSize: 16)),
+        Text(emoji, style: TextStyle(fontSize: SeyirTokens.typeTitle)),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
             text,
             softWrap: true,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
               color: _MahkemeRenkler.ortaKahve,
@@ -2714,7 +2715,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: _isPenaltyApplied ? _MahkemeRenkler.kemik.withOpacity(0.5) : _MahkemeRenkler.kemik,
+        color: _isPenaltyApplied ? SeyirPalette.of(context).surfaceMuted.withOpacity(0.5) : _MahkemeRenkler.kemik,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.5)),
       ),
@@ -2726,10 +2727,10 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         maxLength: maxLength,
         enabled: !_isPenaltyApplied,
         readOnly: _isPenaltyApplied,
-        style: const TextStyle(fontSize: 13, color: _MahkemeRenkler.koyu, height: 1.5),
+        style: TextStyle(fontSize: 13, color: SeyirPalette.of(context).textPrimary, height: 1.5),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: const TextStyle(color: _MahkemeRenkler.gri, fontSize: 12),
+          hintStyle: TextStyle(color: SeyirPalette.of(context).textSecondary, fontSize: SeyirTokens.typeCaption),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.all(14),
           counterText: '',
@@ -2750,9 +2751,9 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       child: Text(
         '$label: $current/$max',
         style: TextStyle(
-          fontSize: 10,
+          fontSize: SeyirTokens.typeCaption,
           fontWeight: FontWeight.bold,
-          color: ok ? Colors.green.shade700 : _MahkemeRenkler.gri,
+          color: ok ? Colors.green.shade700 : SeyirPalette.of(context).textSecondary,
         ),
       ),
     );
@@ -2772,7 +2773,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         elevation: onPressed != null ? 3 : 0,
       ),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+      child: Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: SeyirTokens.typeCaption)),
     );
   }
 
@@ -2787,7 +2788,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
           // Parşömen efektli ceza belgesi
           Container(
             decoration: BoxDecoration(
-              color: _MahkemeRenkler.kemik,
+              color: SeyirPalette.of(context).surfaceMuted,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: _MahkemeRenkler.altin, width: 2),
               boxShadow: [
@@ -2811,7 +2812,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                         'MAHKEME KARARI',
                         style: TextStyle(
                           color: _MahkemeRenkler.altin,
-                          fontSize: 14,
+                          fontSize: SeyirTokens.typeBody,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 2,
                         ),
@@ -2825,13 +2826,13 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Mahkeme-i Kübra',
-                        style: TextStyle(fontSize: 11, color: _MahkemeRenkler.gri, fontStyle: FontStyle.italic),
+                        style: TextStyle(fontSize: 11, color: SeyirPalette.of(context).textSecondary, fontStyle: FontStyle.italic),
                       ),
                       Text(
                         _formatDate(),
-                        style: const TextStyle(fontSize: 11, color: _MahkemeRenkler.gri),
+                        style: TextStyle(fontSize: 11, color: SeyirPalette.of(context).textSecondary),
                       ),
                     ],
                   ),
@@ -2842,9 +2843,9 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      const Text(
+                      Text(
                         'İşbu belge ile,',
-                        style: TextStyle(fontSize: 12, color: _MahkemeRenkler.gri, fontStyle: FontStyle.italic),
+                        style: TextStyle(fontSize: SeyirTokens.typeCaption, color: SeyirPalette.of(context).textSecondary, fontStyle: FontStyle.italic),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -2856,17 +2857,17 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                         style: TextStyle(
                           fontSize: selectedPenaltyText != null ? 16 : 13,
                           fontWeight: selectedPenaltyText != null ? FontWeight.bold : FontWeight.normal,
-                          color: selectedPenaltyText != null ? _MahkemeRenkler.ortaKahve : _MahkemeRenkler.gri,
+                          color: selectedPenaltyText != null ? _MahkemeRenkler.ortaKahve : SeyirPalette.of(context).textSecondary,
                           fontStyle: FontStyle.italic,
                           height: 1.5,
                         ),
                       ),
                       const SizedBox(height: 12),
                       if (selectedPenaltyText != null)
-                        const Text(
+                        Text(
                           'cezasının uygulanmasına karar verilmiştir.\nBu karar kesin ve değiştirilemez!',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11, color: _MahkemeRenkler.gri, fontStyle: FontStyle.italic, height: 1.5),
+                          style: TextStyle(fontSize: 11, color: SeyirPalette.of(context).textSecondary, fontStyle: FontStyle.italic, height: 1.5),
                         ),
                     ],
                   ),
@@ -2887,7 +2888,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                         child: const Text(
                           '🔴 RESMİ MÜHÜR',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: SeyirTokens.typeCaption,
                             fontWeight: FontWeight.bold,
                             color: _MahkemeRenkler.ortaKahve,
                             letterSpacing: 1,
@@ -2912,12 +2913,12 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
               ),
               child: const Row(
                 children: [
-                  Text('⚠️', style: TextStyle(fontSize: 16)),
+                  Text('⚠️', style: TextStyle(fontSize: SeyirTokens.typeTitle)),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '"Ceza Seç" veya "Özel Ceza" sekmesinden bir ceza belirleyiniz.',
-                      style: TextStyle(fontSize: 12, color: _MahkemeRenkler.ortaKahve, height: 1.4),
+                      style: TextStyle(fontSize: SeyirTokens.typeCaption, color: _MahkemeRenkler.ortaKahve, height: 1.4),
                     ),
                   ),
                 ],
@@ -2940,7 +2941,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       decoration: BoxDecoration(
-        color: _MahkemeRenkler.kemik,
+        color: SeyirPalette.of(context).surfaceMuted,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _MahkemeRenkler.altin.withValues(alpha: 0.55), width: 1.2),
         boxShadow: [
@@ -2968,7 +2969,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: _MahkemeRenkler.altin,
-                  fontSize: 12,
+                  fontSize: SeyirTokens.typeCaption,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.0,
                 ),
@@ -3014,7 +3015,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                             'CEZA UYGULA!',
                             style: TextStyle(
                               fontWeight: FontWeight.w900,
-                              fontSize: 14,
+                              fontSize: SeyirTokens.typeBody,
                               letterSpacing: 1.0,
                             ),
                           ),
@@ -3033,7 +3034,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11,
-                    color: _MahkemeRenkler.gri.withValues(alpha: 0.92),
+                    color: SeyirPalette.of(context).textSecondary.withValues(alpha: 0.92),
                     fontStyle: FontStyle.italic,
                   ),
                 ),
