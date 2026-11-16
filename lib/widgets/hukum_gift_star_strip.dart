@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+
 /// Untitled projesindeki [StarPackagesSection] ile uyumlu: bakiye çipi + üç paket.
 class HukumGiftStarStrip extends StatelessWidget {
   const HukumGiftStarStrip({
@@ -64,9 +66,9 @@ class HukumGiftStarStrip extends StatelessWidget {
       ),
       padding: EdgeInsets.all(dense ? 10 : 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: SeyirPalette.of(context).card,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFDDE9E2)),
+        border: Border.all(color: SeyirPalette.of(context).border),
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: const Color(0xFF101815).withValues(alpha: 0.05),
@@ -84,7 +86,7 @@ class HukumGiftStarStrip extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleSmall?.copyWith(
-                color: const Color(0xFF1B2A23),
+                color: SeyirPalette.of(context).textPrimary,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -181,10 +183,11 @@ class _PaketChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color border = Colors.orange.shade100;
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color border = palette.border;
 
     return Material(
-      color: Colors.white,
+      color: palette.surfaceMuted,
       elevation: 0,
       shadowColor: Colors.transparent,
       shape: RoundedRectangleBorder(
@@ -194,7 +197,9 @@ class _PaketChip extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
-        child: Padding(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+          child: Padding(
           padding: EdgeInsets.symmetric(vertical: dense ? 10 : 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -222,11 +227,12 @@ class _PaketChip extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   color: stars == 500
                       ? Colors.green.shade700
-                      : Colors.grey.shade600,
+                      : palette.textSecondary,
                 ),
               ),
             ],
           ),
+        ),
         ),
       ),
     );

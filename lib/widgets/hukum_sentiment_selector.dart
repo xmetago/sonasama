@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+
 import '../models/hukum_sentiment.dart';
 
 /// Hüküm metni için olumlu/olumsuz seçim yapılmasını sağlayan widget.
@@ -31,7 +33,7 @@ class HukumSentimentSelector extends StatelessWidget {
             'Hüküm Yönünüzü Seçin',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: isDisabled ? Colors.grey.shade500 : Colors.grey.shade800,
+                  color: isDisabled ? SeyirPalette.of(context).textMuted : SeyirPalette.of(context).textPrimary,
                 ),
           ),
           const SizedBox(height: 8),
@@ -76,8 +78,8 @@ class HukumSentimentSelector extends StatelessWidget {
                   )
                 : LinearGradient(
                     colors: <Color>[
-                      disabled ? Colors.grey.shade200 : Colors.grey.shade100,
-                      disabled ? Colors.grey.shade300 : Colors.grey.shade200,
+                      SeyirPalette.of(context).surfaceMuted,
+                      SeyirPalette.of(context).surfaceMuted,
                     ],
                   ),
             border: Border.all(

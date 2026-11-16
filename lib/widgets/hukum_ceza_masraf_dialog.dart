@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../theme/seyir_tokens.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'dart:math' as math;
 
@@ -382,7 +384,7 @@ class _HukumCezaMasrafDialogState extends State<HukumCezaMasrafDialog>
                           widget.rolAdi,
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.95),
-                            fontSize: 14,
+                            fontSize: SeyirTokens.typeBody,
                             fontWeight: FontWeight.w500,
                           ),
                           overflow: TextOverflow.ellipsis,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+
 /// Yargila ve Delilleri İncele sayfalarında kullanılan özel checkbox widget'ı
 class MyCheckboxWidgetYargila extends StatefulWidget {
   const MyCheckboxWidgetYargila({super.key});
@@ -17,7 +19,7 @@ class _MyCheckboxWidgetYargilaState extends State<MyCheckboxWidgetYargila> {
       children: [ SizedBox(width: 38),
         Text(
           ' YARGILA ',
-          style: TextStyle( fontSize: 18,color: Colors.green),
+          style: TextStyle( fontSize: SeyirTokens.typeHeadline,color: Colors.green),
         ),
         SizedBox(width:100),
         Icon(Icons.gavel_outlined, size: 24, color: Colors.green),

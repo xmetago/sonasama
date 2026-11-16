@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
+import '../theme/seyir_tokens.dart';
+import '../utils/dialog_utils.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../widgets/cezalar_ceza_unified_panel.dart';
 import '../widgets/cezalar_page_layout_rails.dart';
@@ -40,14 +44,48 @@ class CezalarPage extends StatefulWidget {
 class _CezalarPageState extends State<CezalarPage> {
   bool _isHeaderCollapsed = true;
 
+  static String _shown(String value) => value.trim().isEmpty ? '—' : value;
+
+  bool get _hasCase {
+    bool filled(String? value) => value != null && value.trim().isNotEmpty;
+    return filled(widget.davaId) ||
+        filled(widget.davaAdi) ||
+        filled(widget.davaDavali) ||
+        filled(widget.davaDavaci);
+  }
+
   CezalarUnifiedDava get _panelDava => CezalarUnifiedDava(
-        adi: widget.davaAdi.isNotEmpty ? widget.davaAdi : 'Şeytanın Hileleri',
-        davali: widget.davaDavali.isNotEmpty ? widget.davaDavali : 'Edip Yüksel',
+        adi: _shown(widget.davaAdi),
+        davali: _shown(widget.davaDavali),
         davaci: widget.davaDavaci,
         mevkii: widget.davaGorev.isNotEmpty ? widget.davaGorev : '—',
         kalanSure: widget.kalanSure.isNotEmpty ? widget.kalanSure : '—',
         profilResmi: 'lib/icons/03_davala_ana_icon.png',
       );
+
+  void _openSavedDavalar() {
+    final String? email = widget.userEmail;
+    if (email == null || email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kullanıcı e-posta adresi bulunamadı!')),
+      );
+      return;
+    }
+    showSavedDavalarDialog(context, email);
+  }
+
+  CezalarPage _sameCasePage() {
+    return CezalarPage(
+      userEmail: widget.userEmail,
+      davaId: widget.davaId,
+      davaAdi: widget.davaAdi,
+      davaDavali: widget.davaDavali,
+      davaDavaci: widget.davaDavaci,
+      davaGorev: widget.davaGorev,
+      kalanSure: widget.kalanSure,
+      davaOpenedAt: widget.davaOpenedAt,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,10 +104,11 @@ class _CezalarPageState extends State<CezalarPage> {
           headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
             return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
-              height: _isHeaderCollapsed ? 40 : null,
+              height: _isHeaderCollapsed ? 48 : null,
               child: _isHeaderCollapsed
                   ? CollapsedWbHeaderRow(
-                      title: 'CEZALAR ',
+                      title: 'CEZALAR',
+                      titleStyle: SeyirPalette.of(context).headline(weight: FontWeight.w600),
                       onExpandHeader: () => setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
                       onToggleLeftNav: toggle,
                     )
@@ -86,12 +125,12 @@ class _CezalarPageState extends State<CezalarPage> {
                           padding: const EdgeInsets.all(4.0),
                           child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                             userEmail: widget.userEmail,
-                            onShowSavedDavalar: () {},
+                            onShowSavedDavalar: _openSavedDavalar,
                           ),
                         ),
                         CezalarMenuTitleRow(
                           onToggleLeftNav: toggle,
-                          title: 'CEZALAR ',
+                          title: 'CEZALAR',
                           isHeaderCollapsed: _isHeaderCollapsed,
                           onToggleCollapse: () => setState(() => _isHeaderCollapsed = !_isHeaderCollapsed),
                         ),
@@ -118,7 +157,7 @@ class _CezalarPageState extends State<CezalarPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute<void>(
-                            builder: (BuildContext context) => CezalarPage(userEmail: widget.userEmail),
+                            builder: (BuildContext context) => _sameCasePage(),
                           ),
                         );
                       },
@@ -126,16 +165,32 @@ class _CezalarPageState extends State<CezalarPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute<void>(
-                            builder: (BuildContext context) => CezalarPage(userEmail: widget.userEmail),
+                            builder: (BuildContext context) => _sameCasePage(),
                           ),
                         );
                       },
                     ),
                     Expanded(
-                      child: Card(
+                      child: !_hasCase
+                          ? const Padding(
+                              padding: EdgeInsets.all(SeyirTokens.space4),
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: DelilSoftEmpty(
+                                  title: 'Seçili dava yok',
+                                  message: 'Ceza vermek için önce bir dava seçin.',
+                                  icon: MdiIcons.gavel,
+                                ),
+                              ),
+                            )
+                          : Card(
                         margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 4),
+                        color: SeyirPalette.of(context).card,
                         elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: SeyirPalette.of(context).border),
+                        ),
                         clipBehavior: Clip.antiAlias,
                         child: CezalarCezaUnifiedPanel(
                           dava: _panelDava,

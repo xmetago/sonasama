@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../theme/seyir_tokens.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
@@ -279,10 +281,10 @@ class _RolHukumKartlariSectionState extends State<RolHukumKartlariSection> {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: hasHukum ? const Color(0xFFF1F8F3) : Colors.white,
+        color: hasHukum ? SeyirPalette.of(context).brandSoft : SeyirPalette.of(context).card,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: hasHukum ? Colors.green.shade300 : const Color(0xFFDCE7E1),
+          color: hasHukum ? Colors.green.shade300 : SeyirPalette.of(context).border,
           width: hasHukum ? 1.5 : 1,
         ),
       ),
@@ -309,10 +311,10 @@ class _RolHukumKartlariSectionState extends State<RolHukumKartlariSection> {
             child: Text(
               title,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: SeyirTokens.typeBody,
                 fontWeight: FontWeight.w600,
                 color:
-                    hasHukum ? Colors.green.shade700 : Colors.grey.shade900,
+                    hasHukum ? Colors.green.shade700 : SeyirPalette.of(context).textPrimary,
               ),
             ),
           ),
@@ -504,7 +506,7 @@ class _RolHukumKartlariSectionState extends State<RolHukumKartlariSection> {
                                         Text(
                                           _getSentimentText(sentiment),
                                           style: TextStyle(
-                                            fontSize: 14,
+                                            fontSize: SeyirTokens.typeBody,
                                             fontWeight: FontWeight.w600,
                                             color: sentimentColor,
                                           ),
@@ -660,9 +662,9 @@ class _RolHukumKartlariSectionState extends State<RolHukumKartlariSection> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: SeyirPalette.of(context).card,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200, width: 1),
+        border: Border.all(color: SeyirPalette.of(context).border, width: 1),
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: accentColor.withValues(alpha: 0.05),
@@ -680,9 +682,9 @@ class _RolHukumKartlariSectionState extends State<RolHukumKartlariSection> {
               children: <Widget>[
                 SelectableText(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
-                    color: Color(0xFF2D2D2D),
+                    color: SeyirPalette.of(context).textPrimary,
                     height: 1.5,
                     fontWeight: FontWeight.w500,
                   ),
@@ -735,7 +737,7 @@ class _RolHukumKartlariSectionState extends State<RolHukumKartlariSection> {
                   style: TextStyle(
                     color: color,
                     fontWeight: FontWeight.w700,
-                    fontSize: 14,
+                    fontSize: SeyirTokens.typeBody,
                     letterSpacing: 0.3,
                   ),
                 ),
@@ -828,9 +830,9 @@ class _RolHukumKartlariSectionState extends State<RolHukumKartlariSection> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: SeyirPalette.of(context).card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFDCE7E1)),
+        border: Border.all(color: SeyirPalette.of(context).border),
       ),
       child: ListView.builder(
         shrinkWrap: true,

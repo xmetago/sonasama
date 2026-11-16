@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/sekiz_hukum_arguments.dart';
+import '../theme/seyir_tokens.dart';
+import '../utils/dialog_utils.dart';
 import '../widgets/common_header_widgets.dart';
 import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../widgets/left_navigation_column.dart';
@@ -28,8 +30,9 @@ class _SekizHukumPageState extends State<SekizHukumPage> {
   Widget build(BuildContext context) {
     final SekizHukumArguments? currentArgs = widget.arguments;
 
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: AppExpandableIconMenu(
           expandBody: true,
@@ -53,7 +56,18 @@ class _SekizHukumPageState extends State<SekizHukumPage> {
                   padding: const EdgeInsets.all(4.0),
                   child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                     userEmail: widget.userEmail,
-                    onShowSavedDavalar: () {},
+                    onShowSavedDavalar: () {
+                      final String? email = widget.userEmail;
+                      if (email == null || email.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Kullanıcı e-posta adresi bulunamadı!'),
+                          ),
+                        );
+                        return;
+                      }
+                      showSavedDavalarDialog(context, email);
+                    },
                   ),
                 ),
                 Padding(

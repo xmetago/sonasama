@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../models/sekiz_hukum_arguments.dart';
+import '../theme/seyir_tokens.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../widgets/yargila_case_card.dart';
 import '../widgets/modern_yargila_card.dart';
 import '../services/hive_database_service.dart';
 import '../utils/dialog_utils.dart';
 import 'cezalar_page.dart';
+import 'sekiz_hukum_page.dart';
 
 export '../widgets/yargila_case_card.dart' show Dava, FiveCardCaseInformation;
 export '../widgets/modern_yargila_card.dart' show ModernYargilaCard, DashedLinePainter;
@@ -15,7 +19,18 @@ export '../widgets/modern_yargila_card.dart' show ModernYargilaCard, DashedLineP
 class YargilaPage extends StatefulWidget {
   final String? userEmail;
 
-  const YargilaPage({super.key, this.userEmail});
+  /// Test: kabul edilen davalar yüklenemesin.
+  final bool forceLoadError;
+
+  /// Test: yükleme göstergesinde kalsın.
+  final bool forceLoading;
+
+  const YargilaPage({
+    super.key,
+    this.userEmail,
+    this.forceLoadError = false,
+    this.forceLoading = false,
+  });
 
   @override
   State<YargilaPage> createState() => _YargilaPageState();
@@ -27,6 +42,8 @@ class _YargilaPageState extends State<YargilaPage> {
   int likeCount = 0;
   int dislikeCount = 0;
   List<Dava> _davaList = [];
+  bool _isLoading = true;
+  String? _loadError;
   final Map<String, TextEditingController> _hukumControllers = {}; // Her dava için ayrı controller
   final Map<String, bool> _isHukumExpanded = {}; // Her dava için ayrı expanded durumu
   final Map<String, int> _hukumCharacterCounts = {}; // Her dava için karakter sayısı
@@ -35,12 +52,37 @@ class _YargilaPageState extends State<YargilaPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.forceLoading) return;
     _loadAcceptedDavalar();
   }
 
-  void _loadAcceptedDavalar() async {
-    final acceptedDavalar = await HiveDatabaseService.getAcceptedDavalar(widget.userEmail ?? '');
+  Future<void> _loadAcceptedDavalar() async {
     setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      if (widget.forceLoadError) {
+        throw Exception('Yargılanacak davalar yüklenemedi');
+      }
+      final acceptedDavalar =
+          await HiveDatabaseService.getAcceptedDavalar(widget.userEmail ?? '');
+      if (!mounted) return;
+      setState(() {
+        _applyAcceptedDavalar(acceptedDavalar);
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Yargılanacak davalar yüklenemedi';
+        _davaList = [];
+      });
+    }
+  }
+
+  void _applyAcceptedDavalar(List<Map<String, dynamic>> acceptedDavalar) {
       _davaAcceptedAt.clear();
       final List<Dava> yeniDavaListesi = [];
 
@@ -84,7 +126,57 @@ class _YargilaPageState extends State<YargilaPage> {
       }
 
       _davaList = yeniDavaListesi;
-    });
+  }
+
+  Dava? get _caseForCezalar {
+    for (final Dava dava in _davaList) {
+      if (_isHukumExpanded[dava.id] == true) return dava;
+    }
+    if (_davaList.isEmpty) return null;
+    return _davaList.first;
+  }
+
+  void _openCezalar() {
+    final Dava? dava = _caseForCezalar;
+    final String id = dava?.id.trim() ?? '';
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => CezalarPage(
+          userEmail: widget.userEmail,
+          davaId: id.isEmpty ? null : id,
+          davaAdi: dava?.adi ?? '',
+          davaDavali: dava?.davali ?? '',
+          davaDavaci: dava?.davaci ?? '',
+          davaGorev: dava?.mevkii ?? '',
+          kalanSure: dava?.kalanSure ?? '',
+          davaOpenedAt: dava == null ? null : _davaAcceptedAt[dava.id],
+        ),
+      ),
+    );
+  }
+
+  void _openSekizHukum(Dava dava) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => SekizHukumPage(
+          userEmail: widget.userEmail,
+          arguments: SekizHukumArguments(
+            davaId: dava.id.isNotEmpty ? dava.id : null,
+            davaAdi: dava.adi.isNotEmpty ? dava.adi : 'Dava adı belirtilmedi',
+            davaDavali:
+                dava.davali.isNotEmpty ? dava.davali : 'Davalı bilgisi yok',
+            davaDavaci:
+                dava.davaci.isNotEmpty ? dava.davaci : 'Davacı bilgisi yok',
+            davaGorev: dava.mevkii.isNotEmpty ? dava.mevkii : 'Görev bilgisi yok',
+            kalanSure:
+                dava.kalanSure.isNotEmpty ? dava.kalanSure : 'Süre bilgisi yok',
+            openedAt: _davaAcceptedAt[dava.id],
+          ),
+        ),
+      ),
+    );
   }
 
   DateTime? _parseDateTimeOrNull(dynamic value) {
@@ -115,8 +207,9 @@ class _YargilaPageState extends State<YargilaPage> {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: SingleChildScrollView(
           child: AppExpandableIconMenu(
@@ -162,8 +255,13 @@ class _YargilaPageState extends State<YargilaPage> {
                       ),
                       onPressed: toggle,
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.red.withOpacity(0.10),
+                        backgroundColor: Colors.red.withValues(alpha: 0.10),
                         padding: const EdgeInsets.all(10),
+                        minimumSize: const Size(
+                          SeyirTokens.tapTarget,
+                          SeyirTokens.tapTarget,
+                        ),
+                        tapTargetSize: MaterialTapTargetSize.padded,
                       ),
                     ),
 
@@ -172,14 +270,10 @@ class _YargilaPageState extends State<YargilaPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
+                          Text(
                             "YARGILA ||",
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontStyle: FontStyle.normal,
-                              fontWeight: FontWeight.w600,
+                            style: palette.display(weight: FontWeight.w600).copyWith(
                               letterSpacing: 0.8,
-                              color: Color(0xFF2F3E35),
                             ),
                           ),
 
@@ -199,38 +293,28 @@ class _YargilaPageState extends State<YargilaPage> {
             ],
               );
             },
-            body: _davaList.isEmpty
-                          ? Center(
+            body: _isLoading
+                          ? const Center(
                               child: Padding(
-                                padding: const EdgeInsets.all(32.0),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      MdiIcons.gavel,
-                                      size: 80,
-                                      color: Colors.grey.shade300,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'Henüz yargılanacak dava yok',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        color: Colors.grey.shade600,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Kabul ettiğiniz davalar burada görünecek',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
+                                padding: EdgeInsets.all(32),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          : _loadError != null
+                          ? Padding(
+                              padding: const EdgeInsets.all(SeyirTokens.space4),
+                              child: DelilLoadError(
+                                message: _loadError!,
+                                onRetry: _loadAcceptedDavalar,
+                              ),
+                            )
+                          : _davaList.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(SeyirTokens.space4),
+                              child: DelilSoftEmpty(
+                                title: 'Henüz yargılanacak dava yok',
+                                message: 'Kabul ettiğiniz davalar burada görünecek',
+                                icon: MdiIcons.gavel,
                               ),
                             )
                           : ListView.builder(
@@ -284,9 +368,15 @@ class _YargilaPageState extends State<YargilaPage> {
     return [
       AppExpandableIconMenuItem(
         onTap: () {},
-        customChild: Padding(
-          padding: EdgeInsets.fromLTRB(8.0, 18.0, 8.0, 8.0),
-          child: Icon(Icons.save_outlined, size: 24, color: Colors.black54),
+        customChild: IgnorePointer(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 18, 8, 8),
+            child: Icon(
+              Icons.save_outlined,
+              size: 24,
+              color: SeyirPalette.of(context).textMuted,
+            ),
+          ),
         ),
       ),
       AppExpandableIconMenuItem(
@@ -299,15 +389,12 @@ class _YargilaPageState extends State<YargilaPage> {
               size: 26,
               color: Colors.blue.shade700,
             ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
-              );
-            },
+            onPressed: _openCezalar,
             style: IconButton.styleFrom(
-              backgroundColor: Colors.blue.withOpacity(0.10),
+              backgroundColor: Colors.blue.withValues(alpha: 0.10),
               padding: const EdgeInsets.all(10),
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+              tapTargetSize: MaterialTapTargetSize.padded,
             ),
           ),
         ),
@@ -322,15 +409,12 @@ class _YargilaPageState extends State<YargilaPage> {
               size: 26,
               color: Colors.blueGrey.shade700,
             ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => CezalarPage(userEmail: widget.userEmail)),
-              );
-            },
+            onPressed: _openCezalar,
             style: IconButton.styleFrom(
-              backgroundColor: Colors.blueGrey.withOpacity(0.10),
+              backgroundColor: Colors.blueGrey.withValues(alpha: 0.10),
               padding: const EdgeInsets.all(10),
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+              tapTargetSize: MaterialTapTargetSize.padded,
             ),
           ),
         ),
@@ -339,22 +423,17 @@ class _YargilaPageState extends State<YargilaPage> {
   }
 
   Widget _buildHukumComposer(Dava dava, TextEditingController controller) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     final characterCount = _hukumCharacterCounts[dava.id] ?? controller.text.length;
     const maxChars = 1500;
     final remaining = maxChars - characterCount;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: palette.card,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8E6), width: 1.3),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F1A17).withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        border: Border.all(color: palette.border, width: 1.3),
+        boxShadow: palette.cardShadow,
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -365,7 +444,7 @@ class _YargilaPageState extends State<YargilaPage> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF7EF),
+                  color: palette.brandSoft,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -382,21 +461,12 @@ class _YargilaPageState extends State<YargilaPage> {
                   children: [
                     Text(
                       'HÜKMÜNÜ BURAYA YAZ',
-                      style: TextStyle(
-                        color: const Color(0xFF1B2A23),
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.6,
-                      ),
+                      style: palette.headline(),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Davacı ${dava.davaci.isNotEmpty ? dava.davaci : ' '} ile davalı ${dava.davali.isNotEmpty ? dava.davali : ' '} arasındaki uyuşmazlık için son söz sizde.',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
+                      style: palette.body(weight: FontWeight.w400),
                     ),
                   ],
                 ),
@@ -408,9 +478,9 @@ class _YargilaPageState extends State<YargilaPage> {
           const SizedBox(height: 20),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: palette.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFDCE8DF)),
+              border: Border.all(color: palette.border),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             child: TextField(
@@ -418,11 +488,14 @@ class _YargilaPageState extends State<YargilaPage> {
               maxLength: maxChars,
               maxLines: null,
               minLines: 6,
-              style: const TextStyle(fontSize: 16, height: 1.6, color: Color(0xFF111111)),
-              decoration: const InputDecoration(
+              style: palette.title(weight: FontWeight.w500).copyWith(height: 1.6),
+              decoration: InputDecoration(
                 border: InputBorder.none,
                 hintText: 'Hükmünüzü ayrıntılı olarak yazın. Deliller, tanık ifadeleri ve vicdani kanaatinizi not edin...',
-                hintStyle: TextStyle(color: Color(0xFF9AA5B1), fontSize: 15),
+                hintStyle: palette.title(
+                  weight: FontWeight.w400,
+                  color: palette.textMuted,
+                ),
                 counterText: '',
               ),
               onChanged: (value) {
@@ -441,17 +514,18 @@ class _YargilaPageState extends State<YargilaPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F8F3),
+                  color: palette.brandSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   remaining >= 0
                       ? 'Kalan karakter: $remaining'
                       : 'Karakter sınırı aşıldı',
-                  style: TextStyle(
-                    color: remaining >= 0 ? Colors.green.shade800 : const Color(0xFFB42318),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                  style: palette.caption(
+                    weight: FontWeight.w600,
+                    color: remaining >= 0
+                        ? Colors.green.shade800
+                        : SeyirTokens.reject,
                   ),
                 ),
               ),
@@ -459,22 +533,15 @@ class _YargilaPageState extends State<YargilaPage> {
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.green.shade700,
                   foregroundColor: Colors.white,
+                  minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                onPressed: () {
-                  // TODO: Hüküm kaydetme iş akışı burada gerçekleştirilecek.
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Hüküm kaydetme işlemi yakında eklenecek.'),
-                      backgroundColor: Color(0xFF2D6A4F),
-                    ),
-                  );
-                },
+                onPressed: () => _openSekizHukum(dava),
                 icon: const Icon(Icons.send_rounded),
-                label: const Text(
+                label: Text(
                   'Hükmümü Kayda Geçir',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  style: palette.title(color: Colors.white),
                 ),
               ),
             ],

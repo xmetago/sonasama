@@ -4,6 +4,7 @@ import 'package:flutter_material_design_icons/flutter_material_design_icons.dart
 import '../models/sekiz_hukum_arguments.dart';
 import '../screens/delilleri_incele_page.dart' hide Dava, FiveCardCaseInformation;
 import '../screens/sekiz_hukum_page.dart';
+import '../theme/seyir_tokens.dart';
 import 'yargila_case_card.dart';
 
 // Modern Yargıla Card — Dava Künyesi: collapsing (expand/collapse) başlık + içerik
@@ -33,22 +34,17 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
     final dava = widget.dava;
     final acceptedAt = widget.acceptedAt;
 
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: palette.card,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFFDDE9E2),
+          color: palette.border,
           width: 1.5,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF101815).withValues(alpha: 0.07),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        boxShadow: palette.cardShadow,
       ),
       child: Material(
         color: Colors.transparent,
@@ -60,9 +56,9 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
                 // Dava Künyesi — collapsing toolbar benzeri: sabit başlık çubuğu, içerik açılır/kapanır
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: palette.card,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFDCE7E1)),
+                    border: Border.all(color: palette.border),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Column(
@@ -85,12 +81,7 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
                                       Center(
                                         child: Text(
                                           ' || Dava Künyesi ||',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.2,
-                                            color: const Color(0xFF1B2A23),
-                                          ),
+                                          style: palette.title(),
                                         ),
                                       ),
 
@@ -103,7 +94,7 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
                                   curve: Curves.easeOutCubic,
                                   child: Icon(
                                     Icons.expand_more,
-                                    color: Colors.grey.shade600,
+                                    color: palette.textSecondary,
                                     size: 26,
                                   ),
                                 ),
@@ -127,19 +118,19 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
                             children: [
                               _buildInfoRow('Göreviniz', dava.mevkii, Icons.gavel_outlined),
                               const SizedBox(height: 3),
-                              _buildDashedLine(const Color(0xFFD8E5DE)),
+                              _buildDashedLine(palette.border),
                               const SizedBox(height: 3),
                               _buildInfoRow('Dava Adı', dava.adi, Icons.description),
                               const SizedBox(height: 3),
-                              _buildDashedLine(const Color(0xFFD8E5DE)),
+                              _buildDashedLine(palette.border),
                               const SizedBox(height: 3),
                               _buildInfoRow('Davacı', dava.davaci, Icons.person),
                               const SizedBox(height: 3),
-                              _buildDashedLine(const Color(0xFFD8E5DE)),
+                              _buildDashedLine(palette.border),
                               const SizedBox(height: 3),
                               _buildInfoRow('Davalı', dava.davali, Icons.person_outline),
                               const SizedBox(height: 3),
-                              _buildDashedLine(const Color(0xFFD8E5DE)),
+                              _buildDashedLine(palette.border),
                               const SizedBox(height: 1),
                               buildYargilaCountdownRow(
                                 context: context,
@@ -171,9 +162,9 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF6FBF8),
+                              color: palette.surfaceMuted,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFDCE7E1)),
+                              border: Border.all(color: palette.border),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,9 +175,8 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
                                     const SizedBox(width: 8),
                                     Text(
                                       'Dava Konusu:',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
+                                      style: palette.body(
+                                        weight: FontWeight.w700,
                                         color: Colors.green.shade700,
                                       ),
                                     ),
@@ -196,11 +186,7 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
                                 SelectableText(
                                   dava.davaKonusu,
                                   textAlign: TextAlign.justify,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black87,
-                                    height: 1.5,
-                                  ),
+                                  style: palette.body(weight: FontWeight.w500).copyWith(height: 1.5),
                                 )
                               ],
                             ),
@@ -238,14 +224,15 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.withOpacity(0.10),
+                          backgroundColor: Colors.blue.withValues(alpha: 0.10),
                           foregroundColor: Colors.blue.shade800,
+                          minimumSize: const Size(0, SeyirTokens.tapTarget),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18),
                             side: BorderSide(
-                              color: Colors.blue.withOpacity(0.20),
+                              color: Colors.blue.withValues(alpha: 0.20),
                               width: 1.2,
                             ),
                           ),
@@ -289,14 +276,15 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.withOpacity(0.10),
+                          backgroundColor: Colors.green.withValues(alpha: 0.10),
                           foregroundColor: Colors.green.shade800,
+                          minimumSize: const Size(0, SeyirTokens.tapTarget),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18),
                             side: BorderSide(
-                              color: Colors.green.withOpacity(0.20),
+                              color: Colors.green.withValues(alpha: 0.20),
                               width: 1.2,
                             ),
                           ),
@@ -330,6 +318,7 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
   }
 
   Widget _buildInfoRow(String label, String value, IconData icon, {bool isHighlight = false}) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -345,19 +334,14 @@ class _ModernYargilaCardState extends State<ModernYargilaCard> {
             children: [
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
-                ),
+                style: palette.caption(weight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               Text(
                 value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isHighlight ? Colors.red.shade700 : Colors.grey.shade900,
+                style: palette.body(
+                  weight: FontWeight.w700,
+                  color: isHighlight ? Colors.red.shade700 : palette.textPrimary,
                 ),
               ),
             ],
