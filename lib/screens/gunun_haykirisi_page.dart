@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/hashtag_text_helper.dart';
 import 'haykir_page.dart';
 
@@ -17,6 +18,14 @@ class GununHaykirisiPage extends StatelessWidget {
 
   static const String _completedKey = 'gunun_haykirisi_completed';
 
+  /// Günün sloganı. Form bu metinle açılır ve düzenlenebilir.
+  static const String daySlogan = 'Sessiz kalmak, zulmü onaylamaktır.';
+
+  /// Günün haykır metni. Formun detay alanı bu metinle açılır.
+  static const String dayDetail =
+      'Bugün, dünyadaki tüm haksızlıklara karşı tek bir nefes oluyoruz. '
+      'Zulme karşı durmak, mazlumun yanında saf tutmak için sesini yükselt!';
+
   static Future<bool> isCompletedForUser(String email) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('${_completedKey}_$email') ?? false;
@@ -29,12 +38,14 @@ class GununHaykirisiPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Scaffold(
-      // Arka planı hafif bir gri yaparak kartları öne çıkarıyoruz
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: palette.surface,
       appBar: AppBar(
-        title: const Text('Günün Haykırışı', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text('Günün Haykırışı', style: palette.headline()),
         centerTitle: true,
+        backgroundColor: palette.surface,
+        foregroundColor: palette.textPrimary,
       ),
       body: SafeArea(
         child: ListView(
@@ -47,10 +58,9 @@ class GununHaykirisiPage extends StatelessWidget {
             const _SectionTitle('BUGÜNÜN MESELESİ: ADALET'),
             const SizedBox(height: 12),
             const _GununMesajiCard(
-              quote: "Sessiz kalmak, zulmü onaylamaktır.",
+              quote: daySlogan,
               author: "Anonim",
-              description: "Bugün, dünyadaki tüm haksızlıklara karşı tek bir nefes oluyoruz. "
-                  "Zulme karşı durmak, mazlumun yanında saf tutmak için sesini yükselt!",
+              description: dayDetail,
             ),
 
             const SizedBox(height: 24),
@@ -103,35 +113,35 @@ class _GununMesajiCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final quoteStyle = palette.headline(
+      color: palette.foreground(Colors.orange.shade800),
+    ).copyWith(fontStyle: FontStyle.italic);
+    final bodyStyle = palette.body(color: palette.textPrimary);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.orange.shade200, width: 1),
+        color: palette.tint(Colors.orange.shade700),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
+        border: Border.all(color: palette.tintBorder(Colors.orange.shade700), width: 1),
       ),
       child: Column(
         children: [
-          Icon(Icons.format_quote, color: Colors.orange.shade800, size: 40),
+          Icon(Icons.format_quote, color: palette.foreground(Colors.orange.shade800), size: 40),
           Text(
             quote,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              fontStyle: FontStyle.italic,
-              color: Colors.orange.shade900,
-            ),
+            style: quoteStyle,
           ),
           const SizedBox(height: 8),
-          Text("- $author", style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text('- $author', style: palette.body(weight: FontWeight.w600)),
           const Divider(height: 32),
           SelectableText.rich(
             TextSpan(
-              style: const TextStyle(fontSize: 15, height: 1.5),
+              style: bodyStyle,
               children: buildHashtagAwareSpans(
                 description,
-                baseStyle: const TextStyle(fontSize: 15, height: 1.5),
+                baseStyle: bodyStyle,
               ),
             ),
             textAlign: TextAlign.center,
@@ -147,6 +157,7 @@ class _HaykirHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Column(
       children: [
         CircleAvatar(
@@ -155,9 +166,9 @@ class _HaykirHeader extends StatelessWidget {
           child: const Icon(Icons.campaign, size: 40, color: Colors.white),
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           'VİCDANIN SESİ',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+          style: palette.display().copyWith(letterSpacing: 1.2),
         ),
       ],
     );
@@ -170,14 +181,13 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Text(
       text,
-      style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        color: Colors.grey.shade700,
-        letterSpacing: 1.1,
-      ),
+      style: palette.body(
+        weight: FontWeight.w800,
+        color: palette.textSecondary,
+      ).copyWith(letterSpacing: 1.1),
     );
   }
 }
@@ -190,11 +200,16 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final palette = SeyirPalette.of(context);
+    final bodyStyle = palette.body(color: palette.textPrimary);
+    return Semantics(
+      label: title,
+      child: Card(
       elevation: 0,
+      color: palette.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-        side: BorderSide(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
+        side: BorderSide(color: palette.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -203,16 +218,17 @@ class _InfoCard extends StatelessWidget {
           children: [
             SelectableText.rich(
               TextSpan(
-                style: TextStyle(height: 1.5, color: Colors.grey.shade800),
+                style: bodyStyle,
                 children: buildHashtagAwareSpans(
                   body,
-                  baseStyle: TextStyle(height: 1.5, color: Colors.grey.shade800),
+                  baseStyle: bodyStyle,
                 ),
               ),
             ),
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -222,10 +238,11 @@ class _ClosingHaykirText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Text(
+    final palette = SeyirPalette.of(context);
+    return Text(
       'Şimdi sıra sende. Bu haksızlığa karşı sessizliğini bozmaya hazır mısın?',
       textAlign: TextAlign.center,
-      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+      style: palette.title(weight: FontWeight.w600),
     );
   }
 }
@@ -256,12 +273,16 @@ class _HaykirDecisionArea extends StatelessWidget {
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, SeyirTokens.tapTarget),
           padding: const EdgeInsets.symmetric(vertical: 20),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         child: const Text(
           'HAYDİ HAYKIR',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: SeyirTokens.typeHeadline,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
@@ -308,6 +329,8 @@ class _HaykirDecisionArea extends StatelessWidget {
         builder: (context) => HaykirPage(
           userEmail: email,
           initialShowForm: true,
+          initialSlogan: GununHaykirisiPage.daySlogan,
+          initialDetay: GununHaykirisiPage.dayDetail,
         ),
       ),
     );

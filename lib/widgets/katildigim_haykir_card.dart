@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/haykir_duration.dart';
 import 'haykir_card_shell.dart';
 
@@ -124,40 +125,34 @@ class _KatildigimHaykirCardState extends State<KatildigimHaykirCard> {
   }
 
   Widget _buildDetaylarBox(String detaylar) {
+    final palette = SeyirPalette.of(context);
+    const teal = Color(0xFF0F766E);
+    final ink = palette.foreground(teal);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.teal.shade100),
+        color: palette.card,
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+        border: Border.all(color: palette.tintBorder(teal)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(MdiIcons.textBoxOutline,
-                  size: 16, color: Colors.teal.shade700),
+              Icon(MdiIcons.textBoxOutline, size: 16, color: ink),
               const SizedBox(width: 6),
               Text(
                 'Detay',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal.shade700,
-                ),
+                style: palette.caption(weight: FontWeight.w800, color: ink),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             detaylar,
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.5,
-              color: Colors.grey.shade800,
-            ),
+            style: palette.body(color: palette.textPrimary),
           ),
         ],
       ),
