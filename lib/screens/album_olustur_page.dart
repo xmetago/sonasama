@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
+import '../theme/seyir_tokens.dart';
+import '../utils/dialog_utils.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/delil_surface.dart';
 import '../services/hive_database_service.dart';
 import '../models/album_model.dart';
 import '../models/album_image_model.dart';
@@ -16,10 +19,14 @@ class AlbumOlusturPage extends StatefulWidget {
   final String? userEmail;
   final String? existingAlbumId; // Mevcut albümü düzenlemek için (opsiyonel)
 
+  /// Test: mevcut albüm yüklenemesin.
+  final bool forceLoadError;
+
   const AlbumOlusturPage({
     super.key,
     this.userEmail,
     this.existingAlbumId,
+    this.forceLoadError = false,
   });
 
   @override
@@ -28,18 +35,28 @@ class AlbumOlusturPage extends StatefulWidget {
 
 class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
   final TextEditingController _albumNameController = TextEditingController();
-  final TextEditingController _albumDescriptionController = TextEditingController();
+  final TextEditingController _albumDescriptionController =
+      TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
-  
+
   List<AlbumImageModel> _images = [];
   bool _isLoading = false;
+  bool _needsLogin = false;
+  String? _loadError;
   String? _currentAlbumId;
   List<AlbumModel> _allAlbums = [];
 
   @override
   void initState() {
     super.initState();
-    if (widget.existingAlbumId != null && widget.userEmail != null) {
+    final email = widget.userEmail?.trim();
+    if (email == null || email.isEmpty) {
+      _needsLogin = true;
+      return;
+    }
+    if (widget.forceLoadError) {
+      _loadError = 'Albüm yüklenemedi';
+    } else if (widget.existingAlbumId != null) {
       _loadExistingAlbum();
     }
     _loadAllAlbums();
@@ -47,11 +64,38 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
 
   /// ✅ Step-5: Tüm albümleri yükle
   void _loadAllAlbums() {
-    if (widget.userEmail != null) {
+    final email = widget.userEmail?.trim();
+    if (email == null || email.isEmpty) return;
+    try {
+      final albums = HiveDatabaseService.getAlbums(email);
+      if (!mounted) return;
       setState(() {
-        _allAlbums = HiveDatabaseService.getAlbums(widget.userEmail!);
+        _allAlbums = albums;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _allAlbums = [];
       });
     }
+  }
+
+  void _openSavedDavalar() {
+    final email = widget.userEmail?.trim();
+    if (email == null || email.isEmpty) return;
+    showSavedDavalarDialog(context, email);
+  }
+
+  void _retryLoad() {
+    if (widget.forceLoadError) {
+      setState(() => _loadError = 'Albüm yüklenemedi');
+      return;
+    }
+    setState(() => _loadError = null);
+    if (widget.existingAlbumId != null) {
+      _loadExistingAlbum();
+    }
+    _loadAllAlbums();
   }
 
   @override
@@ -63,8 +107,14 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
 
   /// Mevcut albümü yükle
   Future<void> _loadExistingAlbum() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
+      if (widget.forceLoadError) {
+        throw Exception('Albüm yüklenemedi');
+      }
       final albums = HiveDatabaseService.getAlbums(widget.userEmail!);
       final album = albums.firstWhere(
         (a) => a.id == widget.existingAlbumId,
@@ -77,12 +127,43 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
       _images = HiveDatabaseService.getAlbumImages(album.id);
     } catch (e) {
       print('❌ Albüm yüklenirken hata: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Albüm yüklenirken hata: $e')),
-      );
+      if (mounted) {
+        setState(() => _loadError = 'Albüm yüklenemedi');
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  InputDecoration _fieldDecoration(
+    SeyirPalette palette, {
+    required String label,
+    required String hint,
+    required IconData icon,
+    bool alignLabelWithHint = false,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      alignLabelWithHint: alignLabelWithHint,
+      labelStyle: palette.body(color: palette.textSecondary),
+      hintStyle: palette.body(
+        color: palette.textMuted,
+        weight: FontWeight.w400,
+      ),
+      prefixIcon: Icon(icon, color: palette.textSecondary),
+      filled: true,
+      fillColor: palette.surfaceMuted,
+      border: const OutlineInputBorder(borderRadius: SeyirTokens.radiusMdAll),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: SeyirTokens.radiusMdAll,
+        borderSide: BorderSide(color: palette.border),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: SeyirTokens.radiusMdAll,
+        borderSide: BorderSide(color: Colors.blue, width: 1.5),
+      ),
+    );
   }
 
   /// Resim seçme dialog'u göster
@@ -183,7 +264,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
 
       // Resimleri yeniden yükle
       _images = HiveDatabaseService.getAlbumImages(_currentAlbumId!);
-      
+
       // ✅ Resim eklendiğinde albümü otomatik kaydet
       if (_albumNameController.text.trim().isNotEmpty) {
         await HiveDatabaseService.updateAlbum(
@@ -196,7 +277,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
         );
         _loadAllAlbums();
       }
-      
+
       setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -314,15 +395,15 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
 
       // ✅ Veritabanına kaydediliyor
       // ✅ Kalıcı olarak saklanıyor
-      
+
       // Yeni albüm oluşturulduysa resimleri yükle
       if (_currentAlbumId != null) {
         _images = HiveDatabaseService.getAlbumImages(_currentAlbumId!);
       }
-      
+
       // Albüm listesini güncelle
       _loadAllAlbums();
-      
+
       setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -331,7 +412,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
           backgroundColor: Colors.green,
         ),
       );
-      
+
       // Sayfada kal - kullanıcı albümü düzenlemeye devam edebilir
     } catch (e) {
       print('❌ Albüm kaydedilirken hata: $e');
@@ -348,72 +429,70 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
   /// ✅ Step-6: Albüm listesi dialog'unu siyah noktalar ile göster
   void _showAlbumsListDialog() {
     _loadAllAlbums(); // Güncel listeyi yükle
-    
+    final palette = SeyirPalette.of(context);
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
         child: Container(
           width: MediaQuery.of(context).size.width * 0.9,
           height: MediaQuery.of(context).size.height * 0.8,
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(SeyirTokens.space4),
           child: Column(
             children: [
               // Başlık
               Row(
                 children: [
                   const Icon(Icons.photo_album, color: Colors.blue),
-                  const SizedBox(width: 8),
-                  const Text(
+                  const SizedBox(width: SeyirTokens.space2),
+                  Text(
                     'Albümlerim',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: palette.headline(),
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SeyirTokens.space3,
+                      vertical: SeyirTokens.space2,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(20),
+                      color: palette.tint(Colors.blue),
+                      borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
+                      border:
+                          Border.all(color: palette.tintBorder(Colors.blue)),
                     ),
                     child: Text(
                       '${_allAlbums.length}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
+                      style: palette.title(color: Colors.blue),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: SeyirTokens.space2),
                   IconButton(
+                    tooltip: 'Kapat',
+                    style:
+                        delilIconButtonStyle(foreground: palette.textPrimary),
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              
+              const SizedBox(height: SeyirTokens.space4),
+
               // Siyah noktalar grid
               Expanded(
                 child: _allAlbums.isEmpty
                     ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.photo_album_outlined, size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text(
-                              'Henüz albüm oluşturmadınız',
-                              style: TextStyle(color: Colors.grey, fontSize: 16),
-                            ),
-                          ],
+                        child: DelilSoftEmpty(
+                          title: 'Henüz albüm oluşturmadınız',
+                          message:
+                              'Yeni bir albüm oluşturarak fotoğraflarınızı toplayabilirsiniz.',
+                          icon: Icons.photo_album_outlined,
                         ),
                       )
                     : GridView.builder(
                         padding: const EdgeInsets.all(8.0),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 6, // Her satırda 6 nokta
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
@@ -422,16 +501,19 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
                         itemCount: _allAlbums.length,
                         itemBuilder: (context, index) {
                           final album = _allAlbums[index];
-                          final albumNumber = index + 1; // 1'den başlayan sıra numarası
-                          
+                          final albumNumber =
+                              index + 1; // 1'den başlayan sıra numarası
+
                           // Yeşil-turuncu karışımı renk (her nokta için farklı ton)
-                          final colorRatio = index / _allAlbums.length; // 0.0 (yeşil) -> 1.0 (turuncu)
+                          final colorRatio = index /
+                              _allAlbums.length; // 0.0 (yeşil) -> 1.0 (turuncu)
                           final mixedColor = Color.lerp(
-                            Colors.green,
-                            Colors.orange,
-                            colorRatio,
-                          ) ?? Colors.green;
-                          
+                                Colors.green,
+                                Colors.orange,
+                                colorRatio,
+                              ) ??
+                              Colors.green;
+
                           return GestureDetector(
                             onTap: () {
                               Navigator.pop(context); // Dialog'u kapat
@@ -459,7 +541,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
                                   '$albumNumber',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 14,
+                                    fontSize: SeyirTokens.typeBody,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -475,7 +557,6 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
       ),
     );
   }
-
 
   /// Albüm seçenekleri menüsü (uzun basınca)
   void _showAlbumOptionsMenu(BuildContext context, AlbumModel album) {
@@ -508,7 +589,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
               title: const Text('Sil', style: TextStyle(color: Colors.red)),
               onTap: () async {
                 Navigator.pop(context); // Bottom sheet'i kapat
-                
+
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -531,7 +612,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
                     ],
                   ),
                 );
-                
+
                 if (confirmed == true) {
                   try {
                     await HiveDatabaseService.deleteAlbum(
@@ -570,22 +651,6 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
     );
   }
 
-  /// Tarih formatla
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-    
-    if (difference.inDays == 0) {
-      return 'Bugün';
-    } else if (difference.inDays == 1) {
-      return 'Dün';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} gün önce';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  }
-
   /// Resim için ImageProvider döndür
   ImageProvider<Object>? _getImageProvider(String imageUrl) {
     if (imageUrl.isEmpty) return null;
@@ -620,7 +685,9 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Scaffold(
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -629,69 +696,76 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
 
             // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
               child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
             ),
 
             // ROW 3: Profil Bölümü
             Padding(
-              padding: const EdgeInsets.all(4.0),
+              padding: const EdgeInsets.all(SeyirTokens.space1),
               child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                 userEmail: widget.userEmail,
-                onShowSavedDavalar: () {},
+                onShowSavedDavalar: _openSavedDavalar,
               ),
             ),
 
             // ROW 4: Başlık ve Albümlerim Butonu
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(SeyirTokens.space2),
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    tooltip: 'Geri',
+                    style:
+                        delilIconButtonStyle(foreground: palette.textPrimary),
+                    icon: const Icon(Icons.arrow_back),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: SeyirTokens.space2),
                   Expanded(
                     child: Text(
-                      widget.existingAlbumId != null ? 'ALBÜM DÜZENLE' : 'ALBÜM OLUŞTUR',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      widget.existingAlbumId != null
+                          ? 'ALBÜM DÜZENLE'
+                          : 'ALBÜM OLUŞTUR',
+                      style: palette.headline(),
                       textAlign: TextAlign.center,
                     ),
                   ),
                   // ✅ Albümü Kaydet icon butonu
                   IconButton(
-                    icon: const Icon(Icons.save, color: Colors.blue),
-                    onPressed: _saveAlbum,
                     tooltip: 'Albümü Kaydet',
+                    style: delilIconButtonStyle(foreground: Colors.blue),
+                    icon: const Icon(Icons.save),
+                    onPressed: _saveAlbum,
                   ),
                   // ✅ Step-5: Albümlerim butonu
                   IconButton(
+                    tooltip: 'Albümlerim',
+                    style: delilIconButtonStyle(foreground: Colors.blue),
+                    onPressed: _showAlbumsListDialog,
                     icon: Stack(
+                      clipBehavior: Clip.none,
                       children: [
-                        const Icon(Icons.photo_album, color: Colors.blue),
+                        const Icon(Icons.photo_album),
                         if (_allAlbums.isNotEmpty)
                           Positioned(
                             right: 0,
                             top: 0,
                             child: Container(
-                              padding: const EdgeInsets.all(2),
+                              padding: const EdgeInsets.all(SeyirTokens.space1),
                               decoration: const BoxDecoration(
                                 color: Colors.red,
                                 shape: BoxShape.circle,
                               ),
                               constraints: const BoxConstraints(
-                                minWidth: 16,
-                                minHeight: 16,
+                                minWidth: SeyirTokens.space4,
+                                minHeight: SeyirTokens.space4,
                               ),
                               child: Text(
                                 '${_allAlbums.length}',
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 10,
+                                  fontSize: SeyirTokens.typeCaption,
                                   fontWeight: FontWeight.bold,
                                 ),
                                 textAlign: TextAlign.center,
@@ -700,8 +774,6 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
                           ),
                       ],
                     ),
-                    onPressed: _showAlbumsListDialog,
-                    tooltip: 'Albümlerim (${_allAlbums.length})',
                   ),
                 ],
               ),
@@ -711,181 +783,261 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Albüm Adı
-                          TextField(
-                            controller: _albumNameController,
-                            decoration: InputDecoration(
-                              labelText: 'Albüm Adı *',
-                              hintText: 'Örn: Tatil Fotoğrafları',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
-                              prefixIcon: const Icon(Icons.photo_album),
+                  : _needsLogin
+                      ? const Padding(
+                          padding: EdgeInsets.all(SeyirTokens.space4),
+                          child: Center(
+                            child: DelilSoftEmpty(
+                              title: 'Giriş gerekli',
+                              message: 'Albüm oluşturmak için oturum aç.',
+                              icon: Icons.lock_outline,
                             ),
                           ),
-                          const SizedBox(height: 19),
-
-
-                          // Resim Ekle Butonu
-                          ElevatedButton.icon(
-                            onPressed: _showImageSourceDialog,
-                            icon: const Icon(Icons.add_photo_alternate),
-                            label: const Text('Resim Ekle'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Resimler Listesi
-                          if (_images.isNotEmpty) ...[
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Resimler (${_images.length})',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                        )
+                      : _loadError != null
+                          ? Padding(
+                              padding: const EdgeInsets.all(SeyirTokens.space4),
+                              child: Center(
+                                child: DelilLoadError(
+                                  message: _loadError!,
+                                  onRetry: _retryLoad,
                                 ),
-                                // ✅ Step-3.3: Galeri görünümü butonu
-                                TextButton.icon(
-                                  onPressed: _currentAlbumId != null
-                                      ? () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => AlbumGoruntulePage(
-                                                userEmail: widget.userEmail,
-                                                albumId: _currentAlbumId!,
-                                                initialIndex: 0,
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      : null,
-                                  icon: const Icon(Icons.slideshow),
-                                  label: const Text('Galeri Görünümü'),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.blue,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 8,
-                                mainAxisSpacing: 8,
-                                childAspectRatio: 1,
                               ),
-                              itemCount: _images.length,
-                              itemBuilder: (context, index) {
-                                final image = _images[index];
-                                return GestureDetector(
-                                  onTap: _currentAlbumId != null
-                                      ? () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => AlbumGoruntulePage(
-                                                userEmail: widget.userEmail,
-                                                albumId: _currentAlbumId!,
-                                                initialIndex: index,
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      : null,
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: _getImageProvider(image.imageUrl) != null
-                                            ? Image(
-                                                image: _getImageProvider(image.imageUrl)!,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) {
-                                                  return Container(
-                                                    color: Colors.grey[300],
-                                                    child: const Icon(Icons.broken_image),
+                            )
+                          : SingleChildScrollView(
+                              padding: const EdgeInsets.all(SeyirTokens.space4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Albüm Adı
+                                  TextField(
+                                    controller: _albumNameController,
+                                    style: palette.body(),
+                                    cursorColor: palette.textPrimary,
+                                    decoration: _fieldDecoration(
+                                      palette,
+                                      label: 'Albüm Adı *',
+                                      hint: 'Örn: Tatil Fotoğrafları',
+                                      icon: Icons.photo_album,
+                                    ),
+                                  ),
+                                  const SizedBox(height: SeyirTokens.space4),
+                                  TextField(
+                                    controller: _albumDescriptionController,
+                                    style: palette.body(),
+                                    cursorColor: palette.textPrimary,
+                                    minLines: 2,
+                                    maxLines: 4,
+                                    textInputAction: TextInputAction.newline,
+                                    decoration: _fieldDecoration(
+                                      palette,
+                                      label: 'Açıklama',
+                                      hint: 'Albüm hakkında kısa bir not',
+                                      icon: Icons.notes_outlined,
+                                      alignLabelWithHint: true,
+                                    ),
+                                  ),
+                                  const SizedBox(height: SeyirTokens.space4),
+
+                                  // Resim Ekle Butonu
+                                  ElevatedButton.icon(
+                                    onPressed: _showImageSourceDialog,
+                                    icon: const Icon(Icons.add_photo_alternate),
+                                    label: const Text('Resim Ekle'),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: SeyirTokens.space4,
+                                      ),
+                                      minimumSize: const Size(
+                                        SeyirTokens.tapTarget,
+                                        SeyirTokens.tapTarget,
+                                      ),
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: SeyirTokens.radiusMdAll,
+                                      ),
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: SeyirTokens.space6),
+
+                                  // Resimler Listesi
+                                  if (_images.isNotEmpty) ...[
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Resimler (${_images.length})',
+                                          style: palette.headline(),
+                                        ),
+                                        // ✅ Step-3.3: Galeri görünümü butonu
+                                        TextButton.icon(
+                                          onPressed: _currentAlbumId != null
+                                              ? () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          AlbumGoruntulePage(
+                                                        userEmail:
+                                                            widget.userEmail,
+                                                        albumId:
+                                                            _currentAlbumId!,
+                                                        initialIndex: 0,
+                                                      ),
+                                                    ),
                                                   );
-                                                },
-                                              )
-                                            : Container(
-                                                color: Colors.grey[300],
-                                                child: const Icon(Icons.image),
+                                                }
+                                              : null,
+                                          icon: const Icon(Icons.slideshow),
+                                          label: const Text('Galeri Görünümü'),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: Colors.blue,
+                                            minimumSize: const Size(
+                                              SeyirTokens.tapTarget,
+                                              SeyirTokens.tapTarget,
+                                            ),
+                                            tapTargetSize:
+                                                MaterialTapTargetSize.padded,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: SeyirTokens.space3),
+                                    GridView.builder(
+                                      shrinkWrap: true,
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
+                                      gridDelegate:
+                                          const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 3,
+                                        crossAxisSpacing: 8,
+                                        mainAxisSpacing: 8,
+                                        childAspectRatio: 1,
+                                      ),
+                                      itemCount: _images.length,
+                                      itemBuilder: (context, index) {
+                                        final image = _images[index];
+                                        return GestureDetector(
+                                          onTap: _currentAlbumId != null
+                                              ? () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          AlbumGoruntulePage(
+                                                        userEmail:
+                                                            widget.userEmail,
+                                                        albumId:
+                                                            _currentAlbumId!,
+                                                        initialIndex: index,
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              : null,
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                child: _getImageProvider(
+                                                            image.imageUrl) !=
+                                                        null
+                                                    ? Image(
+                                                        image:
+                                                            _getImageProvider(
+                                                                image
+                                                                    .imageUrl)!,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context,
+                                                            error, stackTrace) {
+                                                          return ColoredBox(
+                                                            color: palette
+                                                                .surfaceMuted,
+                                                            child: Icon(
+                                                              Icons
+                                                                  .broken_image,
+                                                              color: palette
+                                                                  .textMuted,
+                                                            ),
+                                                          );
+                                                        },
+                                                      )
+                                                    : ColoredBox(
+                                                        color: palette
+                                                            .surfaceMuted,
+                                                        child: Icon(
+                                                          Icons.image,
+                                                          color:
+                                                              palette.textMuted,
+                                                        ),
+                                                      ),
                                               ),
-                                      ),
-                                      Positioned(
-                                        top: 4,
-                                        right: 4,
-                                        child: GestureDetector(
-                                          onTap: () => _deleteImage(image),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.red,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 16,
-                                            ),
+                                              Positioned(
+                                                top: 4,
+                                                right: 4,
+                                                child: GestureDetector(
+                                                  onTap: () =>
+                                                      _deleteImage(image),
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.all(4),
+                                                    decoration:
+                                                        const BoxDecoration(
+                                                      color: Colors.red,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.close,
+                                                      color: Colors.white,
+                                                      size: 16,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              // ✅ Step-3.4: Resim sıra numarası
+                                              Positioned(
+                                                bottom: 4,
+                                                left: 4,
+                                                child: Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal:
+                                                        SeyirTokens.space2,
+                                                    vertical:
+                                                        SeyirTokens.space1,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black
+                                                        .withValues(alpha: 0.6),
+                                                    borderRadius:
+                                                        SeyirTokens.radiusSmAll,
+                                                  ),
+                                                  child: Text(
+                                                    '${index + 1}',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: SeyirTokens
+                                                          .typeCaption,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ),
-                                      ),
-                                      // ✅ Step-3.4: Resim sıra numarası
-                                      Positioned(
-                                        bottom: 4,
-                                        left: 4,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withOpacity(0.6),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            '${index + 1}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: SeyirTokens.space6),
+                                  ],
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 24),
-                          ],
-                        ],
-                      ),
-                    ),
             ),
           ],
         ),
@@ -893,4 +1045,3 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
     );
   }
 }
-

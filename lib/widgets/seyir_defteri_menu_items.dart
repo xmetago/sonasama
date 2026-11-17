@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dava_provider.dart';
 import '../screens/actigim_davalar_page.dart';
+import '../screens/albumler_liste_page.dart';
 import '../screens/davaci_unlulur_page.dart';
 import '../screens/gelen_davalar_page.dart';
 import '../screens/haykirislarim_page.dart';
@@ -134,6 +135,20 @@ List<AppExpandableIconMenuItem> buildSeyirDefteriMenuItems(
           context,
           MaterialPageRoute(
             builder: (context) => SavedHaykirlarPage(userEmail: userEmail),
+          ),
+        );
+      },
+    ),
+    AppExpandableIconMenuItem(
+      padding: kSeyirMenuIconPadding,
+      icon: MdiIcons.imageAlbum,
+      tooltip: 'Albümler',
+      color: SeyirPalette.of(context).textSecondary,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AlbumlerListePage(userEmail: userEmail),
           ),
         );
       },

@@ -4,6 +4,8 @@ import 'dart:convert';
 import '../models/album_model.dart';
 import '../models/album_image_model.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
+import '../widgets/delil_surface.dart';
 
 /// ✅ Step-3: Albüm görüntüleme sayfası (galeri modu, tam ekran)
 /// ✅ Veritabanına kaydediliyor
@@ -14,11 +16,15 @@ class AlbumGoruntulePage extends StatefulWidget {
   final String albumId;
   final int initialIndex;
 
+  /// Test: albüm yüklenemesin.
+  final bool forceLoadError;
+
   const AlbumGoruntulePage({
     super.key,
     this.userEmail,
     required this.albumId,
     this.initialIndex = 0,
+    this.forceLoadError = false,
   });
 
   @override
@@ -30,6 +36,9 @@ class _AlbumGoruntulePageState extends State<AlbumGoruntulePage> {
   late int _currentIndex;
   List<AlbumImageModel> _images = [];
   AlbumModel? _album;
+  bool _isLoading = true;
+  bool _needsLogin = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -47,19 +56,42 @@ class _AlbumGoruntulePageState extends State<AlbumGoruntulePage> {
 
   /// ✅ Step-3.1: Albüm verilerini yükle
   void _loadAlbumData() {
-    if (widget.userEmail != null) {
+    var needsLogin = false;
+    String? loadError;
+    AlbumModel? album;
+    var images = <AlbumImageModel>[];
+
+    final email = widget.userEmail?.trim();
+    if (email == null || email.isEmpty) {
+      needsLogin = true;
+    } else {
       try {
-        final albums = HiveDatabaseService.getAlbums(widget.userEmail!);
-        _album = albums.firstWhere(
+        if (widget.forceLoadError) {
+          throw Exception('Albüm yüklenemedi');
+        }
+        final albums = HiveDatabaseService.getAlbums(email);
+        album = albums.firstWhere(
           (a) => a.id == widget.albumId,
           orElse: () => throw Exception('Albüm bulunamadı'),
         );
-        _images = HiveDatabaseService.getAlbumImages(widget.albumId);
-        setState(() {});
+        images = HiveDatabaseService.getAlbumImages(widget.albumId);
       } catch (e) {
         print('❌ Albüm yüklenirken hata: $e');
+        loadError = 'Albüm yüklenemedi';
       }
     }
+
+    if (!mounted) return;
+    setState(() {
+      _needsLogin = needsLogin;
+      _loadError = loadError;
+      _album = album;
+      _images = images;
+      _isLoading = false;
+      if (images.isNotEmpty && _currentIndex >= images.length) {
+        _currentIndex = images.length - 1;
+      }
+    });
   }
 
   /// Resim için ImageProvider döndür
@@ -94,15 +126,72 @@ class _AlbumGoruntulePageState extends State<AlbumGoruntulePage> {
     return null;
   }
 
+  Widget _statusScaffold({required String title, required Widget body}) {
+    final palette = SeyirPalette.of(context);
+    return Scaffold(
+      backgroundColor: palette.surface,
+      appBar: AppBar(
+        backgroundColor: palette.surface,
+        foregroundColor: palette.textPrimary,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          tooltip: 'Geri',
+          style: delilIconButtonStyle(foreground: palette.textPrimary),
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(title, style: palette.headline()),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(SeyirTokens.space4),
+        child: Center(child: body),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_images.isEmpty) {
+    final palette = SeyirPalette.of(context);
+    final title = _album?.name ?? 'Albüm';
+
+    if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text(_album?.name ?? 'Albüm'),
+        backgroundColor: palette.surface,
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_needsLogin) {
+      return _statusScaffold(
+        title: 'Albüm',
+        body: const DelilSoftEmpty(
+          title: 'Giriş gerekli',
+          message: 'Albümü görmek için oturum aç.',
+          icon: Icons.lock_outline,
         ),
-        body: const Center(
-          child: Text('Albümde resim bulunmuyor'),
+      );
+    }
+
+    if (_loadError != null) {
+      return _statusScaffold(
+        title: title,
+        body: DelilLoadError(
+          message: _loadError!,
+          onRetry: () {
+            setState(() => _isLoading = true);
+            _loadAlbumData();
+          },
+        ),
+      );
+    }
+
+    if (_images.isEmpty) {
+      return _statusScaffold(
+        title: title,
+        body: const DelilSoftEmpty(
+          title: 'Albümde resim bulunmuyor',
+          message: 'Bu albüme henüz fotoğraf eklenmedi.',
+          icon: Icons.photo_outlined,
         ),
       );
     }
@@ -123,7 +212,7 @@ class _AlbumGoruntulePageState extends State<AlbumGoruntulePage> {
             itemBuilder: (context, index) {
               final image = _images[index];
               final imageProvider = _getImageProvider(image.imageUrl);
-              
+
               return InteractiveViewer(
                 minScale: 0.5,
                 maxScale: 4.0,
@@ -153,34 +242,36 @@ class _AlbumGoruntulePageState extends State<AlbumGoruntulePage> {
               );
             },
           ),
-          
+
           // Üst bar (başlık ve geri butonu)
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(SeyirTokens.space4),
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    tooltip: 'Geri',
+                    style: delilIconButtonStyle(foreground: Colors.white),
+                    icon: const Icon(Icons.arrow_back),
                     onPressed: () => Navigator.pop(context),
                   ),
                   Expanded(
                     child: Text(
-                      _album?.name ?? 'Albüm',
+                      title,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontSize: SeyirTokens.typeHeadline,
+                        fontWeight: FontWeight.w800,
                       ),
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  const SizedBox(width: 48), // Geri butonu genişliği kadar boşluk
+                  const SizedBox(width: SeyirTokens.tapTarget),
                 ],
               ),
             ),
           ),
-          
+
           // Alt bar (resim sayısı ve bilgiler)
           Positioned(
             bottom: 0,
@@ -188,14 +279,14 @@ class _AlbumGoruntulePageState extends State<AlbumGoruntulePage> {
             right: 0,
             child: SafeArea(
               child: Container(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(SeyirTokens.space4),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.7),
+                      Colors.black.withValues(alpha: 0.7),
                     ],
                   ),
                 ),
@@ -206,19 +297,19 @@ class _AlbumGoruntulePageState extends State<AlbumGoruntulePage> {
                       '${_currentIndex + 1} / ${_images.length}',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: SeyirTokens.typeTitle,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     if (_images[_currentIndex].title != null &&
                         _images[_currentIndex].title!.isNotEmpty) ...[
-                      const SizedBox(width: 16),
+                      const SizedBox(width: SeyirTokens.space4),
                       Expanded(
                         child: Text(
                           _images[_currentIndex].title!,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 14,
+                            fontSize: SeyirTokens.typeBody,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -236,4 +327,3 @@ class _AlbumGoruntulePageState extends State<AlbumGoruntulePage> {
     );
   }
 }
-

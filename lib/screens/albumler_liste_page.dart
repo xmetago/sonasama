@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'dart:io';
 import 'dart:convert';
+import '../theme/seyir_tokens.dart';
+import '../utils/dialog_utils.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/delil_surface.dart';
 import '../services/hive_database_service.dart';
 import '../models/album_model.dart';
-import '../models/album_image_model.dart';
+import 'album_goruntule_page.dart';
 import 'album_olustur_page.dart';
 
 /// ✅ Step-1: Albüm listesi sayfası
@@ -14,9 +19,13 @@ import 'album_olustur_page.dart';
 class AlbumlerListePage extends StatefulWidget {
   final String? userEmail;
 
+  /// Test: albüm listesi yüklenemesin.
+  final bool forceLoadError;
+
   const AlbumlerListePage({
     super.key,
     this.userEmail,
+    this.forceLoadError = false,
   });
 
   @override
@@ -24,14 +33,17 @@ class AlbumlerListePage extends StatefulWidget {
 }
 
 class _AlbumlerListePageState extends State<AlbumlerListePage> {
+  final TextEditingController _searchController = TextEditingController();
   List<AlbumModel> _allAlbums = [];
   List<AlbumModel> _filteredAlbums = [];
   bool _isLoading = false;
+  bool _needsLogin = false;
+  String? _loadError;
   bool _isGridView = true; // Grid görünüm varsayılan
   String _searchQuery = '';
   String _sortBy = 'tarih'; // 'tarih', 'isim', 'resim_sayisi'
   bool _isSelectionMode = false; // ✅ Step-3.5: Toplu işlem modu
-  Set<String> _selectedAlbumIds = {}; // Seçili albüm ID'leri
+  final Set<String> _selectedAlbumIds = {}; // Seçili albüm ID'leri
 
   @override
   void initState() {
@@ -39,19 +51,48 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
     _loadAlbums();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   /// ✅ Step-1.1: Tüm albümleri yükle
   void _loadAlbums() {
-    if (widget.userEmail != null) {
+    final email = widget.userEmail?.trim();
+    if (email == null || email.isEmpty) {
       setState(() {
-        _isLoading = true;
+        _isLoading = false;
+        _needsLogin = true;
+        _loadError = null;
+        _allAlbums = [];
+        _filteredAlbums = [];
       });
-      
-      try {
-        _allAlbums = HiveDatabaseService.getAlbums(widget.userEmail!);
-        _applyFilters();
-      } catch (e) {
-        print('❌ Albümler yüklenirken hata: $e');
-      } finally {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _needsLogin = false;
+      _loadError = null;
+    });
+
+    try {
+      if (widget.forceLoadError) {
+        throw Exception('Albümler yüklenemedi');
+      }
+      _allAlbums = HiveDatabaseService.getAlbums(email);
+      _applyFilters();
+    } catch (e) {
+      print('❌ Albümler yüklenirken hata: $e');
+      if (!mounted) return;
+      setState(() {
+        _allAlbums = [];
+        _filteredAlbums = [];
+        _loadError = 'Albümler yüklenemedi';
+      });
+    } finally {
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
@@ -93,6 +134,36 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
     setState(() {
       _filteredAlbums = filtered;
     });
+  }
+
+  void _openSavedDavalar() {
+    final email = widget.userEmail?.trim();
+    if (email == null || email.isEmpty) return;
+    showSavedDavalarDialog(context, email);
+  }
+
+  void _openAlbum(AlbumModel album) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AlbumGoruntulePage(
+          userEmail: widget.userEmail,
+          albumId: album.id,
+        ),
+      ),
+    ).then((_) => _loadAlbums());
+  }
+
+  void _openEditor({String? albumId}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AlbumOlusturPage(
+          userEmail: widget.userEmail,
+          existingAlbumId: albumId,
+        ),
+      ),
+    ).then((_) => _loadAlbums());
   }
 
   /// ✅ Step-1.3: Albüm kapak resmini al (ilk resim)
@@ -295,7 +366,7 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Yeni albüm adını girin:'),
-            const SizedBox(height: 16),
+            const SizedBox(height: SeyirTokens.space4),
             TextField(
               controller: newNameController,
               decoration: const InputDecoration(
@@ -362,6 +433,54 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
         }
       }
     }
+    newNameController.dispose();
+  }
+
+  String _albumInfoText(AlbumModel album) {
+    final images = HiveDatabaseService.getAlbumImages(album.id);
+    final imageCount = images.length;
+    final totalSize = images.fold<int>(
+      0,
+      (sum, img) => sum + img.fileSize,
+    );
+    final buffer = StringBuffer()..writeln('Albüm: ${album.name}');
+    if (album.description != null && album.description!.isNotEmpty) {
+      buffer.writeln('Açıklama: ${album.description}');
+    }
+    buffer
+      ..writeln('Resim Sayısı: $imageCount')
+      ..writeln('Toplam Boyut: ${_formatFileSize(totalSize)}')
+      ..write('Oluşturulma: ${_formatDate(album.createdAt)}');
+    return buffer.toString();
+  }
+
+  Future<void> _copyAlbumInfo(AlbumModel album) async {
+    final text = _albumInfoText(album);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Albüm bilgileri kopyalandı'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _shareAlbumSheet(AlbumModel album) async {
+    final text = _albumInfoText(album);
+    try {
+      await Share.share(text, subject: album.name);
+    } catch (e) {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Paylaşım açılamadı. Albüm bilgileri panoya kopyalandı'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   /// ✅ Step-4.5: Albüm paylaşımı
@@ -372,22 +491,25 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
       0,
       (sum, img) => sum + img.fileSize,
     );
+    final palette = SeyirPalette.of(context);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Albüm Bilgileri'),
+        title: Text('Albüm Bilgileri', style: palette.headline()),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Albüm: ${album.name}'),
+            Text('Albüm: ${album.name}', style: palette.body()),
             if (album.description != null && album.description!.isNotEmpty)
-              Text('Açıklama: ${album.description}'),
-            const SizedBox(height: 8),
-            Text('Resim Sayısı: $imageCount'),
-            Text('Toplam Boyut: ${_formatFileSize(totalSize)}'),
-            Text('Oluşturulma: ${_formatDate(album.createdAt)}'),
+              Text('Açıklama: ${album.description}', style: palette.body()),
+            const SizedBox(height: SeyirTokens.space2),
+            Text('Resim Sayısı: $imageCount', style: palette.body()),
+            Text('Toplam Boyut: ${_formatFileSize(totalSize)}',
+                style: palette.body()),
+            Text('Oluşturulma: ${_formatDate(album.createdAt)}',
+                style: palette.body()),
           ],
         ),
         actions: [
@@ -395,19 +517,27 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Kapat'),
           ),
-          ElevatedButton.icon(
-            onPressed: () {
-              // Burada gerçek paylaşım işlemi yapılabilir (share_plus paketi ile)
+          TextButton.icon(
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Albüm bilgileri kopyalandı'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              await _copyAlbumInfo(album);
             },
             icon: const Icon(Icons.copy),
             label: const Text('Bilgileri Kopyala'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _shareAlbumSheet(album);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              minimumSize:
+                  const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            ),
+            icon: const Icon(Icons.share),
+            label: const Text('Paylaş'),
           ),
         ],
       ),
@@ -427,15 +557,7 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
               title: const Text('Düzenle'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AlbumOlusturPage(
-                      userEmail: widget.userEmail,
-                      existingAlbumId: album.id,
-                    ),
-                  ),
-                ).then((_) => _loadAlbums());
+                _openEditor(albumId: album.id);
               },
             ),
             // ✅ Step-4.2: Albüm kopyalama
@@ -461,7 +583,7 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
               title: const Text('Sil', style: TextStyle(color: Colors.red)),
               onTap: () async {
                 Navigator.pop(context);
-                
+
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -484,7 +606,7 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
                     ],
                   ),
                 );
-                
+
                 if (confirmed == true) {
                   try {
                     await HiveDatabaseService.deleteAlbum(
@@ -525,7 +647,7 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       return 'Bugün';
     } else if (difference.inDays == 1) {
@@ -550,9 +672,60 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
     }
   }
 
+  Widget _coverPlaceholder(SeyirPalette palette, {double iconSize = 48}) {
+    return ColoredBox(
+      color: palette.surfaceMuted,
+      child: Icon(
+        Icons.photo_album,
+        size: iconSize,
+        color: palette.textMuted,
+      ),
+    );
+  }
+
+  Widget _albumCover(AlbumModel album, SeyirPalette palette,
+      {double iconSize = 48}) {
+    final provider = _getAlbumCoverImage(album);
+    if (provider == null) {
+      return _coverPlaceholder(palette, iconSize: iconSize);
+    }
+    return Image(
+      image: provider,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return _coverPlaceholder(palette, iconSize: iconSize);
+      },
+    );
+  }
+
+  Widget _selectionMark(String albumId, {double size = 20}) {
+    final palette = SeyirPalette.of(context);
+    final selected = _selectedAlbumIds.contains(albumId);
+    return Container(
+      width: size + SeyirTokens.space1,
+      height: size + SeyirTokens.space1,
+      decoration: BoxDecoration(
+        color: selected ? Colors.blue : palette.card,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.blue, width: 2),
+      ),
+      child:
+          selected ? Icon(Icons.check, color: Colors.white, size: size) : null,
+    );
+  }
+
+  ShapeBorder _albumShape(SeyirPalette palette) {
+    return RoundedRectangleBorder(
+      borderRadius: SeyirTokens.radiusMdAll,
+      side: BorderSide(color: palette.border),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Scaffold(
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -561,36 +734,36 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
 
             // ROW 2: Anasayfa, Arkadaş, Telefon, Bildirim, Menü, Ayarlar Iconu
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
               child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
             ),
 
             // ROW 3: Profil Bölümü
             Padding(
-              padding: const EdgeInsets.all(4.0),
+              padding: const EdgeInsets.all(SeyirTokens.space1),
               child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                 userEmail: widget.userEmail,
-                onShowSavedDavalar: () {},
+                onShowSavedDavalar: _openSavedDavalar,
               ),
             ),
 
             // ROW 4: Başlık ve Kontroller
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(SeyirTokens.space2),
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    tooltip: 'Geri',
+                    style:
+                        delilIconButtonStyle(foreground: palette.textPrimary),
+                    icon: const Icon(Icons.arrow_back),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const SizedBox(width: 8),
-                  const Expanded(
+                  const SizedBox(width: SeyirTokens.space2),
+                  Expanded(
                     child: Text(
                       'ALBÜMLERİM',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: palette.headline(),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -598,33 +771,35 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
                   if (!_isSelectionMode) ...[
                     // Görünüm değiştir butonu
                     IconButton(
+                      tooltip: _isGridView ? 'Liste Görünümü' : 'Grid Görünümü',
+                      style: delilIconButtonStyle(foreground: Colors.blue),
                       icon: Icon(
                         _isGridView ? Icons.view_list : Icons.grid_view,
-                        color: Colors.blue,
                       ),
                       onPressed: () {
                         setState(() {
                           _isGridView = !_isGridView;
                         });
                       },
-                      tooltip: _isGridView ? 'Liste Görünümü' : 'Grid Görünümü',
                     ),
                     // Sıralama butonu
                     IconButton(
-                      icon: const Icon(Icons.sort, color: Colors.blue),
-                      onPressed: _showSortDialog,
                       tooltip: 'Sırala',
+                      style: delilIconButtonStyle(foreground: Colors.blue),
+                      icon: const Icon(Icons.sort),
+                      onPressed: _showSortDialog,
                     ),
                     // Seçim modu butonu
                     IconButton(
-                      icon: const Icon(Icons.checklist, color: Colors.blue),
+                      tooltip: 'Toplu İşlem',
+                      style: delilIconButtonStyle(foreground: Colors.blue),
+                      icon: const Icon(Icons.checklist),
                       onPressed: () {
                         setState(() {
                           _isSelectionMode = true;
                           _selectedAlbumIds.clear();
                         });
                       },
-                      tooltip: 'Toplu İşlem',
                     ),
                   ] else ...[
                     // İptal butonu
@@ -635,14 +810,20 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
                           _selectedAlbumIds.clear();
                         });
                       },
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(
+                            SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                        foregroundColor: palette.textPrimary,
+                      ),
                       child: const Text('İptal'),
                     ),
                     // Sil butonu
                     if (_selectedAlbumIds.isNotEmpty)
                       IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: _showBulkDeleteDialog,
                         tooltip: 'Seçili Albümleri Sil',
+                        style: delilIconButtonStyle(foreground: Colors.red),
+                        icon: const Icon(Icons.delete),
+                        onPressed: _showBulkDeleteDialog,
                       ),
                   ],
                 ],
@@ -651,32 +832,50 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
 
             // ROW 5: Arama çubuğu
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: SeyirTokens.space4,
+                vertical: SeyirTokens.space2,
+              ),
               child: TextField(
+                controller: _searchController,
+                style: palette.body(),
+                cursorColor: palette.textPrimary,
                 decoration: InputDecoration(
                   hintText: 'Albüm ara...',
-                  prefixIcon: const Icon(Icons.search),
+                  hintStyle: palette.body(
+                    color: palette.textMuted,
+                    weight: FontWeight.w400,
+                  ),
+                  prefixIcon: Icon(Icons.search, color: palette.textSecondary),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
+                          tooltip: 'Aramayı temizle',
+                          style: delilIconButtonStyle(
+                              foreground: palette.textSecondary),
                           icon: const Icon(Icons.clear),
                           onPressed: () {
-                            setState(() {
-                              _searchQuery = '';
-                            });
+                            _searchController.clear();
+                            _searchQuery = '';
                             _applyFilters();
                           },
                         )
                       : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  border: const OutlineInputBorder(
+                    borderRadius: SeyirTokens.radiusMdAll,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: SeyirTokens.radiusMdAll,
+                    borderSide: BorderSide(color: palette.border),
+                  ),
+                  focusedBorder: const OutlineInputBorder(
+                    borderRadius: SeyirTokens.radiusMdAll,
+                    borderSide: BorderSide(color: Colors.blue, width: 1.5),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
+                  fillColor: palette.surfaceMuted,
                 ),
                 onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
+                  _searchQuery = value;
                   _applyFilters();
                 },
               ),
@@ -686,70 +885,83 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _filteredAlbums.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                _searchQuery.isNotEmpty
-                                    ? Icons.search_off
-                                    : Icons.photo_album_outlined,
-                                size: 64,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _searchQuery.isNotEmpty
-                                    ? 'Arama sonucu bulunamadı'
-                                    : 'Henüz albüm oluşturmadınız',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              if (_searchQuery.isEmpty) ...[
-                                const SizedBox(height: 16),
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AlbumOlusturPage(
-                                          userEmail: widget.userEmail,
-                                        ),
-                                      ),
-                                    ).then((_) => _loadAlbums());
-                                  },
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Yeni Albüm Oluştur'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ],
+                  : _needsLogin
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: SeyirTokens.space4),
+                          child: Center(
+                            child: DelilSoftEmpty(
+                              title: 'Giriş gerekli',
+                              message: 'Albümleri görmek için oturum aç.',
+                              icon: Icons.lock_outline,
+                            ),
                           ),
                         )
-                      : _isGridView
-                          ? _buildGridView()
-                          : _buildListView(),
+                      : _loadError != null
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: SeyirTokens.space4,
+                              ),
+                              child: Center(
+                                child: DelilLoadError(
+                                  message: _loadError!,
+                                  onRetry: _loadAlbums,
+                                ),
+                              ),
+                            )
+                          : _filteredAlbums.isEmpty
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: SeyirTokens.space4,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        DelilSoftEmpty(
+                                          title: _searchQuery.isNotEmpty
+                                              ? 'Arama sonucu bulunamadı'
+                                              : 'Henüz albüm oluşturmadınız',
+                                          message: _searchQuery.isNotEmpty
+                                              ? '"$_searchQuery" için eşleşme yok'
+                                              : 'Yeni bir albüm oluşturarak fotoğraflarınızı toplayabilirsiniz.',
+                                          icon: _searchQuery.isNotEmpty
+                                              ? Icons.search_off
+                                              : Icons.photo_album_outlined,
+                                        ),
+                                        if (_searchQuery.isEmpty) ...[
+                                          const SizedBox(
+                                              height: SeyirTokens.space4),
+                                          ElevatedButton.icon(
+                                            onPressed: () => _openEditor(),
+                                            icon: const Icon(Icons.add),
+                                            label: const Text(
+                                                'Yeni Albüm Oluştur'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.green,
+                                              foregroundColor: Colors.white,
+                                              minimumSize: const Size(
+                                                SeyirTokens.tapTarget,
+                                                SeyirTokens.tapTarget,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : _isGridView
+                                  ? _buildGridView(palette)
+                                  : _buildListView(palette),
             ),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AlbumOlusturPage(
-                userEmail: widget.userEmail,
-              ),
-            ),
-          ).then((_) => _loadAlbums());
-        },
+        tooltip: 'Yeni Albüm',
+        onPressed: () => _openEditor(),
         icon: const Icon(Icons.add),
         label: const Text('Yeni Albüm'),
         backgroundColor: Colors.green,
@@ -759,13 +971,13 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
   }
 
   /// ✅ Step-1.5: Grid görünümü
-  Widget _buildGridView() {
+  Widget _buildGridView(SeyirPalette palette) {
     return GridView.builder(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(SeyirTokens.space4),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+        crossAxisSpacing: SeyirTokens.space4,
+        mainAxisSpacing: SeyirTokens.space4,
         childAspectRatio: 0.85,
       ),
       itemCount: _filteredAlbums.length,
@@ -773,149 +985,84 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
         final album = _filteredAlbums[index];
         final images = HiveDatabaseService.getAlbumImages(album.id);
         final imageCount = images.length;
-        
+
         return GestureDetector(
           onTap: _isSelectionMode
               ? () => _toggleAlbumSelection(album.id)
-              : () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AlbumOlusturPage(
-                        userEmail: widget.userEmail,
-                        existingAlbumId: album.id,
-                      ),
-                    ),
-                  ).then((_) => _loadAlbums());
-                },
+              : () => _openAlbum(album),
           onLongPress: _isSelectionMode
               ? () => _toggleAlbumSelection(album.id)
               : () => _showAlbumOptionsMenu(context, album),
           child: Card(
             elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            color: palette.card,
+            surfaceTintColor: Colors.transparent,
+            shadowColor: palette.shadow,
+            shape: _albumShape(palette),
+            clipBehavior: Clip.antiAlias,
             child: Stack(
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Kapak resmi
                     Expanded(
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(12),
-                        ),
-                        child: _getAlbumCoverImage(album) != null
-                            ? Image(
-                                image: _getAlbumCoverImage(album)!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[300],
-                                    child: const Icon(
-                                      Icons.photo_album,
-                                      size: 48,
-                                      color: Colors.grey,
-                                    ),
-                                  );
-                                },
-                              )
-                            : Container(
-                                color: Colors.grey[300],
-                                child: const Icon(
-                                  Icons.photo_album,
-                                  size: 48,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                      ),
+                      child: _albumCover(album, palette),
                     ),
-                // Albüm bilgileri
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        album.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
+                    Padding(
+                      padding: const EdgeInsets.all(SeyirTokens.space3),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.photo, size: 14, color: Colors.grey),
-                          const SizedBox(width: 4),
                           Text(
-                            '$imageCount resim',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
+                            album.name,
+                            style: palette.title(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          if (imageCount > 0) ...[
-                            const SizedBox(width: 8),
-                            const Icon(Icons.storage, size: 12, color: Colors.grey),
-                            const SizedBox(width: 2),
-                            Text(
-                              _formatFileSize(images.fold<int>(
-                                0,
-                                (sum, img) => sum + img.fileSize,
-                              )),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey,
+                          const SizedBox(height: SeyirTokens.space1),
+                          Row(
+                            children: [
+                              Icon(Icons.photo,
+                                  size: 14, color: palette.textMuted),
+                              const SizedBox(width: SeyirTokens.space1),
+                              Text(
+                                '$imageCount resim',
+                                style:
+                                    palette.body(color: palette.textSecondary),
                               ),
-                            ),
-                          ],
+                              if (imageCount > 0) ...[
+                                const SizedBox(width: SeyirTokens.space2),
+                                Icon(Icons.storage,
+                                    size: 12, color: palette.textMuted),
+                                const SizedBox(width: SeyirTokens.space1),
+                                Flexible(
+                                  child: Text(
+                                    _formatFileSize(images.fold<int>(
+                                      0,
+                                      (sum, img) => sum + img.fileSize,
+                                    )),
+                                    style: palette.caption(),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: SeyirTokens.space1),
+                          Text(
+                            _formatDate(album.createdAt),
+                            style: palette.caption(),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatDate(album.createdAt),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-                // ✅ Step-3.10: Seçim checkbox'ı
                 if (_isSelectionMode)
                   Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: _selectedAlbumIds.contains(album.id)
-                            ? Colors.blue
-                            : Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.blue,
-                          width: 2,
-                        ),
-                      ),
-                      child: _selectedAlbumIds.contains(album.id)
-                          ? const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 20,
-                            )
-                          : const SizedBox(
-                              width: 20,
-                              height: 20,
-                            ),
-                    ),
+                    top: SeyirTokens.space2,
+                    right: SeyirTokens.space2,
+                    child: _selectionMark(album.id),
                   ),
               ],
             ),
@@ -926,149 +1073,102 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
   }
 
   /// ✅ Step-1.6: List görünümü
-  Widget _buildListView() {
+  Widget _buildListView(SeyirPalette palette) {
     return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(SeyirTokens.space4),
       itemCount: _filteredAlbums.length,
       itemBuilder: (context, index) {
         final album = _filteredAlbums[index];
         final images = HiveDatabaseService.getAlbumImages(album.id);
         final imageCount = images.length;
-        
+
         return Card(
           elevation: 2,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          color: palette.card,
+          surfaceTintColor: Colors.transparent,
+          shadowColor: palette.shadow,
+          margin: const EdgeInsets.only(bottom: SeyirTokens.space3),
+          shape: _albumShape(palette),
+          clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
               ListTile(
-                contentPadding: const EdgeInsets.all(12),
+                contentPadding: const EdgeInsets.all(SeyirTokens.space3),
                 leading: Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: SeyirTokens.radiusSmAll,
                       child: SizedBox(
                         width: 60,
                         height: 60,
-                        child: _getAlbumCoverImage(album) != null
-                            ? Image(
-                                image: _getAlbumCoverImage(album)!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[300],
-                                    child: const Icon(
-                                      Icons.photo_album,
-                                      color: Colors.grey,
-                                    ),
-                                  );
-                                },
-                              )
-                            : Container(
-                                color: Colors.grey[300],
-                                child: const Icon(
-                                  Icons.photo_album,
-                                  color: Colors.grey,
-                                ),
-                              ),
+                        child: _albumCover(album, palette, iconSize: 28),
                       ),
                     ),
-                    // ✅ Step-3.11: Liste görünümünde seçim checkbox'ı
                     if (_isSelectionMode)
                       Positioned(
                         top: 0,
                         right: 0,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: _selectedAlbumIds.contains(album.id)
-                                ? Colors.blue
-                                : Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.blue,
-                              width: 2,
-                            ),
-                          ),
-                          child: _selectedAlbumIds.contains(album.id)
-                              ? const Icon(
-                                  Icons.check,
-                                  color: Colors.white,
-                                  size: 16,
-                                )
-                              : const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                ),
-                        ),
+                        child: _selectionMark(album.id, size: 16),
                       ),
                   ],
                 ),
-            title: Text(
-              album.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Row(
+                title: Text(album.name, style: palette.title()),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.photo, size: 14, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$imageCount resim',
-                      style: const TextStyle(fontSize: 12),
+                    const SizedBox(height: SeyirTokens.space1),
+                    Row(
+                      children: [
+                        Icon(Icons.photo, size: 14, color: palette.textMuted),
+                        const SizedBox(width: SeyirTokens.space1),
+                        Text(
+                          '$imageCount resim',
+                          style: palette.body(color: palette.textSecondary),
+                        ),
+                        const SizedBox(width: SeyirTokens.space3),
+                        Text(
+                          _formatDate(album.createdAt),
+                          style: palette.body(color: palette.textSecondary),
+                        ),
+                        if (imageCount > 0) ...[
+                          const SizedBox(width: SeyirTokens.space3),
+                          Icon(Icons.storage,
+                              size: 12, color: palette.textMuted),
+                          const SizedBox(width: SeyirTokens.space1),
+                          Flexible(
+                            child: Text(
+                              _formatFileSize(images.fold<int>(
+                                0,
+                                (sum, img) => sum + img.fileSize,
+                              )),
+                              style: palette.caption(),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Text(
-                      _formatDate(album.createdAt),
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    if (imageCount > 0) ...[
-                      const SizedBox(width: 12),
-                      const Icon(Icons.storage, size: 12, color: Colors.grey),
-                      const SizedBox(width: 2),
+                    if (album.description != null &&
+                        album.description!.isNotEmpty) ...[
+                      const SizedBox(height: SeyirTokens.space1),
                       Text(
-                        _formatFileSize(images.fold<int>(
-                          0,
-                          (sum, img) => sum + img.fileSize,
-                        )),
-                        style: const TextStyle(fontSize: 11),
+                        album.description!,
+                        style: palette.body(
+                          color: palette.textSecondary,
+                          weight: FontWeight.w400,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ],
                 ),
-                if (album.description != null && album.description!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    album.description!,
-                    style: const TextStyle(fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
                 trailing: _isSelectionMode
                     ? null
-                    : const Icon(Icons.chevron_right),
+                    : Icon(Icons.chevron_right, color: palette.textMuted),
                 onTap: _isSelectionMode
                     ? () => _toggleAlbumSelection(album.id)
-                    : () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AlbumOlusturPage(
-                              userEmail: widget.userEmail,
-                              existingAlbumId: album.id,
-                            ),
-                          ),
-                        ).then((_) => _loadAlbums());
-                      },
+                    : () => _openAlbum(album),
                 onLongPress: _isSelectionMode
                     ? () => _toggleAlbumSelection(album.id)
                     : () => _showAlbumOptionsMenu(context, album),
@@ -1080,4 +1180,3 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
     );
   }
 }
-
