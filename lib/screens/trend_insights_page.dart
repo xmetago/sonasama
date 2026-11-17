@@ -1,25 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
+import '../models/sekiz_hukum_arguments.dart';
+import '../services/hive_database_service.dart';
 import '../services/statistics_analytics_service.dart';
 import '../services/trend_engagement_service.dart';
 import '../services/trending_insights_service.dart';
+import '../theme/seyir_tokens.dart';
+import '../widgets/common_header_widgets.dart';
+import '../widgets/delil_surface.dart';
+import '../widgets/shared/app_expandable_icon_menu.dart';
 import 'actigim_davalar_page.dart';
 import 'davaci_unlulur_page.dart';
 import 'haykirislarim_page.dart';
 import 'katildigim_davalar_page.dart';
+import 'sekiz_hukum_page.dart';
 import 'statistics_dashboard_page.dart';
 import 'yargila_page.dart';
-import '../widgets/common_header_widgets.dart';
-import '../widgets/shared/app_expandable_icon_menu.dart';
 
 /// Trend davalar ve haykırışlar ekranı.
 class TrendInsightsPage extends StatefulWidget {
   /// İsteğe bağlı kullanıcı e-posta bilgisi.
   final String? userEmail;
 
+  /// Testlerde sahte trend verisi veya hata üretmek için.
+  final Future<TrendingInsights> Function({String? userEmail})? insightsLoader;
+
   /// Varsayılan kurucu.
-  const TrendInsightsPage({super.key, this.userEmail});
+  const TrendInsightsPage({
+    super.key,
+    this.userEmail,
+    this.insightsLoader,
+  });
 
   @override
   State<TrendInsightsPage> createState() => _TrendInsightsPageState();
@@ -53,7 +65,10 @@ class _TrendInsightsPageState extends State<TrendInsightsPage>
       _error = null;
     });
     try {
-      final data = await _service.load(userEmail: widget.userEmail);
+      final loader = widget.insightsLoader;
+      final data = loader != null
+          ? await loader(userEmail: widget.userEmail)
+          : await _service.load(userEmail: widget.userEmail);
       if (!mounted) return;
       setState(() {
         _insights = data;
@@ -64,18 +79,21 @@ class _TrendInsightsPageState extends State<TrendInsightsPage>
         _error = 'Trend verileri alınamadı. Lütfen tekrar deneyin.';
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: palette.surface,
         body: SafeArea(
           child: AppExpandableIconMenu(
             expandBody: true,
@@ -95,32 +113,41 @@ class _TrendInsightsPageState extends State<TrendInsightsPage>
               ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
               // Başlık, Menü ve Yenile butonu
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SeyirTokens.space4,
+                  vertical: SeyirTokens.space2,
+                ),
                 child: Row(
                   children: [
                     IconButton(
+                      tooltip: isOpen ? 'Menüyü kapat' : 'Menü',
+                      style: delilIconButtonStyle(foreground: SeyirTokens.reject),
                       icon: Icon(
                         isOpen ? MdiIcons.close : MdiIcons.menuOpen,
-                        color: Colors.red,
+                        color: SeyirTokens.reject,
                       ),
                       onPressed: toggle,
                     ),
-                    const SizedBox(width: 8),
-                    const Expanded(
+                    const SizedBox(width: SeyirTokens.space2),
+                    Expanded(
                       child: Text(
                         'Trend Davalar & Haykırışlar',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
+                        style: palette.headline(),
                       ),
                     ),
                     IconButton(
                       icon: Icon(
                         Icons.refresh_rounded,
-                        color: _isLoading ? Colors.grey : Theme.of(context).primaryColor,
+                        color: _isLoading
+                            ? palette.textMuted
+                            : Theme.of(context).colorScheme.primary,
                       ),
                       tooltip: 'Yenile',
+                      style: delilIconButtonStyle(
+                        foreground: _isLoading
+                            ? palette.textMuted
+                            : Theme.of(context).colorScheme.primary,
+                      ),
                       onPressed: _isLoading ? null : _loadData,
                     ),
                   ],
@@ -129,9 +156,12 @@ class _TrendInsightsPageState extends State<TrendInsightsPage>
               // Tab Bar
               TabBar(
                 controller: _tabController,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                labelColor: palette.textPrimary,
+                unselectedLabelColor: palette.textSecondary,
+                indicatorColor: SeyirTokens.brand,
+                dividerColor: palette.border,
+                labelStyle: palette.title(),
+                unselectedLabelStyle: palette.title(weight: FontWeight.w600),
                 tabs: const [
                   Tab(text: 'Trend Davalar'),
                   Tab(text: 'Trend Haykırışlar'),
@@ -150,16 +180,20 @@ class _TrendInsightsPageState extends State<TrendInsightsPage>
                               error: _error,
                               cases: _insights?.trendDavalar ?? const [],
                               userEmail: widget.userEmail,
+                              emptyTitle: 'Trend dava bulunamadı',
                               emptyMessage:
-                                  'Trend dava bulunamadı. Yeni davalar destek aldıkça burada görünecek.',
+                                  'Yeni davalar destek aldıkça burada görünecek.',
+                              onRetry: _loadData,
                             ),
                             _TrendList(
                               isLoading: _isLoading,
                               error: _error,
                               cases: _insights?.trendHaykirislar ?? const [],
                               userEmail: widget.userEmail,
+                              emptyTitle: 'Trend haykırış bulunamadı',
                               emptyMessage:
-                                  'Trend haykırış bulunamadı. Kaydedilen davalar destek aldıkça burada görünecek.',
+                                  'Kaydedilen davalar destek aldıkça burada görünecek.',
+                              onRetry: _loadData,
                             ),
                           ],
                         ),
@@ -177,15 +211,19 @@ class _TrendList extends StatelessWidget {
     required this.cases,
     required this.isLoading,
     required this.error,
+    required this.emptyTitle,
     required this.emptyMessage,
     required this.userEmail,
+    required this.onRetry,
   });
 
   final List<CaseInsight> cases;
   final bool isLoading;
   final String? error;
+  final String emptyTitle;
   final String emptyMessage;
   final String? userEmail;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -204,33 +242,11 @@ class _TrendList extends StatelessWidget {
     if (error != null) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(SeyirTokens.space6),
         children: [
-          Card(
-            color: Colors.red[50],
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    color: Colors.red[400],
-                    size: 48,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    error!,
-                    style: TextStyle(
-                      color: Colors.red[900],
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          _TrendErrorCard(
+            message: error!,
+            onRetry: onRetry,
           ),
         ],
       );
@@ -239,25 +255,12 @@ class _TrendList extends StatelessWidget {
     if (cases.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(SeyirTokens.space6),
         children: [
-          Column(
-            children: [
-              Icon(
-                MdiIcons.trendingDown,
-                size: 48,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                emptyMessage,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          DelilSoftEmpty(
+            title: emptyTitle,
+            message: emptyMessage,
+            icon: MdiIcons.trendingDown,
           ),
         ],
       );
@@ -265,9 +268,9 @@ class _TrendList extends StatelessWidget {
 
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(SeyirTokens.space4),
       itemCount: cases.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, __) => const SizedBox(height: SeyirTokens.space3),
       itemBuilder: (context, index) {
         final insight = cases[index];
         return _TrendCaseCard(
@@ -277,6 +280,65 @@ class _TrendList extends StatelessWidget {
           userEmail: userEmail,
         );
       },
+    );
+  }
+}
+
+/// Kırmızı hata kartı. Kenarlık koyu temada da seçilir; yeniden deneme vardır.
+class _TrendErrorCard extends StatelessWidget {
+  const _TrendErrorCard({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    const Color accent = SeyirTokens.reject;
+    final Color ink = palette.foreground(accent);
+    final Color borderColor = palette.isDark
+        ? Color.lerp(accent, SeyirTokens.neutral0, 0.45)!
+        : accent;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(SeyirTokens.space6),
+      decoration: BoxDecoration(
+        color: palette.tint(accent),
+        borderRadius: SeyirTokens.radiusLgAll,
+        border: Border.all(color: borderColor, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Icon(
+            Icons.error_outline,
+            color: ink,
+            size: 48,
+          ),
+          const SizedBox(height: SeyirTokens.space3),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: palette.title(color: ink),
+          ),
+          const SizedBox(height: SeyirTokens.space4),
+          OutlinedButton(
+            onPressed: onRetry,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(
+                SeyirTokens.tapTarget,
+                SeyirTokens.tapTarget,
+              ),
+              foregroundColor: ink,
+              side: BorderSide(color: borderColor),
+            ),
+            child: const Text('Tekrar dene'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -313,6 +375,11 @@ class _TrendCaseCardState extends State<_TrendCaseCard> {
   int get _commentCount =>
       _snapshot?.commentCount ?? widget.insight.commentCount;
 
+  bool get _loggedIn {
+    final email = widget.userEmail;
+    return email != null && email.isNotEmpty;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -339,18 +406,19 @@ class _TrendCaseCardState extends State<_TrendCaseCard> {
         _engagementError = 'Etkileşim verileri getirilemedi.';
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isEngagementLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isEngagementLoading = false;
+        });
+      }
     }
   }
 
-  void _requireLogin() {
+  void _requireLogin(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Lütfen bu işlem için giriş yapın.'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -358,7 +426,7 @@ class _TrendCaseCardState extends State<_TrendCaseCard> {
   Future<void> _handleReaction(bool isSupport) async {
     final email = widget.userEmail;
     if (email == null || email.isEmpty) {
-      _requireLogin();
+      _requireLogin('Lütfen bu işlem için giriş yapın.');
       return;
     }
     setState(() {
@@ -381,28 +449,27 @@ class _TrendCaseCardState extends State<_TrendCaseCard> {
         _engagementError = 'Aksiyon tamamlanamadı. Lütfen tekrar deneyin.';
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isEngagementLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isEngagementLoading = false;
+        });
+      }
     }
   }
 
-  Future<void> _handleComment() async {
+  /// Yorum listesini girişsiz açar. Yazma formu yalnızca girişliyken gelir.
+  Future<void> _openComments() async {
     final email = widget.userEmail;
-    if (email == null || email.isEmpty) {
-      _requireLogin();
-      return;
-    }
-
     final payload = await showModalBottomSheet<_CommentPayload>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => _CommentComposerSheet(
         comments: _snapshot?.comments ?? const [],
+        canWrite: _loggedIn,
       ),
     );
-    if (payload == null) return;
+    if (payload == null || email == null || email.isEmpty) return;
 
     setState(() {
       _isEngagementLoading = true;
@@ -433,15 +500,90 @@ class _TrendCaseCardState extends State<_TrendCaseCard> {
         _engagementError = 'Yorum gönderilemedi. Lütfen tekrar deneyin.';
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isEngagementLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isEngagementLoading = false;
+        });
+      }
     }
+  }
+
+  /// Yargıla ve katıldığım kartlarıyla aynı: 8-Hüküm dava sayfası.
+  Future<void> _openRelatedCase() async {
+    final String id = widget.insight.id;
+    Map<String, dynamic>? raw;
+    try {
+      raw = HiveDatabaseService.getOpenedDavaById(id);
+    } catch (_) {}
+    if (raw == null) {
+      try {
+        raw = _findDava(HiveDatabaseService.getSavedDavalar(), id);
+      } catch (_) {}
+    }
+    if (raw == null) {
+      try {
+        raw = await HiveDatabaseService.getAcceptedDavaById(id);
+      } catch (_) {}
+    }
+    if (!mounted) return;
+
+    final String title = _field(
+      raw,
+      const ['davaAdi', 'adi', 'title'],
+      widget.insight.title,
+    );
+    final String davali = _field(raw, const ['davali'], '');
+    final String davaci = _field(raw, const ['davaci'], '');
+    final String gorev = _field(raw, const ['mevkii', 'userRole'], '');
+    final String kalan = _field(raw, const ['kalanSure'], '');
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => SekizHukumPage(
+          userEmail: widget.userEmail,
+          arguments: SekizHukumArguments(
+            davaId: id.isNotEmpty ? id : null,
+            davaAdi: title.isNotEmpty ? title : 'Dava adı belirtilmedi',
+            davaDavali: davali.isNotEmpty ? davali : 'Davalı bilgisi yok',
+            davaDavaci: davaci.isNotEmpty ? davaci : 'Davacı bilgisi yok',
+            davaGorev: gorev.isNotEmpty ? gorev : 'Görev bilgisi yok',
+            kalanSure: kalan.isNotEmpty ? kalan : 'Süre bilgisi yok',
+            openedAt: widget.insight.openedAt,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic>? _findDava(
+    List<Map<String, dynamic>> list,
+    String id,
+  ) {
+    for (final Map<String, dynamic> item in list) {
+      final String itemId = (item['id'] ?? item['davaId'] ?? '').toString();
+      if (itemId == id) return item;
+    }
+    return null;
+  }
+
+  String _field(
+    Map<String, dynamic>? raw,
+    List<String> keys,
+    String fallback,
+  ) {
+    if (raw != null) {
+      for (final String key in keys) {
+        final String value = raw[key]?.toString().trim() ?? '';
+        if (value.isNotEmpty) return value;
+      }
+    }
+    return fallback.trim();
   }
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     final hashtag = widget.insight.hashtag?.isNotEmpty == true
         ? widget.insight.hashtag!
         : _fallbackHashtag(widget.insight.title);
@@ -449,15 +591,23 @@ class _TrendCaseCardState extends State<_TrendCaseCard> {
     final comments = _snapshot?.comments ?? const <TrendComment>[];
 
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Column(
+      elevation: 0,
+      color: palette.card,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: SeyirTokens.radiusLgAll,
+        side: BorderSide(color: palette.border, width: 1),
+      ),
+      child: InkWell(
+        onTap: _openRelatedCase,
+        borderRadius: SeyirTokens.radiusLgAll,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_isEngagementLoading)
             const LinearProgressIndicator(minHeight: 2),
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(SeyirTokens.space4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -465,88 +615,89 @@ class _TrendCaseCardState extends State<_TrendCaseCard> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
+                        horizontal: SeyirTokens.space3,
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green[50],
+                        color: palette.tint(SeyirTokens.brand),
                         borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: palette.tintBorder(SeyirTokens.brand),
+                        ),
                       ),
                       child: Text(
                         hashtag,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
+                        style: palette.body(
+                          weight: FontWeight.w700,
+                          color: palette.foreground(SeyirTokens.brandDeep),
                         ),
                       ),
                     ),
                     const Spacer(),
                     Text(
                       '#${widget.rank}',
-                      style: TextStyle(
-                        color: Colors.grey[500],
-                        fontWeight: FontWeight.bold,
+                      style: palette.body(
+                        weight: FontWeight.w700,
+                        color: palette.textMuted,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: SeyirTokens.space3),
                 Text(
                   widget.insight.title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                  style: palette.title(),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: SeyirTokens.space2),
                 Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
+                  spacing: SeyirTokens.space3,
+                  runSpacing: SeyirTokens.space1,
                   children: [
                     _StatChip(
                       icon: Icons.thumb_up_alt_rounded,
-                      color: Colors.green,
+                      color: SeyirTokens.accept,
                       label: 'Destek',
                       value: _supportCount,
                     ),
                     _StatChip(
                       icon: Icons.thumb_down_alt_rounded,
-                      color: Colors.red,
+                      color: SeyirTokens.reject,
                       label: 'Kınama',
                       value: _condemnCount,
                     ),
                     _StatChip(
                       icon: Icons.comment_rounded,
-                      color: Colors.blue,
+                      color: SeyirTokens.engageComment,
                       label: 'Yorum',
                       value: _commentCount,
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: SeyirTokens.space3),
                 Row(
                   children: [
                     Icon(
                       Icons.category_rounded,
                       size: 18,
-                      color: Colors.grey[600],
+                      color: palette.textSecondary,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         widget.insight.category,
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w500,
+                        style: palette.body(
+                          weight: FontWeight.w500,
+                          color: palette.textSecondary,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: SeyirTokens.space4),
                 _TrendActionRow(
                   onSupport: () => _handleReaction(true),
                   onCondemn: () => _handleReaction(false),
-                  onComment: _handleComment,
+                  onComment: _openComments,
                   supportCount: _supportCount,
                   condemnCount: _condemnCount,
                   commentCount: _commentCount,
@@ -554,19 +705,19 @@ class _TrendCaseCardState extends State<_TrendCaseCard> {
                   isCondemnActive: _snapshot?.userCondemned ?? false,
                 ),
                 if (_engagementError != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: SeyirTokens.space3),
                   Text(
                     _engagementError!,
-                    style: TextStyle(
+                    style: palette.body(
+                      weight: FontWeight.w600,
                       color: Theme.of(context).colorScheme.error,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
                 if (comments.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: SeyirTokens.space3),
+                  Divider(color: palette.border),
+                  const SizedBox(height: SeyirTokens.space3),
                   ...comments.take(2).map(
                     (comment) => _CommentTile(comment: comment),
                   ),
@@ -574,8 +725,18 @@ class _TrendCaseCardState extends State<_TrendCaseCard> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton(
-                        onPressed: _handleComment,
-                        child: Text('Tüm yorumları gör (${comments.length})'),
+                        onPressed: _openComments,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(
+                            SeyirTokens.tapTarget,
+                            SeyirTokens.tapTarget,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.padded,
+                        ),
+                        child: Text(
+                          'Tüm yorumları gör (${comments.length})',
+                          style: palette.body(weight: FontWeight.w700),
+                        ),
                       ),
                     ),
                 ],
@@ -583,6 +744,7 @@ class _TrendCaseCardState extends State<_TrendCaseCard> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -626,27 +788,27 @@ class _TrendActionRow extends StatelessWidget {
           child: _TrendActionButton(
             icon: Icons.thumb_up_alt_rounded,
             label: 'Destek ($supportCount)',
-            color: Colors.green,
+            color: SeyirTokens.accept,
             isActive: isSupportActive,
             onPressed: onSupport,
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: SeyirTokens.space2),
         Expanded(
           child: _TrendActionButton(
             icon: Icons.thumb_down_alt_rounded,
             label: 'Kınama ($condemnCount)',
-            color: Colors.red,
+            color: SeyirTokens.reject,
             isActive: isCondemnActive,
             onPressed: onCondemn,
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: SeyirTokens.space2),
         Expanded(
           child: _TrendActionButton(
             icon: Icons.comment_rounded,
             label: 'Yorum ($commentCount)',
-            color: Colors.blue,
+            color: SeyirTokens.engageComment,
             onPressed: onComment,
           ),
         ),
@@ -673,25 +835,36 @@ class _TrendActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayColor = isActive ? color : Colors.grey[700];
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color displayColor =
+        isActive ? palette.foreground(color) : palette.textSecondary;
+    final Color borderColor = color.withValues(alpha: isActive ? 0.75 : 0.55);
     return TextButton.icon(
       style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+        tapTargetSize: MaterialTapTargetSize.padded,
+        padding: const EdgeInsets.symmetric(
+          horizontal: SeyirTokens.space1,
+          vertical: SeyirTokens.space2,
+        ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: color.withOpacity(isActive ? 0.6 : 0.2)),
+          borderRadius: SeyirTokens.radiusMdAll,
+          side: BorderSide(color: borderColor),
         ),
       ),
       onPressed: onPressed,
       icon: Icon(
         icon,
+        size: 18,
         color: displayColor,
       ),
       label: Text(
         label,
-        style: TextStyle(
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: palette.caption(
+          weight: FontWeight.w600,
           color: displayColor,
-          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -706,11 +879,15 @@ class _CommentPayload {
   final bool isAnonymous;
 }
 
-/// Yorum compose ve liste sheet'i.
+/// Yorum listesi. Yazma alanı yalnızca giriş yapılmışsa gösterilir.
 class _CommentComposerSheet extends StatefulWidget {
-  const _CommentComposerSheet({required this.comments});
+  const _CommentComposerSheet({
+    required this.comments,
+    required this.canWrite,
+  });
 
   final List<TrendComment> comments;
+  final bool canWrite;
 
   @override
   State<_CommentComposerSheet> createState() => _CommentComposerSheetState();
@@ -737,104 +914,130 @@ class _CommentComposerSheetState extends State<_CommentComposerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final canSend = _controller.text.trim().isNotEmpty;
+    final canSend = widget.canWrite && _controller.text.trim().isNotEmpty;
     final comments = widget.comments;
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: 16 + bottomInset,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(2),
-            ),
+      padding: const EdgeInsets.only(top: SeyirTokens.space6),
+      child: Material(
+        color: palette.card,
+        borderRadius: SeyirTokens.sheetTop,
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: SeyirTokens.space4,
+            right: SeyirTokens.space4,
+            top: SeyirTokens.space4,
+            bottom: SeyirTokens.space4 + bottomInset,
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Yorumlar',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: palette.border,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-          ),
-          const SizedBox(height: 16),
-          if (comments.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.chat_bubble_outline_rounded,
-                    color: Colors.grey[500],
+              const SizedBox(height: SeyirTokens.space4),
+              Text(
+                'Yorumlar',
+                style: palette.headline(),
+              ),
+              const SizedBox(height: SeyirTokens.space4),
+              if (comments.isEmpty)
+                DelilSoftEmpty(
+                  title: widget.canWrite ? 'İlk yorumu sen yaz' : 'Henüz yorum yok',
+                  message: widget.canWrite
+                      ? 'Bu dava için ilk yorumu sen bırakabilirsin.'
+                      : 'Yorumlar giriş yapmadan da okunur.',
+                  icon: Icons.chat_bubble_outline_rounded,
+                )
+              else
+                SizedBox(
+                  height: 280,
+                  child: ListView.separated(
+                    itemCount: comments.length,
+                    separatorBuilder: (_, __) => Divider(color: palette.border),
+                    itemBuilder: (context, index) {
+                      return _CommentTile(comment: comments[index]);
+                    },
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'İlk yorumu sen yaz',
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w600,
+                ),
+              const SizedBox(height: SeyirTokens.space4),
+              if (!widget.canWrite)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
+                  child: Text(
+                    'Yorum yazmak için giriş yapın.',
+                    textAlign: TextAlign.center,
+                    style: palette.body(
+                      weight: FontWeight.w600,
+                      color: palette.textSecondary,
                     ),
                   ),
-                ],
-              ),
-            )
-          else
-            SizedBox(
-              height: 280,
-              child: ListView.separated(
-                itemCount: comments.length,
-                separatorBuilder: (_, __) => const Divider(),
-                itemBuilder: (context, index) {
-                  return _CommentTile(comment: comments[index]);
-                },
-              ),
-            ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            maxLines: 3,
-            decoration: InputDecoration(
-              hintText: 'Yorumunu yaz...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+                )
+              else ...[
+                TextField(
+                  controller: _controller,
+                  maxLines: 3,
+                  style: palette.body(),
+                  decoration: InputDecoration(
+                    hintText: 'Yorumunu yaz...',
+                    hintStyle: palette.body(
+                      weight: FontWeight.w400,
+                      color: palette.textMuted,
+                    ),
+                    filled: true,
+                    fillColor: palette.surfaceMuted,
+                    border: OutlineInputBorder(
+                      borderRadius: SeyirTokens.radiusMdAll,
+                      borderSide: BorderSide(color: palette.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: SeyirTokens.radiusMdAll,
+                      borderSide: BorderSide(color: palette.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: SeyirTokens.radiusMdAll,
+                      borderSide: BorderSide(
+                        color: palette.foreground(SeyirTokens.brand),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SeyirTokens.space2),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: _anonymous,
+                  onChanged: (value) => setState(() => _anonymous = value),
+                  title: Text(
+                    'Gizli Tanık olarak paylaş',
+                    style: palette.body(),
+                  ),
+                ),
+                const SizedBox(height: SeyirTokens.space2),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    onPressed: canSend
+                        ? () => Navigator.pop(
+                              context,
+                              _CommentPayload(_controller.text.trim(), _anonymous),
+                            )
+                        : null,
+                    icon: const Icon(Icons.send_rounded),
+                    label: const Text('Gönder'),
+                  ),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(height: 8),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            value: _anonymous,
-            onChanged: (value) => setState(() => _anonymous = value),
-            title: const Text('Gizli Tanık olarak paylaş'),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton.icon(
-              onPressed: canSend
-                  ? () => Navigator.pop(
-                        context,
-                        _CommentPayload(_controller.text.trim(), _anonymous),
-                      )
-                  : null,
-              icon: const Icon(Icons.send_rounded),
-              label: const Text('Gönder'),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -848,6 +1051,7 @@ class _CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     final initials = comment.author.isNotEmpty
         ? comment.author.characters.first.toUpperCase()
         : '?';
@@ -859,23 +1063,27 @@ class _CommentTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(
-        backgroundColor: Colors.grey[200],
+        backgroundColor: palette.surfaceMuted,
         child: Text(
           initials,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: palette.body(weight: FontWeight.w700),
         ),
       ),
       title: Text(
         subtitle,
-        style: const TextStyle(fontWeight: FontWeight.w600),
+        style: palette.body(weight: FontWeight.w600),
       ),
-      subtitle: Text(comment.message),
+      subtitle: Text(
+        comment.message,
+        style: palette.body(
+          weight: FontWeight.w400,
+          color: palette.textSecondary,
+        ),
+      ),
       trailing: Text(
         formattedDate,
-        style: TextStyle(
-          color: Colors.grey[500],
-          fontSize: 12,
-        ),
+        textAlign: TextAlign.end,
+        style: palette.caption(color: palette.textMuted),
       ),
     );
   }
@@ -900,28 +1108,31 @@ class _StatChip extends StatelessWidget {
   });
 
   final IconData icon;
-  final MaterialColor color;
+  final Color color;
   final String label;
   final int value;
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color ink = palette.foreground(color);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: palette.tint(color),
         borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: palette.tintBorder(color)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: color),
+          Icon(icon, size: 16, color: ink),
           const SizedBox(width: 6),
           Text(
             '$label: $value',
-            style: TextStyle(
-              color: color.shade700,
-              fontWeight: FontWeight.w600,
+            style: palette.caption(
+              weight: FontWeight.w600,
+              color: ink,
             ),
           ),
         ],
@@ -945,10 +1156,11 @@ class _SideNavigationMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Container(
-      color: Colors.white,
+      color: palette.surface,
       child: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 24),
+        padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space6),
         children: [
           _NavIconButton(
             icon: Icons.gavel_rounded,
@@ -1017,8 +1229,9 @@ class _NavIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     final child = icon != null
-        ? Icon(icon, size: 28, color: Colors.black54)
+        ? Icon(icon, size: 28, color: palette.textSecondary)
         : Image.asset(
             assetPath!,
             width: 28,
@@ -1026,23 +1239,29 @@ class _NavIconButton extends StatelessWidget {
           );
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space3),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: SeyirTokens.radiusLgAll,
         child: Tooltip(
           message: tooltip,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(16),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: SeyirTokens.tapTarget,
+              minHeight: SeyirTokens.tapTarget,
             ),
-            child: Center(child: child),
+            child: Container(
+              padding: const EdgeInsets.all(SeyirTokens.space4),
+              decoration: BoxDecoration(
+                color: palette.surfaceMuted,
+                borderRadius: SeyirTokens.radiusLgAll,
+                border: Border.all(color: palette.border),
+              ),
+              child: Center(child: child),
+            ),
           ),
         ),
       ),
     );
   }
 }
-

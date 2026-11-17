@@ -58,19 +58,17 @@ class TrendingInsightsService {
           .toList(),
     );
 
-    final haykirCandidates = sortBySupport(
+    /// Gerçek trend haykırış, kaydedilmiş (saved) kayıtlardır.
+    /// Kayıt yoksa alfabetik dava listesiyle doldurulmaz.
+    final List<CaseInsight> haykirislar = sortBySupport(
       analytics.mostSupported
           .where((caseInsight) => caseInsight.source == CaseSource.saved)
           .toList(),
     );
 
-    final fallbackHaykirList = haykirCandidates.isNotEmpty
-        ? haykirCandidates
-        : sortBySupport(analytics.alphabetical);
-
     return TrendingInsights(
       trendDavalar: davalar,
-      trendHaykirislar: fallbackHaykirList,
+      trendHaykirislar: haykirislar,
       generatedAt: DateTime.now(),
     );
   }
