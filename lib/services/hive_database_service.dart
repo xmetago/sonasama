@@ -6144,7 +6144,7 @@ class HiveDatabaseService {
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // En yeni önce
     } catch (e) {
       print('❌ Albümler getirilirken hata: $e');
-      return [];
+      rethrow;
     }
   }
 
