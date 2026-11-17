@@ -1,12 +1,69 @@
 import '../models/registration_model.dart';
+import '../services/firebase_password_gateway.dart';
 import '../services/hive_database_service.dart';
 import '../services/user_session_service.dart';
 import 'base_provider.dart';
 
+/// Testlerin Firebase yerine kullanabildiği şifre çağrıları.
+class PasswordAuthClient {
+  const PasswordAuthClient({
+    this.sendResetEmail,
+    this.reauthenticateAndUpdate,
+  });
+
+  final Future<void> Function(String email)? sendResetEmail;
+  final Future<void> Function({
+    required String email,
+    required String currentPassword,
+    required String newPassword,
+  })? reauthenticateAndUpdate;
+}
+
 /// Kimlik doğrulama ve kullanıcı oturum yönetimi için provider
 class AuthProvider extends BaseProvider {
+  AuthProvider({PasswordAuthClient? passwordAuthClient})
+      : _passwordAuthClient = passwordAuthClient ?? const PasswordAuthClient();
+
+  final PasswordAuthClient _passwordAuthClient;
   RegistrationModel? _currentUser;
   bool _isInitialized = false;
+
+  static final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+  static final RegExp _strongPassword = RegExp(
+    r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,19}$',
+  );
+
+  static bool isValidEmail(String email) => _emailPattern.hasMatch(email.trim());
+
+  static String? weakPasswordMessage(String password) {
+    if (_strongPassword.hasMatch(password)) return null;
+    return 'Şifre çok zayıf. En az 8 karakter, bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir.';
+  }
+
+  static String passwordAuthMessage(String code, {required bool reset}) {
+    switch (code) {
+      case 'invalid-email':
+        return 'Geçerli bir e-posta adresi giriniz.';
+      case 'user-not-found':
+        return 'Bu e-posta ile kayıtlı bir hesap bulunamadı.';
+      case 'wrong-password':
+      case 'invalid-credential':
+      case 'invalid-login-credentials':
+        return 'Mevcut şifre hatalı.';
+      case 'weak-password':
+        return 'Şifre çok zayıf. Daha güçlü bir şifre seçin.';
+      case 'too-many-requests':
+        return 'Çok fazla deneme yapıldı. Lütfen daha sonra tekrar deneyin.';
+      case 'network-request-failed':
+        return 'Bağlantı kurulamadı. İnternetinizi kontrol edin.';
+      case 'requires-recent-login':
+        return 'Güvenlik için yeniden giriş yapmanız gerekiyor.';
+      default:
+        return reset
+            ? 'Şifre sıfırlama e-postası gönderilemedi. Lütfen tekrar deneyin.'
+            : 'Şifre değiştirilirken hata oluştu.';
+    }
+  }
 
   /// Mevcut kullanıcı
   RegistrationModel? get currentUser => _currentUser;
@@ -226,29 +283,116 @@ class AuthProvider extends BaseProvider {
     return _currentUser!.password == password;
   }
 
+  /// Firebase Auth üzerinden şifre sıfırlama e-postası gönderir.
+  ///
+  /// Başarıda null, aksi halde Türkçe hata döner.
+  Future<String?> sendPasswordResetEmail(String email) async {
+    final trimmed = email.trim();
+    if (!isValidEmail(trimmed)) {
+      const message = 'Geçerli bir e-posta adresi giriniz.';
+      setError(message);
+      return message;
+    }
+
+    try {
+      setLoading(true);
+      clearMessages();
+      final override = _passwordAuthClient.sendResetEmail;
+      if (override != null) {
+        await override(trimmed);
+      } else {
+        await FirebasePasswordGateway.sendPasswordResetEmail(trimmed);
+      }
+      setSuccess('Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.');
+      return null;
+    } on PasswordAuthException catch (error) {
+      final message = passwordAuthMessage(error.code, reset: true);
+      setError(message);
+      return message;
+    } catch (_) {
+      const message = 'Şifre sıfırlama e-postası gönderilemedi. Lütfen tekrar deneyin.';
+      setError(message);
+      return message;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /// Mevcut şifreyle yeniden doğrular, ardından şifreyi günceller.
+  ///
+  /// Firebase oturumu varsa `reauthenticateWithCredential` ve `updatePassword`
+  /// çağrılır. Yerel hesap her durumda Hive üzerinde güncellenir.
+  /// Başarıda null, aksi halde Türkçe hata döner.
+  Future<String?> reauthenticateAndUpdatePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    if (newPassword != confirmPassword) {
+      const message = 'Yeni şifreler eşleşmiyor.';
+      setError(message);
+      return message;
+    }
+    final weak = weakPasswordMessage(newPassword);
+    if (weak != null) {
+      setError(weak);
+      return weak;
+    }
+    if (_currentUser == null) {
+      const message = 'Giriş gerekli.';
+      setError(message);
+      return message;
+    }
+    if (!validatePassword(currentPassword)) {
+      const message = 'Mevcut şifre hatalı.';
+      setError(message);
+      return message;
+    }
+
+    try {
+      setLoading(true);
+      clearMessages();
+      final override = _passwordAuthClient.reauthenticateAndUpdate;
+      if (override != null) {
+        await override(
+          email: _currentUser!.email,
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+        );
+      } else {
+        await FirebasePasswordGateway.reauthenticateAndUpdatePassword(
+          email: _currentUser!.email,
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+        );
+      }
+
+      final updatedUser = _currentUser!.copyWith(password: newPassword);
+      await HiveDatabaseService.updateRegistration(updatedUser);
+      _currentUser = updatedUser;
+      UserSessionService.setCurrentUser(updatedUser);
+      setSuccess('Şifre başarıyla değiştirildi.');
+      return null;
+    } on PasswordAuthException catch (error) {
+      final message = passwordAuthMessage(error.code, reset: false);
+      setError(message);
+      return message;
+    } catch (_) {
+      const message = 'Şifre değiştirilirken hata oluştu.';
+      setError(message);
+      return message;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   /// Şifre değiştirme
   Future<bool> changePassword(String currentPassword, String newPassword) async {
-    if (_currentUser == null) return false;
-
-    return await executeAsync(
-      () async {
-        // Mevcut şifreyi kontrol et
-        if (!validatePassword(currentPassword)) {
-          throw Exception('Mevcut şifre hatalı');
-        }
-
-        // Yeni şifre ile kullanıcıyı güncelle
-        final updatedUser = _currentUser!.copyWith(password: newPassword);
-        await HiveDatabaseService.updateRegistration(updatedUser);
-        
-        _currentUser = updatedUser;
-        UserSessionService.setCurrentUser(updatedUser);
-        notifyListeners();
-        
-        return true;
-      },
-      errorMessage: 'Şifre değiştirilirken hata oluştu',
-      successMessage: 'Şifre başarıyla değiştirildi',
-    ) ?? false;
+    final error = await reauthenticateAndUpdatePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+      confirmPassword: newPassword,
+    );
+    return error == null;
   }
 }
