@@ -71,7 +71,6 @@ its19/
 │   │   ├── statistics_dashboard_page.dart
 │   │   ├── terms_conditions_page.dart
 │   │   ├── test_notifications_page.dart
-│   │   ├── trend_dava_page.dart
 │   │   ├── trend_insights_page.dart
 │   │   ├── user_gamified_score_page.dart
 │   │   ├── uyarilar_page.dart

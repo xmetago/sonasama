@@ -5,11 +5,12 @@ import 'package:lottie/lottie.dart';
 import 'package:shimmer/shimmer.dart';
 import '../services/hive_database_service.dart';
 import '../models/category_model.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/category_icon_utils.dart';
 import '../utils/category_lottie_config.dart';
 import '../utils/constants.dart';
-import '../widgets/sub_category_tile.dart';
 import '../widgets/category_search_bar.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/empty_search_result.dart';
 import 'dava_ac_page.dart';
 
@@ -17,7 +18,14 @@ import 'dava_ac_page.dart';
 class CategoryPage extends StatefulWidget {
   final String? userEmail; // Kullanıcı e-posta adresi
 
-  const CategoryPage({super.key, this.userEmail});
+  /// Testlerde yükleme hatasını üretmek için. Üretimde null kalır.
+  final Future<List<CategoryModel>> Function()? categoryLoader;
+
+  const CategoryPage({
+    super.key,
+    this.userEmail,
+    this.categoryLoader,
+  });
 
   @override
   State<CategoryPage> createState() => _CategoryPageState();
@@ -27,17 +35,12 @@ class _CategoryPageState extends State<CategoryPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // Ferah yeşil tonlar – Kategoriler sayfası
-  static const Color primaryColor = Color(0xFF169371); // Ana yeşil (#169371)
-  static const Color primaryLightColor = Color(0xFF22B48E); // Biraz daha açık yeşil
-  static const Color primaryLighterColor = Color(0xFFE0F5EF); // Çok açık mint/yeşil arka plan
-  static const Color primaryDarkColor = Color(0xFF0F6B52); // Daha koyu yeşil
-
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
+  bool _loadFailed = false;
 
   List<CategoryModel> get filteredCategories =>
-      HiveDatabaseService.filterCategories(_searchQuery);
+      _filterLoaded(_categories, _searchQuery);
 
   @override
   void initState() {
@@ -46,19 +49,25 @@ class _CategoryPageState extends State<CategoryPage> {
     _preloadCategoryLottieAssets();
   }
 
-  /// Kategorileri veri tabanından yükler
+  /// Kategorileri veri tabanından yükler.
+  /// Hata, boş arama gibi gösterilmez; yeniden deneme kartı açılır.
   Future<void> _loadCategories() async {
     setState(() {
       _isLoading = true;
+      _loadFailed = false;
     });
-    
+
     try {
-      _categories = HiveDatabaseService.getActiveCategories();
+      final loader = widget.categoryLoader;
+      _categories = loader != null
+          ? await loader()
+          : HiveDatabaseService.getActiveCategories();
     } catch (e) {
-      // Hata durumunda boş liste kullan
       _categories = [];
+      _loadFailed = true;
     }
-    
+
+    if (!mounted) return;
     setState(() {
       _isLoading = false;
     });
@@ -99,46 +108,79 @@ class _CategoryPageState extends State<CategoryPage> {
     }
   }
 
+  /// Hive `filterCategories` ile aynı sıra: boş aramada ve sonuçta İlişkiler üstte.
+  static List<CategoryModel> _filterLoaded(
+    List<CategoryModel> source,
+    String query,
+  ) {
+    final List<CategoryModel> all = List<CategoryModel>.from(source);
+    bool isIliskiler(CategoryModel category) {
+      final String name = category.name.toLowerCase();
+      return name == 'ilişkiler' || name == 'ilişkiler' || category.name == 'İlişkiler';
+    }
+
+    void pinIliskiler(List<CategoryModel> list) {
+      final int idx = list.indexWhere(isIliskiler);
+      if (idx > 0) {
+        final CategoryModel item = list.removeAt(idx);
+        list.insert(0, item);
+      }
+    }
+
+    if (query.trim().isEmpty) {
+      pinIliskiler(all);
+      return all;
+    }
+    final String q = query.toLowerCase();
+    final List<CategoryModel> filtered = all.where((CategoryModel category) {
+      if (category.name.toLowerCase().contains(q)) return true;
+      return category.subCategories.any((String sub) => sub.toLowerCase().contains(q));
+    }).toList();
+    pinIliskiler(filtered);
+    return filtered;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color headerInk = palette.onSolid(SeyirTokens.brandDeep);
     return Scaffold(
-      backgroundColor: primaryLighterColor, // Ferah, yumuşak açık yeşil arka plan
+      backgroundColor: Color.alphaBlend(
+        SeyirTokens.brand.withValues(alpha: palette.isDark ? 0.08 : 0.10),
+        palette.surface,
+      ),
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           '📋 Kategoriler',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            fontSize: 20,
-          ),
+          style: palette.headline(color: headerInk),
         ),
-        backgroundColor: primaryColor,
+        backgroundColor: SeyirTokens.brandDeep,
+        foregroundColor: headerInk,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: headerInk),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                primaryLightColor,
-                primaryDarkColor,
+                Color(0xFF14956C),
+                SeyirTokens.brandDeep,
               ],
             ),
           ),
         ),
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.close, size: 24),
-              onPressed: () => Navigator.pop(context),
-              tooltip: 'Kapat',
+          IconButton(
+            icon: const Icon(Icons.close, size: 24),
+            onPressed: () => Navigator.pop(context),
+            tooltip: 'Kapat',
+            style: IconButton.styleFrom(
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+              tapTargetSize: MaterialTapTargetSize.padded,
+              foregroundColor: headerInk,
+              backgroundColor: headerInk.withValues(alpha: 0.16),
             ),
           ),
         ],
@@ -154,22 +196,33 @@ class _CategoryPageState extends State<CategoryPage> {
             Expanded(
               child: _isLoading
                   ? _buildShimmerGrid()
-                  : filteredCategories.isEmpty
-                      ? EmptySearchResult(searchQuery: _searchQuery)
-                      : GridView.builder(
-                          padding: const EdgeInsets.all(16),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 0.85,
-                          ),
-                          itemCount: filteredCategories.length,
-                          itemBuilder: (context, index) {
-                            final category = filteredCategories[index];
-                            return _buildModernCategoryCard(category, index);
-                          },
-                        ),
+                  : _loadFailed
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(SeyirTokens.space4),
+                          children: [
+                            DelilLoadError(
+                              message: 'Kategoriler yüklenemedi.',
+                              onRetry: _loadCategories,
+                            ),
+                          ],
+                        )
+                      : filteredCategories.isEmpty
+                          ? EmptySearchResult(searchQuery: _searchQuery)
+                          : GridView.builder(
+                              padding: const EdgeInsets.all(SeyirTokens.space4),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                crossAxisSpacing: SeyirTokens.space3,
+                                mainAxisSpacing: SeyirTokens.space3,
+                                childAspectRatio: 0.85,
+                              ),
+                              itemCount: filteredCategories.length,
+                              itemBuilder: (context, index) {
+                                final category = filteredCategories[index];
+                                return _buildModernCategoryCard(category, index);
+                              },
+                            ),
             ),
           ],
         ),
@@ -179,30 +232,25 @@ class _CategoryPageState extends State<CategoryPage> {
 
   /// Yüklenirken gösterilen shimmer grid (skeleton)
   Widget _buildShimmerGrid() {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Shimmer.fromColors(
-      baseColor: primaryLighterColor,
-      highlightColor: Colors.white.withOpacity(0.9),
+      baseColor: palette.surfaceMuted,
+      highlightColor: palette.card,
       child: GridView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(SeyirTokens.space4),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          crossAxisSpacing: SeyirTokens.space3,
+          mainAxisSpacing: SeyirTokens.space3,
           childAspectRatio: 0.85,
         ),
         itemCount: 12,
         itemBuilder: (context, index) {
           return Container(
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withOpacity(0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              color: palette.card,
+              borderRadius: SeyirTokens.radiusLgAll,
+              border: Border.all(color: palette.border),
             ),
           );
         },
@@ -212,6 +260,10 @@ class _CategoryPageState extends State<CategoryPage> {
 
   /// Grid kartı: tıklanınca haptic + alt kategori seçimi veya doğrudan dava aç
   Widget _buildModernCategoryCard(CategoryModel category, int index) {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color borderColor = palette.isDark
+        ? SeyirTokens.brand.withValues(alpha: 0.85)
+        : SeyirTokens.brandDeep.withValues(alpha: 0.45);
     return TweenAnimationBuilder<double>(
       duration: Duration(milliseconds: 300 + (index * 40)),
       tween: Tween(begin: 0.0, end: 1.0),
@@ -224,28 +276,25 @@ class _CategoryPageState extends State<CategoryPage> {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () => _onCategoryCardTap(category),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: SeyirTokens.radiusLgAll,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: SeyirTokens.space4,
+                    horizontal: SeyirTokens.space3,
+                  ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        Colors.white,
-                        primaryLighterColor.withOpacity(0.8),
+                        palette.card,
+                        palette.brandSoft,
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryDarkColor.withOpacity(0.18),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+                    borderRadius: SeyirTokens.radiusLgAll,
+                    boxShadow: palette.cardShadow,
                     border: Border.all(
-                      color: primaryLightColor.withOpacity(0.6),
+                      color: borderColor,
                       width: 1.2,
                     ),
                   ),
@@ -255,13 +304,13 @@ class _CategoryPageState extends State<CategoryPage> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: primaryLightColor.withOpacity(0.16),
-                          borderRadius: BorderRadius.circular(12),
+                          color: palette.tint(SeyirTokens.brand),
+                          borderRadius: SeyirTokens.radiusMdAll,
                         ),
                         child: Icon(
                           categoryIconFromPath(category.iconPath),
                           size: 28,
-                          color: primaryDarkColor,
+                          color: palette.foreground(SeyirTokens.brandDeep),
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -270,11 +319,7 @@ class _CategoryPageState extends State<CategoryPage> {
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
+                        style: palette.body(weight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -297,48 +342,52 @@ class _CategoryPageState extends State<CategoryPage> {
       _maybeShowLottieThenNavigate(category.name, subList.first);
       return;
     }
+    final SeyirPalette sheet = SeyirPalette.of(context);
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFFFFBEB),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          border: Border.all(color: primaryLighterColor, width: 1),
+          color: sheet.card,
+          borderRadius: SeyirTokens.sheetTop,
+          border: Border.all(color: sheet.border, width: 1),
         ),
         child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: 8),
+              const SizedBox(height: SeyirTokens.space2),
               Container(
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: primaryDarkColor.withOpacity(0.4),
+                  color: sheet.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(SeyirTokens.space4),
                 child: Text(
                   category.name,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
+                  style: sheet.headline(),
                 ),
               ),
               ...subList.map((sub) => ListTile(
-                    leading: Icon(categoryIconFromPath(category.iconPath), color: primaryColor, size: 22),
-                    title: Text(sub, style: const TextStyle(fontWeight: FontWeight.w500)),
+                    leading: Icon(
+                      categoryIconFromPath(category.iconPath),
+                      color: SeyirTokens.brandDeep,
+                      size: 22,
+                    ),
+                    title: Text(
+                      sub,
+                      style: sheet.body(weight: FontWeight.w500),
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       _maybeShowLottieThenNavigate(category.name, sub);
                     },
                   )),
-              const SizedBox(height: 16),
+              const SizedBox(height: SeyirTokens.space4),
             ],
           ),
         ),
@@ -417,10 +466,13 @@ class _CategoryLottieDialogState extends State<_CategoryLottieDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // Sıcak turuncu palet – CategoryPage ile uyumlu
-    const dialogPrimaryDark = Color(0xFFC2410C);
+    // Sıcak turuncu palet – kategori kutlaması
+    const dialogPrimaryDark = SeyirTokens.warning;
     const dialogPrimaryLight = Color(0xFFF97316);
-    const dialogPrimaryLighter = Color(0xFFFFEDD5);
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color dialogBorder = palette.isDark
+        ? dialogPrimaryLight.withValues(alpha: 0.75)
+        : dialogPrimaryDark.withValues(alpha: 0.35);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -430,15 +482,16 @@ class _CategoryLottieDialogState extends State<_CategoryLottieDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: SeyirTokens.sheetTop,
               child: Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(SeyirTokens.space6),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  color: palette.card,
+                  borderRadius: SeyirTokens.sheetTop,
+                  border: Border.all(color: dialogBorder, width: 1.2),
                   boxShadow: [
                     BoxShadow(
-                      color: dialogPrimaryDark.withOpacity(0.22),
+                      color: dialogPrimaryDark.withValues(alpha: 0.22),
                       blurRadius: 22,
                       offset: const Offset(0, 10),
                     ),
@@ -465,11 +518,12 @@ class _CategoryLottieDialogState extends State<_CategoryLottieDialog> {
                               height: 180,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: dialogPrimaryLighter,
+                                color: palette.tint(dialogPrimaryLight),
                                 shape: BoxShape.circle,
+                                border: Border.all(color: dialogBorder),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: dialogPrimaryLight.withOpacity(0.35),
+                                    color: dialogPrimaryLight.withValues(alpha: 0.35),
                                     blurRadius: 20,
                                     spreadRadius: 3,
                                   ),
@@ -482,11 +536,12 @@ class _CategoryLottieDialogState extends State<_CategoryLottieDialog> {
                             height: 90,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.92),
+                              color: palette.card.withValues(alpha: 0.92),
                               shape: BoxShape.circle,
+                              border: Border.all(color: dialogBorder),
                               boxShadow: [
                                 BoxShadow(
-                                  color: dialogPrimaryDark.withOpacity(0.18),
+                                  color: dialogPrimaryDark.withValues(alpha: 0.18),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
@@ -495,25 +550,20 @@ class _CategoryLottieDialogState extends State<_CategoryLottieDialog> {
                             child: Icon(
                               widget.fallbackIcon,
                               size: 46,
-                              color: dialogPrimaryDark,
+                              color: palette.foreground(dialogPrimaryDark),
                             ),
                           ),
                         ],
                       ),
                     ),
                     if (widget.slogan.isNotEmpty) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: SeyirTokens.space4),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: SeyirTokens.space2),
                         child: Text(
                           widget.slogan,
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
-                            height: 1.35,
-                          ),
+                          style: palette.body(weight: FontWeight.w600).copyWith(height: 1.35),
                         ),
                       ),
                     ],

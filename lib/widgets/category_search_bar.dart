@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+
 /// Kategori arama çubuğu widget'ı - Yeniden kullanılabilir
 class CategorySearchBar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback? onClear;
-
-  // Site genelindeki ana renk teması
-  static const Color primaryColor = Color(0xFF059669); // Koyu yeşil
-  static const Color primaryLightColor = Color(0xFF10B981); // Açık yeşil
 
   const CategorySearchBar({
     super.key,
@@ -32,10 +30,10 @@ class _CategorySearchBarState extends State<CategorySearchBar>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: SeyirTokens.motion,
       vsync: this,
     );
-    
+
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: 1.02,
@@ -43,7 +41,7 @@ class _CategorySearchBarState extends State<CategorySearchBar>
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
-    
+
     _glowAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -61,26 +59,34 @@ class _CategorySearchBarState extends State<CategorySearchBar>
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    const Color brand = SeyirTokens.brandDeep;
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
         return Transform.scale(
           scale: _scaleAnimation.value,
           child: Container(
-            margin: const EdgeInsets.all(12.0),
+            margin: const EdgeInsets.all(SeyirTokens.space3),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              color: palette.card,
+              borderRadius: SeyirTokens.radiusLgAll,
+              border: Border.all(
+                color: _isFocused
+                    ? palette.foreground(SeyirTokens.brand)
+                    : palette.border,
+                width: _isFocused ? 2 : 1,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withAlpha(1),
+                  color: palette.shadow,
                   spreadRadius: 1,
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
                 if (_isFocused)
                   BoxShadow(
-                    color: CategorySearchBar.primaryColor.withOpacity(0.3 * _glowAnimation.value),
+                    color: brand.withValues(alpha: 0.3 * _glowAnimation.value),
                     blurRadius: 12,
                     spreadRadius: 2,
                     offset: const Offset(0, 4),
@@ -90,6 +96,7 @@ class _CategorySearchBarState extends State<CategorySearchBar>
             child: TextField(
               controller: widget.controller,
               onChanged: widget.onChanged,
+              style: palette.body(weight: FontWeight.w500),
               onTap: () {
                 setState(() => _isFocused = true);
                 _animationController.forward();
@@ -100,54 +107,51 @@ class _CategorySearchBarState extends State<CategorySearchBar>
               },
               decoration: InputDecoration(
                 hintText: 'Kategori ara...',
-                hintStyle: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 14,
+                hintStyle: palette.body(
+                  weight: FontWeight.w400,
+                  color: palette.textMuted,
                 ),
                 suffixIcon: widget.controller.text.isNotEmpty
-                    ? AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: CategorySearchBar.primaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.clear,
-                            color: CategorySearchBar.primaryColor,
-                            size: 20,
-                            semanticLabel: 'Aramayı temizle',
+                    ? IconButton(
+                        tooltip: 'Aramayı temizle',
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(
+                            SeyirTokens.tapTarget,
+                            SeyirTokens.tapTarget,
                           ),
-                          onPressed: () {
-                            widget.onClear?.call();
-                            setState(() => _isFocused = false);
-                            _animationController.reverse();
-                          },
+                          tapTargetSize: MaterialTapTargetSize.padded,
+                          foregroundColor: brand,
                         ),
+                        icon: const Icon(
+                          Icons.clear,
+                          size: 20,
+                          semanticLabel: 'Aramayı temizle',
+                        ),
+                        onPressed: () {
+                          widget.onClear?.call();
+                          setState(() => _isFocused = false);
+                          _animationController.reverse();
+                        },
                       )
                     : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                border: const OutlineInputBorder(
+                  borderRadius: SeyirTokens.radiusLgAll,
                   borderSide: BorderSide.none,
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: const BorderSide(
-                    color: CategorySearchBar.primaryColor,
-                    width: 2,
-                  ),
+                enabledBorder: const OutlineInputBorder(
+                  borderRadius: SeyirTokens.radiusLgAll,
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: const OutlineInputBorder(
+                  borderRadius: SeyirTokens.radiusLgAll,
+                  borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: palette.card,
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+                  horizontal: SeyirTokens.space4,
+                  vertical: SeyirTokens.space3,
                 ),
-              ),
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -155,4 +159,4 @@ class _CategorySearchBarState extends State<CategorySearchBar>
       },
     );
   }
-} 
+}

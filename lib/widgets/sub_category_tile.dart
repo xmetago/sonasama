@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+
 /// Alt kategori tile widget'ı - Yeniden kullanılabilir ve test edilebilir
 class SubCategoryTile extends StatefulWidget {
   final String title;
   final VoidCallback? onTap;
   final bool isSelected;
-
-  // Site genelindeki ana renk teması
-  static const Color primaryColor = Color(0xFF059669); // Koyu yeşil
-  static const Color primaryLightColor = Color(0xFF10B981); // Açık yeşil
-  static const Color primaryLighterColor = Color(0xFFD1FAE5); // Çok açık yeşil
-  static const Color primaryDarkColor = Color(0xFF047857); // Daha koyu yeşil
 
   const SubCategoryTile(
     this.title, {
@@ -34,10 +30,10 @@ class _SubCategoryTileState extends State<SubCategoryTile>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: SeyirTokens.motion,
       vsync: this,
     );
-    
+
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: 1.05,
@@ -45,7 +41,7 @@ class _SubCategoryTileState extends State<SubCategoryTile>
       parent: _animationController,
       curve: Curves.elasticOut,
     ));
-    
+
     _rotationAnimation = Tween<double>(
       begin: 0.0,
       end: 0.02,
@@ -75,6 +71,9 @@ class _SubCategoryTileState extends State<SubCategoryTile>
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    const Color accent = SeyirTokens.brandDeep;
+    final Color selectedInk = palette.onSolid(accent);
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -90,106 +89,118 @@ class _SubCategoryTileState extends State<SubCategoryTile>
                 onTapDown: _onTapDown,
                 onTapUp: _onTapUp,
                 onTapCancel: _onTapCancel,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.only(bottom: 12.0),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 16.0,
-                    horizontal: 20.0,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: widget.isSelected
-                          ? [
-                              SubCategoryTile.primaryLightColor,
-                              SubCategoryTile.primaryColor,
-                            ]
-                          : [
-                              SubCategoryTile.primaryLighterColor,
-                              SubCategoryTile.primaryLighterColor.withOpacity(0.7),
-                            ],
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.only(bottom: SeyirTokens.space3),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: SeyirTokens.space4,
+                      horizontal: SeyirTokens.space4,
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: widget.isSelected
-                          ? SubCategoryTile.primaryColor
-                          : SubCategoryTile.primaryLightColor.withOpacity(0.5),
-                      width: widget.isSelected ? 3 : 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: widget.isSelected
+                            ? [
+                                SeyirTokens.brand,
+                                accent,
+                              ]
+                            : [
+                                palette.card,
+                                palette.brandSoft,
+                              ],
+                      ),
+                      borderRadius: SeyirTokens.radiusLgAll,
+                      border: Border.all(
                         color: widget.isSelected
-                            ? SubCategoryTile.primaryColor.withOpacity(0.4)
-                            : SubCategoryTile.primaryColor.withOpacity(0.1),
-                        blurRadius: _isHovered ? 12 : 8,
-                        offset: Offset(0, _isHovered ? 6 : 4),
-                        spreadRadius: _isHovered ? 2 : 1,
+                            ? accent
+                            : (palette.isDark
+                                ? SeyirTokens.brand.withValues(alpha: 0.8)
+                                : palette.tintBorder(accent)),
+                        width: widget.isSelected ? 3 : 2,
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      // Animasyonlu ikon
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.isSelected
+                              ? accent.withValues(alpha: 0.4)
+                              : palette.shadow,
+                          blurRadius: _isHovered ? 12 : 8,
+                          offset: Offset(0, _isHovered ? 6 : 4),
+                          spreadRadius: _isHovered ? 2 : 1,
                         ),
-                        child: Icon(
-                          _getIconForCategory(widget.title),
-                          size: 20,
-                          color: widget.isSelected ? Colors.white : SubCategoryTile.primaryColor,
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.all(SeyirTokens.space2),
+                          decoration: BoxDecoration(
+                            color: widget.isSelected
+                                ? selectedInk.withValues(alpha: 0.2)
+                                : palette.tint(SeyirTokens.brand),
+                            borderRadius: SeyirTokens.radiusMdAll,
+                          ),
+                          child: Icon(
+                            _getIconForCategory(widget.title),
+                            size: 20,
+                            color: widget.isSelected
+                                ? selectedInk
+                                : palette.foreground(accent),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.title,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: widget.isSelected ? FontWeight.w700 : FontWeight.w600,
-                                color: widget.isSelected ? Colors.white : SubCategoryTile.primaryDarkColor,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            if (_isHovered) ...[
-                              const SizedBox(height: 4),
+                        const SizedBox(width: SeyirTokens.space4),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                'Tıkla ve dava aç!',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: widget.isSelected 
-                                      ? Colors.white.withOpacity(0.8)
-                                      : SubCategoryTile.primaryColor.withOpacity(0.7),
-                                  fontStyle: FontStyle.italic,
+                                widget.title,
+                                style: palette.title(
+                                  weight: widget.isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                  color: widget.isSelected
+                                      ? selectedInk
+                                      : palette.textPrimary,
                                 ),
                               ),
+                              if (_isHovered) ...[
+                                const SizedBox(height: SeyirTokens.space1),
+                                Text(
+                                  'Tıkla ve dava aç!',
+                                  style: palette.caption(
+                                    color: widget.isSelected
+                                        ? selectedInk.withValues(alpha: 0.8)
+                                        : palette.textSecondary,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                      // Animasyonlu ok ikonu
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.all(SeyirTokens.space2),
+                          decoration: BoxDecoration(
+                            color: widget.isSelected
+                                ? selectedInk.withValues(alpha: 0.2)
+                                : palette.tint(SeyirTokens.brand),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                            color: widget.isSelected
+                                ? selectedInk
+                                : palette.foreground(accent),
+                          ),
                         ),
-                        child: Icon(
-                          Icons.arrow_forward_ios,
-                          size: 16,
-                          color: widget.isSelected ? Colors.white : SubCategoryTile.primaryColor,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -201,7 +212,6 @@ class _SubCategoryTileState extends State<SubCategoryTile>
   }
 
   IconData _getIconForCategory(String category) {
-    // Kategoriye göre özel ikonlar
     if (category.contains('Sevgili') || category.contains('Eş')) {
       return Icons.favorite;
     } else if (category.contains('Aile')) {
@@ -266,4 +276,4 @@ class _SubCategoryTileState extends State<SubCategoryTile>
       return Icons.category;
     }
   }
-} 
+}

@@ -305,7 +305,7 @@ Kategori seçme penceresi `lib/widgets/friendship_category_dialog.dart`. Sayfa m
 
 ### Tur 9 — `statistics` sonrası küçük liste ekranları
 
-Sıra: `trend_insights_page.dart` (düz `ListView` ve `_StatChip` yerinde kalır), `albumler_liste_page.dart`, `trend_dava_page.dart`, `uyarilar_page.dart`, `haykirislarim_page.dart`. Her tur bir dosya. Boş durum metni değişmez.
+Sıra: `trend_insights_page.dart` (düz `ListView` ve `_StatChip` yerinde kalır), `albumler_liste_page.dart`, `uyarilar_page.dart`, `haykirislarim_page.dart`. Her tur bir dosya. Boş durum metni değişmez. `trend_dava_page.dart` menüden erişilmediği ve sahte dava gösterdiği için kaldırıldı.
 
 ### Tur 10 — `admin_page.dart`
 
