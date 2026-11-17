@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
 
 /// Arkadaş kategorilendirme widget'ı
 /// Kullanıcının arkadaşlarını kategorilere ayırmasını sağlar
@@ -78,9 +79,15 @@ class _FriendCategoryWidgetState extends State<FriendCategoryWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Card(
-      elevation: 2,
+      elevation: 0,
+      color: palette.card,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: SeyirTokens.radiusLgAll,
+        side: BorderSide(color: palette.border),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -90,14 +97,14 @@ class _FriendCategoryWidgetState extends State<FriendCategoryWidget> {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: Colors.blue[100],
+                  backgroundColor: palette.tint(SeyirTokens.sectionPeople),
                   child: Text(
                     widget.friendName.isNotEmpty 
                         ? widget.friendName[0].toUpperCase()
                         : '?',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue[800],
+                      color: palette.foreground(SeyirTokens.sectionPeople),
                     ),
                   ),
                 ),
@@ -108,17 +115,11 @@ class _FriendCategoryWidgetState extends State<FriendCategoryWidget> {
                     children: [
                       Text(
                         widget.friendName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: palette.title(),
                       ),
                       Text(
                         widget.friendEmail,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: palette.caption(),
                       ),
                     ],
                   ),
@@ -126,12 +127,9 @@ class _FriendCategoryWidgetState extends State<FriendCategoryWidget> {
               ],
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Kategori Seçin:',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
+              style: palette.body(weight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -142,23 +140,33 @@ class _FriendCategoryWidgetState extends State<FriendCategoryWidget> {
                 return GestureDetector(
                   onTap: () => _updateCategory(category),
                   child: Container(
+                    constraints: const BoxConstraints(
+                      minHeight: SeyirTokens.tapTarget,
+                    ),
+                    alignment: Alignment.center,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.blue[600] : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(20),
-                      border: isSelected 
-                          ? Border.all(color: Colors.blue[800]!, width: 2)
-                          : null,
+                      color: isSelected
+                          ? SeyirTokens.sectionPeople
+                          : palette.surfaceMuted,
+                      borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
+                      border: Border.all(
+                        color: isSelected
+                            ? palette.tintBorder(SeyirTokens.sectionPeople)
+                            : palette.border,
+                      ),
                     ),
                     child: Text(
                       category.toUpperCase(),
                       style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
+                        color: isSelected
+                            ? palette.onSolid(SeyirTokens.sectionPeople)
+                            : palette.textPrimary,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 12,
+                        fontSize: SeyirTokens.typeCaption,
                       ),
                     ),
                   ),
@@ -170,20 +178,19 @@ class _FriendCategoryWidgetState extends State<FriendCategoryWidget> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green[200]!),
+                  color: palette.brandSoft,
+                  borderRadius: SeyirTokens.radiusSmAll,
+                  border: Border.all(color: palette.tintBorder(SeyirTokens.brand)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green[600], size: 16),
+                    Icon(Icons.check_circle, color: palette.isDark ? SeyirTokens.brand : SeyirTokens.brandDeep, size: 16),
                     const SizedBox(width: 8),
                     Text(
                       'Kategori: ${selectedCategory!.toUpperCase()}',
-                      style: TextStyle(
-                        color: Colors.green[800],
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                      style: palette.caption(
+                        color: palette.isDark ? SeyirTokens.brand : SeyirTokens.brandDeep,
+                        weight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -215,7 +222,10 @@ class FriendCategoryDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('$friendName Kategorisini Belirle'),
+      title: Text(
+        '$friendName Kategorisini Belirle',
+        style: SeyirPalette.of(context).title(),
+      ),
       content: SizedBox(
         width: double.maxFinite,
         child: FriendCategoryWidget(
@@ -231,6 +241,9 @@ class FriendCategoryDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(
+            minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+          ),
           child: const Text('Kapat'),
         ),
       ],

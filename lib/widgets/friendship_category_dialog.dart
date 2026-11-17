@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/registration_model.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/app_theme.dart';
 import 'shared/app_snack.dart';
 
@@ -25,6 +26,7 @@ class FriendshipCategoryDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
@@ -39,15 +41,10 @@ class FriendshipCategoryDialog extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
+            color: palette.card,
+            borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
+            border: Border.all(color: palette.border),
+            boxShadow: palette.cardShadow,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -87,7 +84,7 @@ class FriendshipCategoryDialog extends StatelessWidget {
                             targetUser.judgeName,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 16,
+                              fontSize: SeyirTokens.typeTitle,
                               fontWeight: FontWeight.bold,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -105,8 +102,8 @@ class FriendshipCategoryDialog extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.calmGreenUltraLight,
-                  borderRadius: BorderRadius.circular(12),
+                  color: palette.brandSoft,
+                  borderRadius: SeyirTokens.radiusMdAll,
                 ),
                 child: Row(
                   children: [
@@ -119,9 +116,9 @@ class FriendshipCategoryDialog extends StatelessWidget {
                     Expanded(
                       child: Text(
                         'Kategori seçin',
-                        style: AppTheme.bodySmall.copyWith(
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w500,
+                        style: palette.body(
+                          color: palette.textSecondary,
+                          weight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -131,7 +128,7 @@ class FriendshipCategoryDialog extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              _buildModernCategoryGrid(),
+              _buildModernCategoryGrid(context),
 
               const SizedBox(height: 16),
 
@@ -140,16 +137,18 @@ class FriendshipCategoryDialog extends StatelessWidget {
                 width: double.infinity,
                 child: TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  style: AppTheme.textButtonStyle.copyWith(
-                    padding: MaterialStateProperty.all(
-                      const EdgeInsets.symmetric(vertical: 12),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(
+                      double.infinity,
+                      SeyirTokens.tapTarget,
                     ),
+                    foregroundColor: palette.textSecondary,
                   ),
                   child: Text(
                     'İptal',
-                    style: AppTheme.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textSecondary,
+                    style: palette.title(
+                      weight: FontWeight.w600,
+                      color: palette.textSecondary,
                     ),
                   ),
                 ),
@@ -162,7 +161,8 @@ class FriendshipCategoryDialog extends StatelessWidget {
   }
 
   // Modern kategori grid widget'ı
-  Widget _buildModernCategoryGrid() {
+  Widget _buildModernCategoryGrid(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     final categories = <Map<String, dynamic>>[
       {
         'title': 'Grup-19',
@@ -235,7 +235,7 @@ class FriendshipCategoryDialog extends StatelessWidget {
                     end: Alignment.bottomRight,
                   )
                 : null,
-              color: canSelect ? null : AppTheme.dividerColor,
+              color: canSelect ? null : palette.surfaceMuted,
               borderRadius: BorderRadius.circular(16),
               border: isCurrentCategory
                   ? Border.all(color: Colors.white, width: 2)
@@ -299,7 +299,7 @@ class FriendshipCategoryDialog extends StatelessWidget {
                                limitText,
                                style: const TextStyle(
                                  color: Colors.white,
-                                 fontSize: 10,
+                                 fontSize: SeyirTokens.typeCaption,
                                  fontWeight: FontWeight.bold,
                                ),
                              ),
@@ -314,7 +314,7 @@ class FriendshipCategoryDialog extends StatelessWidget {
                          category['title'] as String,
                          style: const TextStyle(
                            color: Colors.white,
-                           fontSize: 14,
+                           fontSize: SeyirTokens.typeBody,
                            fontWeight: FontWeight.bold,
                          ),
                        ),
@@ -326,7 +326,7 @@ class FriendshipCategoryDialog extends StatelessWidget {
                          category['description'] as String,
                          style: TextStyle(
                            color: Colors.white.withOpacity(0.8),
-                           fontSize: 10,
+                           fontSize: SeyirTokens.typeCaption,
                          ),
                          maxLines: 1,
                          overflow: TextOverflow.ellipsis,

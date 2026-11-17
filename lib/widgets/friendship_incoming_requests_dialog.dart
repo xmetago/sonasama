@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+
 /// Gelen arkadaşlık isteklerinin listesi. Satırlar [itemBuilder] ile kurulur.
 class FriendshipIncomingRequestsDialog extends StatelessWidget {
   const FriendshipIncomingRequestsDialog({
@@ -13,16 +15,15 @@ class FriendshipIncomingRequestsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return AlertDialog(
+      backgroundColor: palette.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
       ),
-      title: const Text(
+      title: Text(
         'Gelen Arkadaşlık İstekleri',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 18,
-        ),
+        style: palette.headline(),
       ),
       content: SizedBox(
         width: double.maxFinite,
@@ -35,9 +36,13 @@ class FriendshipIncomingRequestsDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text(
+          style: TextButton.styleFrom(
+            minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            foregroundColor: palette.textPrimary,
+          ),
+          child: Text(
             'Kapat',
-            style: TextStyle(fontSize: 16),
+            style: palette.title(weight: FontWeight.w600),
           ),
         ),
       ],

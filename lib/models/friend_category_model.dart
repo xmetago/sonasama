@@ -39,8 +39,11 @@ class FriendCategoryModel extends HiveObject {
 
 /// Manuel TypeAdapter (build_runner kullanılmadan)
 class FriendCategoryModelAdapter extends TypeAdapter<FriendCategoryModel> {
+  /// Albüm modeli 21'i kullandığı için arkadaş kategorisi ayrı bir kimlik taşır.
+  static const int hiveTypeId = 23;
+
   @override
-  final int typeId = 21; // Benzersiz typeId
+  final int typeId = hiveTypeId;
 
   @override
   FriendCategoryModel read(BinaryReader reader) {

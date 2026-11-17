@@ -11,7 +11,7 @@ class FriendCategoryService {
 
   /// Başlatma: adapter kaydı ve box açma
   static Future<void> initialize() async {
-    if (!Hive.isAdapterRegistered(21)) {
+    if (!Hive.isAdapterRegistered(FriendCategoryModelAdapter.hiveTypeId)) {
       Hive.registerAdapter(FriendCategoryModelAdapter());
     }
     _box ??= await Hive.openBox<FriendCategoryModel>(_boxName);
