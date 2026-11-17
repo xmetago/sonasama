@@ -1,25 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:country_picker/country_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import 'dart:convert';
+import '../providers/auth_provider.dart';
 import '../services/hive_database_service.dart';
 import '../models/settings_model.dart';
+import '../theme/app_theme.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/country_display_utils.dart';
 import '../utils/country_picker_extension.dart';
+import '../widgets/delil_surface.dart';
 
 void main() {
-  runApp(const MaterialApp(
+  runApp(MaterialApp(
     debugShowCheckedModeBanner: false,
-    home: HesapGizlilikAyarlariPage(),
+    theme: WhoBoomTheme.light,
+    darkTheme: WhoBoomTheme.dark,
+    home: const HesapGizlilikAyarlariPage(),
   ));
 }
 
 class HesapGizlilikAyarlariPage extends StatefulWidget {
   final String? userEmail;
-  
-  const HesapGizlilikAyarlariPage({super.key, this.userEmail});
-  
+  final Future<SettingsModel> Function(String email)? settingsLoader;
+
+  const HesapGizlilikAyarlariPage({
+    super.key,
+    this.userEmail,
+    this.settingsLoader,
+  });
+
   @override
   State<HesapGizlilikAyarlariPage> createState() => _HesapGizlilikAyarlariPageState();
 }
@@ -27,15 +38,25 @@ class HesapGizlilikAyarlariPage extends StatefulWidget {
 class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
   SettingsModel? _settings;
   bool _isLoading = true;
+  bool _loadFailed = false;
+  bool _needsLogin = false;
   final ImagePicker _imagePicker = ImagePicker();
-  File? _selectedImageFile; // Seçilen yerel resim dosyası
-  
-  // Text controllers
+  File? _selectedImageFile;
+
   final TextEditingController _profileImageController = TextEditingController();
   final TextEditingController _philosophyController = TextEditingController();
   final TextEditingController _postrestantController = TextEditingController();
   final TextEditingController _countryController = TextEditingController();
   final TextEditingController _languageController = TextEditingController();
+  final TextEditingController _currentPasswordController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+
+  String? _passwordFeedback;
+  bool _passwordOk = false;
+  bool _passwordBusy = false;
+
+  static const List<String> _languages = ['Türkçe', 'English'];
 
   @override
   void initState() {
@@ -50,33 +71,66 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
     _postrestantController.dispose();
     _countryController.dispose();
     _languageController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _loadSettings() async {
-    if (widget.userEmail != null) {
-      try {
-        final settings = await HiveDatabaseService.getOrCreateSettings(widget.userEmail!);
-        setState(() {
-          _settings = settings;
-          _profileImageController.text = settings.profileImageUrl ?? '';
-          _philosophyController.text = settings.philosophy ?? '';
-          _postrestantController.text = settings.postrestantAddress ?? '';
-          _countryController.text = settings.country ?? '';
-          _languageController.text = settings.language ?? '';
-          _isLoading = false;
-        });
-      } catch (e) {
-        // Ayarlar yüklenirken hata oluştu
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } else {
+    final email = widget.userEmail?.trim();
+    if (email == null || email.isEmpty) {
+      if (!mounted) return;
       setState(() {
+        _settings = null;
         _isLoading = false;
+        _loadFailed = false;
+        _needsLogin = true;
+      });
+      return;
+    }
+
+    try {
+      final settings = widget.settingsLoader != null
+          ? await widget.settingsLoader!(email)
+          : await HiveDatabaseService.getOrCreateSettings(email);
+      if (!mounted) return;
+      setState(() {
+        _settings = settings;
+        _profileImageController.text = settings.profileImageUrl ?? '';
+        _philosophyController.text = settings.philosophy ?? '';
+        _postrestantController.text = settings.postrestantAddress ?? '';
+        _countryController.text = settings.country ?? '';
+        _languageController.text = _canonicalLanguage(settings.language);
+        _isLoading = false;
+        _loadFailed = false;
+        _needsLogin = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _settings = null;
+        _isLoading = false;
+        _loadFailed = true;
+        _needsLogin = false;
       });
     }
+  }
+
+  String _canonicalLanguage(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) return '';
+    final lower = value.toLowerCase();
+    if (lower == 'tr' ||
+        lower == 'türkçe' ||
+        lower == 'turkce' ||
+        lower == 'turkish') {
+      return 'Türkçe';
+    }
+    if (lower == 'en' || lower == 'english' || lower == 'ingilizce') {
+      return 'English';
+    }
+    return value;
   }
 
   Future<void> _updatePrivacySetting(String key, bool value) async {
@@ -87,7 +141,7 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
           _settings!.updatePrivacySetting(key, value);
         });
       } catch (e) {
-        // Ayar güncellenirken hata oluştu
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ayar güncellenirken hata oluştu')),
         );
@@ -98,19 +152,18 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
   Future<void> _saveProfileInfo() async {
     if (widget.userEmail != null) {
       try {
-        // Yerel dosya seçildiyse base64'e çevir
         String? profileImageUrl;
         if (_selectedImageFile != null) {
           try {
             final bytes = await _selectedImageFile!.readAsBytes();
             final base64String = base64Encode(bytes);
-            // Base64 string'i data URI formatına çevir
             profileImageUrl = 'data:image/jpeg;base64,$base64String';
           } catch (e) {
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('❌ Resim yüklenirken hata: $e'),
-                backgroundColor: Colors.red,
+              const SnackBar(
+                content: Text('Resim yüklenirken hata oluştu'),
+                backgroundColor: SeyirTokens.reject,
               ),
             );
             return;
@@ -118,7 +171,7 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
         } else if (_profileImageController.text.isNotEmpty) {
           profileImageUrl = _profileImageController.text;
         }
-        
+
         await HiveDatabaseService.updateProfileInfo(
           widget.userEmail!,
           profileImageUrl: profileImageUrl,
@@ -127,15 +180,16 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
           country: _countryController.text.isNotEmpty ? _countryController.text : null,
           language: _languageController.text.isNotEmpty ? _languageController.text : null,
         );
-        
-        // Ayarları yeniden yükle
+
+        _selectedImageFile = null;
         await _loadSettings();
-        
+
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profil bilgileri kaydedildi')),
         );
       } catch (e) {
-        // Profil bilgileri kaydedilirken hata oluştu
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profil bilgileri kaydedilirken hata oluştu')),
         );
@@ -143,16 +197,51 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
     }
   }
 
+  Future<void> _confirmReset() async {
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Varsayılanlara sıfırla'),
+          content: const Text(
+            'Tüm ayarlar varsayılan değerlere sıfırlanacak. Emin misiniz?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+              ),
+              child: const Text('Vazgeç'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+              ),
+              child: const Text('Sıfırla'),
+            ),
+          ],
+        );
+      },
+    );
+    if (approved == true && mounted) {
+      await _resetToDefaults();
+    }
+  }
+
   Future<void> _resetToDefaults() async {
     if (widget.userEmail != null) {
       try {
         await HiveDatabaseService.resetSettingsToDefaults(widget.userEmail!);
+        _selectedImageFile = null;
         await _loadSettings();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ayarlar varsayılan değerlere sıfırlandı')),
         );
       } catch (e) {
-        // Ayarlar sıfırlanırken hata oluştu
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ayarlar sıfırlanırken hata oluştu')),
         );
@@ -160,87 +249,154 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
     }
   }
 
+  Future<void> _changePassword() async {
+    final auth = _maybeAuth();
+    final email = widget.userEmail?.trim().toLowerCase();
+    final signedIn = auth?.userEmail?.trim().toLowerCase();
+    if (auth == null || signedIn == null || signedIn.isEmpty || signedIn != email) {
+      setState(() {
+        _passwordOk = false;
+        _passwordFeedback = 'Giriş gerekli.';
+      });
+      return;
+    }
+
+    setState(() {
+      _passwordBusy = true;
+      _passwordFeedback = null;
+    });
+    final error = await auth.reauthenticateAndUpdatePassword(
+      currentPassword: _currentPasswordController.text,
+      newPassword: _newPasswordController.text,
+      confirmPassword: _confirmPasswordController.text,
+    );
+    if (!mounted) return;
+    setState(() {
+      _passwordBusy = false;
+      _passwordOk = error == null;
+      _passwordFeedback = error ?? 'Şifre başarıyla değiştirildi.';
+      if (error == null) {
+        _currentPasswordController.clear();
+        _newPasswordController.clear();
+        _confirmPasswordController.clear();
+      }
+    });
+  }
+
+  AuthProvider? _maybeAuth() {
+    try {
+      return Provider.of<AuthProvider>(context, listen: false);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Hesap ve Gizlilik Ayarları")),
+        appBar: AppBar(title: const Text('Hesap ve Gizlilik Ayarları')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_settings == null) {
+    if (_needsLogin) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Hesap ve Gizlilik Ayarları")),
-        body: const Center(child: Text("Ayarlar yüklenemedi")),
+        appBar: AppBar(title: const Text('Hesap ve Gizlilik Ayarları')),
+        body: const Padding(
+          padding: EdgeInsets.all(SeyirTokens.space4),
+          child: DelilSoftEmpty(
+            title: 'Giriş gerekli',
+            message: 'Ayarları görmek için giriş yapın.',
+            icon: Icons.lock_outline,
+          ),
+        ),
+      );
+    }
+
+    if (_loadFailed || _settings == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Hesap ve Gizlilik Ayarları')),
+        body: Padding(
+          padding: const EdgeInsets.all(SeyirTokens.space4),
+          child: DelilLoadError(
+            message: 'Ayarlar yüklenemedi',
+            onRetry: _loadSettings,
+          ),
+        ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Hesap ve Gizlilik Ayarları"),
+        title: const Text('Hesap ve Gizlilik Ayarları'),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: _saveProfileInfo,
-            tooltip: "Kaydet",
+            tooltip: 'Kaydet',
+            style: _iconStyle(palette),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _resetToDefaults,
-            tooltip: "Varsayılanlara Sıfırla",
+            onPressed: _confirmReset,
+            tooltip: 'Varsayılanlara Sıfırla',
+            style: _iconStyle(palette),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(SeyirTokens.space3),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ayarBolumu("SEYİR DEFTERİMİ GÖRSÜN", [
-              ayarSatiri("Arkadaşlar", "seyir_arkadaslar"),
-              ayarSatiri("Takipçiler", "seyir_takipciler"),
-              ayarSatiri("Davalılarım", "seyir_davalllarim"),
-              ayarSatiri("Herkes", "seyir_herkes"),
+            ayarBolumu('SEYİR DEFTERİMİ GÖRSÜN', [
+              ayarSatiri('Arkadaşlar', 'seyir_arkadaslar'),
+              ayarSatiri('Takipçiler', 'seyir_takipciler'),
+              ayarSatiri('Davalılarım', 'seyir_davalllarim'),
+              ayarSatiri('Herkes', 'seyir_herkes'),
             ]),
-            ayarBolumu("ONLINE GÖRÜNME", [
-              ayarSatiri("Arkadaşlar", "online_arkadaslar"),
-              ayarSatiri("Takipçiler", "online_takipciler"),
-              ayarSatiri("Davalllarım", "online_davalllarim"),
-              ayarSatiri("Herkes", "online_herkes"),
+            ayarBolumu('ONLINE GÖRÜNME', [
+              ayarSatiri('Arkadaşlar', 'online_arkadaslar'),
+              ayarSatiri('Takipçiler', 'online_takipciler'),
+              ayarSatiri('Davalarım', 'online_davalllarim'),
+              ayarSatiri('Herkes', 'online_herkes'),
             ]),
-            ayarBolumu("MESAJ KİMLER ATABİLSİN", [
-              ayarSatiri("Arkadaşlar", "mesaj_arkadaslar"),
-              ayarSatiri("Takipçiler", "mesaj_takipciler"),
-              ayarSatiri("Davalllarım", "mesaj_davalllarim"),
-              ayarSatiri("Herkes", "mesaj_herkes"),
+            ayarBolumu('MESAJ KİMLER ATABİLSİN', [
+              ayarSatiri('Arkadaşlar', 'mesaj_arkadaslar'),
+              ayarSatiri('Takipçiler', 'mesaj_takipciler'),
+              ayarSatiri('Davalarım', 'mesaj_davalllarim'),
+              ayarSatiri('Herkes', 'mesaj_herkes'),
             ]),
-            const SizedBox(height: 20),
-            const Text("PROFİL RESMİNİZ", style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
+            const SizedBox(height: SeyirTokens.space4),
+            Text('PROFİL RESMİNİZ', style: palette.title()),
+            const SizedBox(height: SeyirTokens.space2),
             Row(
               children: [
-                // Profil resmi CircleAvatar (common_header_widgets.dart'daki gibi)
                 GestureDetector(
-                  onTap: () => _showImageSourceDialog(),
+                  onTap: _showImageSourceDialog,
                   child: CircleAvatar(
                     radius: 30,
-                    backgroundColor: Colors.grey[200],
-                    backgroundImage: _getProfileImage(),
-                    child: _getProfileImage() == null
-                        ? const Icon(Icons.account_circle, size: 40, color: Colors.grey)
+                    backgroundColor: palette.surfaceMuted,
+                    backgroundImage: _profileImage(),
+                    child: _profileImage() == null
+                        ? Icon(Icons.account_circle, size: 40, color: palette.textMuted)
                         : null,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: SeyirTokens.space3),
                 Expanded(
                   child: TextField(
                     controller: _profileImageController,
-                    decoration: InputDecoration(
-                      border: const OutlineInputBorder(), 
-                      hintText: "Profil Resmi Linki",
-                      suffixIcon: IconButton(
+                    style: _inputStyle(palette),
+                    decoration: _fieldDecoration(
+                      palette,
+                      hint: 'Profil Resmi Linki',
+                      suffix: IconButton(
                         icon: const Icon(Icons.clear),
+                        tooltip: 'Temizle',
+                        style: _iconStyle(palette),
                         onPressed: () {
                           setState(() {
                             _profileImageController.clear();
@@ -250,90 +406,96 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
                       ),
                     ),
                     onChanged: (value) {
-                      setState(() {
-                        // URL değiştiğinde state'i güncelle
-                      });
+                      setState(() {});
                     },
                   ),
                 ),
-                const SizedBox(width: 8),
-                // Önizleme butonu
+                const SizedBox(width: SeyirTokens.space2),
                 IconButton(
                   onPressed: _profileImageController.text.isNotEmpty || _selectedImageFile != null
-                      ? () => _showImagePreview()
+                      ? _showImagePreview
                       : null,
                   icon: const Icon(Icons.remove_red_eye),
-                  tooltip: "Önizle",
+                  tooltip: 'Önizle',
+                  style: _iconStyle(palette),
                 ),
-                // Resim ekleme butonu
                 IconButton(
-                  onPressed: () => _showImageSourceDialog(),
-                  icon: const Icon(Icons.add_circle, color: Colors.green),
-                  tooltip: "Resim Ekle",
+                  onPressed: _showImageSourceDialog,
+                  icon: const Icon(Icons.add_circle, color: SeyirTokens.accept),
+                  tooltip: 'Resim Ekle',
+                  style: _iconStyle(palette, foreground: SeyirTokens.accept),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            ayarBolumu("GENEL", [
-              ayarSatiri("+18 Dava, Reklam", "genel_18"),
-              ayarSatiri("Bana Dava Açılsın", "genel_davaacilsin"),
-              ayarSatiri("Postrestant adresim", "genel_postrestant"),
-              ayarSatiri("Tanınmak", "genel_tanimak"),
+            const SizedBox(height: SeyirTokens.space4),
+            ayarBolumu('GENEL', [
+              ayarSatiri('+18 Dava, Reklam', 'genel_18'),
+              ayarSatiri('Bana Dava Açılsın', 'genel_davaacilsin'),
+              ayarSatiri('Postrestant adresim', 'genel_postrestant'),
+              ayarSatiri('Tanınmak', 'genel_tanimak'),
             ]),
-            ayarBolumu("DAVETLER", [
-              ayarSatiri("Eylem Davetleri", "davet_eylem"),
-              ayarSatiri("Dava Davetleri", "davet_dava"),
-              ayarSatiri("Arkadaşlık Davetleri", "davet_arkadaslik"),
-              ayarSatiri("7-Yargıç", "davet_7yargic"),
+            ayarBolumu('DAVETLER', [
+              ayarSatiri('Eylem Davetleri', 'davet_eylem'),
+              ayarSatiri('Dava Davetleri', 'davet_dava'),
+              ayarSatiri('Arkadaşlık Davetleri', 'davet_arkadaslik'),
+              ayarSatiri('7-Yargıç', 'davet_7yargic'),
             ]),
-            // ŞU ADLA GÖRÜN - Radio Button Mantığı
             Container(
-              margin: const EdgeInsets.symmetric(vertical: 10),
-              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.symmetric(vertical: SeyirTokens.space3),
+              padding: const EdgeInsets.all(SeyirTokens.space4),
               decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
+                color: palette.surfaceMuted,
+                borderRadius: SeyirTokens.radiusSmAll,
+                border: Border.all(color: _crispBorder(palette)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "ŞU ADLA GÖRÜN",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[700],
+                    'ŞU ADLA GÖRÜN',
+                    style: palette.title(color: palette.textSecondary),
+                  ),
+                  const SizedBox(height: SeyirTokens.space3),
+                  RadioGroup<String>(
+                    groupValue: _settings?.stringSettings['display_name_type'] ?? 'yargic_adim',
+                    onChanged: (value) {
+                      if (value != null) {
+                        _updateDisplayNameType(value);
+                      }
+                    },
+                    child: Column(
+                      children: [
+                        _buildRadioOption('Gizli Yargıç Adı', 'gizli_yargic'),
+                        _buildRadioOption('Yargıç Adım', 'yargic_adim'),
+                        _buildRadioOption('E-posta', 'eposta'),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildRadioOption("Gizli Yargıç Adı", "gizli_yargic", "adim_soyadim"),
-                  _buildRadioOption("Yargıç Adım", "yargic_adim", "yargic_adim"),
-                  _buildRadioOption("E-posta", "eposta", "eposta"),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            const Text("Felsefem"),
+            const SizedBox(height: SeyirTokens.space4),
+            Text('Felsefem', style: palette.body()),
             TextField(
               controller: _philosophyController,
               maxLines: 2,
-              decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "Felsefenizi yazın..."),
+              style: _inputStyle(palette),
+              decoration: _fieldDecoration(palette, hint: 'Felsefenizi yazın...'),
             ),
-            const SizedBox(height: 10),
-            const Text("Postrestant Adress:"),
+            const SizedBox(height: SeyirTokens.space3),
+            Text('Postrestant Adres', style: palette.body()),
             TextField(
               controller: _postrestantController,
               maxLines: 2,
-              decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "Postane adresinizi yazın..."),
+              style: _inputStyle(palette),
+              decoration: _fieldDecoration(palette, hint: 'Postane adresinizi yazın...'),
             ),
-            const SizedBox(height: 10),
-            // Ülke Seçimi (country_picker ile)
+            const SizedBox(height: SeyirTokens.space3),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Ülke", style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
+                Text('Ülke', style: palette.title()),
+                const SizedBox(height: SeyirTokens.space2),
                 GestureDetector(
                   onTap: () {
                     showCountryPickerWithKurdistan(
@@ -348,31 +510,49 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
                   },
                   child: Container(
                     width: double.infinity,
-                    constraints: const BoxConstraints(minHeight: 48),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SeyirTokens.space4,
+                      vertical: SeyirTokens.space3,
+                    ),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                      color: Colors.white,
+                      border: Border.all(color: _crispBorder(palette)),
+                      borderRadius: SeyirTokens.radiusSmAll,
+                      color: palette.card,
                     ),
                     alignment: Alignment.centerLeft,
                     child: Text(
                       _countryController.text.isNotEmpty
-                        ? CountryDisplayUtils.getDisplayName(_countryController.text)
-                        : 'Ülke seçiniz',
-                      style: const TextStyle(fontSize: 16, color: Colors.black87),
+                          ? CountryDisplayUtils.getDisplayName(_countryController.text)
+                          : 'Ülke seçiniz',
+                      style: palette.body(
+                        weight: FontWeight.w400,
+                        color: _countryController.text.isNotEmpty
+                            ? palette.textPrimary
+                            : palette.textMuted,
+                      ).copyWith(fontSize: SeyirTokens.typeTitle),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: SeyirTokens.space4),
+            Text('Dil', style: palette.title()),
+            const SizedBox(height: SeyirTokens.space2),
+            _languageField(palette),
+            const SizedBox(height: SeyirTokens.space4),
+            _passwordSection(palette),
+            const SizedBox(height: SeyirTokens.space4),
             ElevatedButton(
               onPressed: _saveProfileInfo,
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 15),
+                minimumSize: const Size(double.infinity, SeyirTokens.tapTarget),
+                padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space3),
               ),
-              child: const Text("Tüm Değişiklikleri Kaydet"),
+              child: const Text(
+                'Tüm Değişiklikleri Kaydet',
+                style: TextStyle(fontSize: SeyirTokens.typeTitle),
+              ),
             ),
           ],
         ),
@@ -380,17 +560,182 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
     );
   }
 
-  Widget ayarBolumu(String baslik, List<Widget> cocuklar) {
+  Widget _languageField(SeyirPalette palette) {
+    final selected = _canonicalLanguage(_languageController.text);
+    final choices = <String>[
+      ..._languages,
+      if (selected.isNotEmpty && !_languages.contains(selected)) selected,
+    ];
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(8),
+      key: const Key('settings-language'),
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+      padding: const EdgeInsets.symmetric(horizontal: SeyirTokens.space4),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.teal, width: 1),
+        border: Border.all(color: _crispBorder(palette)),
+        borderRadius: SeyirTokens.radiusSmAll,
+        color: palette.card,
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: selected.isEmpty ? null : selected,
+          hint: Text(
+            'Dil seçiniz',
+            style: palette.body(weight: FontWeight.w400, color: palette.textMuted),
+          ),
+          dropdownColor: palette.card,
+          iconEnabledColor: palette.textSecondary,
+          style: _inputStyle(palette),
+          items: [
+            for (final language in choices)
+              DropdownMenuItem<String>(
+                value: language,
+                child: Text(language, style: _inputStyle(palette)),
+              ),
+          ],
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() {
+              _languageController.text = value;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _passwordSection(SeyirPalette palette) {
+    final feedbackColor = _passwordOk
+        ? (palette.isDark ? const Color(0xFF6EE7B7) : SeyirTokens.accept)
+        : (palette.isDark ? const Color(0xFFFCA5A5) : SeyirTokens.reject);
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
+      padding: const EdgeInsets.all(SeyirTokens.space2),
+      decoration: BoxDecoration(
+        border: Border.all(color: _tealBorder(palette)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('ŞİFRE DEĞİŞTİR', style: palette.title()),
+          const SizedBox(height: SeyirTokens.space2),
+          Text('Mevcut şifre', style: palette.body()),
+          TextField(
+            key: const Key('password-current'),
+            controller: _currentPasswordController,
+            obscureText: true,
+            style: _inputStyle(palette),
+            decoration: _fieldDecoration(palette, hint: 'Mevcut şifreniz'),
+          ),
+          const SizedBox(height: SeyirTokens.space2),
+          Text('Yeni şifre', style: palette.body()),
+          TextField(
+            key: const Key('password-new'),
+            controller: _newPasswordController,
+            obscureText: true,
+            style: _inputStyle(palette),
+            decoration: _fieldDecoration(palette, hint: 'Yeni şifreniz'),
+          ),
+          const SizedBox(height: SeyirTokens.space2),
+          Text('Yeni şifre tekrar', style: palette.body()),
+          TextField(
+            key: const Key('password-confirm'),
+            controller: _confirmPasswordController,
+            obscureText: true,
+            style: _inputStyle(palette),
+            decoration: _fieldDecoration(palette, hint: 'Yeni şifrenizi tekrar yazın'),
+          ),
+          const SizedBox(height: SeyirTokens.space3),
+          ElevatedButton(
+            key: const Key('password-submit'),
+            onPressed: _passwordBusy ? null : _changePassword,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, SeyirTokens.tapTarget),
+              padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space3),
+            ),
+            child: _passwordBusy
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text(
+                    'Şifreyi güncelle',
+                    style: TextStyle(fontSize: SeyirTokens.typeTitle),
+                  ),
+          ),
+          if (_passwordFeedback != null) ...[
+            const SizedBox(height: SeyirTokens.space2),
+            Text(
+              _passwordFeedback!,
+              key: const Key('password-feedback'),
+              textAlign: TextAlign.center,
+              style: palette.body(weight: FontWeight.w400, color: feedbackColor),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Color _crispBorder(SeyirPalette palette) {
+    return palette.isDark ? SeyirTokens.neutral400 : palette.border;
+  }
+
+  Color _tealBorder(SeyirPalette palette) {
+    return palette.isDark ? const Color(0xFF5EEAD4) : const Color(0xFF0F766E);
+  }
+
+  TextStyle _inputStyle(SeyirPalette palette) {
+    return palette.body(weight: FontWeight.w400).copyWith(
+      fontSize: SeyirTokens.typeTitle,
+    );
+  }
+
+  ButtonStyle _iconStyle(SeyirPalette palette, {Color? foreground}) {
+    return IconButton.styleFrom(
+      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+      tapTargetSize: MaterialTapTargetSize.padded,
+      foregroundColor: foreground ?? palette.textPrimary,
+    );
+  }
+
+  InputDecoration _fieldDecoration(
+    SeyirPalette palette, {
+    String? hint,
+    Widget? suffix,
+  }) {
+    final side = BorderSide(color: _crispBorder(palette));
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: palette.body(weight: FontWeight.w400, color: palette.textMuted),
+      suffixIcon: suffix,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space4,
+        vertical: SeyirTokens.space3,
+      ),
+      border: OutlineInputBorder(borderRadius: SeyirTokens.radiusSmAll, borderSide: side),
+      enabledBorder: OutlineInputBorder(borderRadius: SeyirTokens.radiusSmAll, borderSide: side),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: SeyirTokens.radiusSmAll,
+        borderSide: BorderSide(color: _tealBorder(palette), width: 2),
+      ),
+    );
+  }
+
+  Widget ayarBolumu(String baslik, List<Widget> cocuklar) {
+    final palette = SeyirPalette.of(context);
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
+      padding: const EdgeInsets.all(SeyirTokens.space2),
+      decoration: BoxDecoration(
+        border: Border.all(color: _tealBorder(palette)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(baslik, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(baslik, style: palette.title()),
           ...cocuklar,
         ],
       ),
@@ -398,88 +743,74 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
   }
 
   Widget ayarSatiri(String etiket, String key) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(etiket),
-        Row(
-          children: [
-            Switch(
-              value: _settings?.privacySettings[key] ?? true, // Varsayılan olarak true (açık)
-              onChanged: (val) {
-                _updatePrivacySetting(key, val);
-              },
-            ),
-            const Text("OK"),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // Radio button seçeneği oluştur
-  Widget _buildRadioOption(String label, String value, String settingKey) {
-    final currentValue = _settings?.stringSettings['display_name_type'] ?? 'yargic_adim';
-    
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
+    final palette = SeyirPalette.of(context);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
       child: Row(
         children: [
-          Radio<String>(
-            value: value,
-            groupValue: currentValue,
-            onChanged: (newValue) {
-              if (newValue != null) {
-                _updateDisplayNameType(newValue);
-              }
-            },
-            activeColor: Colors.green,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 14),
-            ),
+          Expanded(child: Text(etiket, style: palette.body())),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Switch(
+                value: _settings?.privacySettings[key] ?? true,
+                materialTapTargetSize: MaterialTapTargetSize.padded,
+                activeThumbColor: SeyirTokens.accept,
+                activeTrackColor: SeyirTokens.accept.withValues(alpha: 0.45),
+                onChanged: (val) {
+                  _updatePrivacySetting(key, val);
+                },
+              ),
+              Text('OK', style: palette.body(color: palette.textSecondary)),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // Görünüm adı tipini güncelle
-  void _updateDisplayNameType(String newType) async {
+  Widget _buildRadioOption(String label, String value) {
+    final palette = SeyirPalette.of(context);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: SeyirTokens.space1),
+      constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+      child: Row(
+        children: [
+          Radio<String>(
+            value: value,
+            materialTapTargetSize: MaterialTapTargetSize.padded,
+            activeColor: SeyirTokens.accept,
+          ),
+          const SizedBox(width: SeyirTokens.space2),
+          Expanded(
+            child: Text(label, style: palette.body()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateDisplayNameType(String newType) async {
+    final email = widget.userEmail;
+    if (email == null) return;
     try {
-      final settings = await HiveDatabaseService.getOrCreateSettings(widget.userEmail!);
+      final settings = await HiveDatabaseService.getOrCreateSettings(email);
       settings.stringSettings['display_name_type'] = newType;
       await HiveDatabaseService.saveSettings(settings);
-      
-      // Ayarları yeniden yükle
       await _loadSettings();
-      
-      setState(() {
-        // State'i güncelle
-      });
     } catch (e) {
       // Hata durumunda işlem yapma
     }
   }
 
-  // Profil resmi görselini döndür
-  ImageProvider? _getProfileImage() {
+  ImageProvider<Object>? _profileImage() {
     if (_selectedImageFile != null) {
       return FileImage(_selectedImageFile!);
-    } else if (_profileImageController.text.isNotEmpty) {
-      try {
-        return NetworkImage(_profileImageController.text);
-      } catch (e) {
-        return null;
-      }
     }
-    return null;
+    return profileImageFromStored(_profileImageController.text);
   }
 
-  // Resim kaynağı seçim dialog'u
   void _showImageSourceDialog() {
     showDialog(
       context: context,
@@ -490,7 +821,7 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.photo_library, color: Colors.blue),
+                leading: const Icon(Icons.photo_library, color: Color(0xFF2563EB)),
                 title: const Text('Galeriden Seç'),
                 onTap: () {
                   Navigator.pop(context);
@@ -498,7 +829,7 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.camera_alt, color: Colors.green),
+                leading: const Icon(Icons.camera_alt, color: SeyirTokens.accept),
                 title: const Text('Kameradan Çek'),
                 onTap: () {
                   Navigator.pop(context);
@@ -512,7 +843,6 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
     );
   }
 
-  // Resim seçme fonksiyonu
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? image = await _imagePicker.pickImage(
@@ -525,75 +855,67 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
       if (image != null) {
         setState(() {
           _selectedImageFile = File(image.path);
-          // Yerel dosya seçildiğinde URL'i temizle
-          // Not: Yerel dosyaları veritabanına kaydetmek için base64 veya dosya yükleme servisi gerekebilir
-          // Şimdilik sadece görsel olarak gösteriyoruz
         });
-        
+
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Resim seçildi. Kaydetmek için "Tüm Değişiklikleri Kaydet" butonuna basın.'),
+            content: Text('Resim seçildi. Kaydetmek için "Tüm Değişiklikleri Kaydet" butonuna basın.'),
             duration: Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Resim seçilemedi: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 2),
+        const SnackBar(
+          content: Text('Resim seçilemedi.'),
+          backgroundColor: SeyirTokens.reject,
+          duration: Duration(seconds: 2),
         ),
       );
     }
   }
 
-  // Resim önizleme dialog'u
   void _showImagePreview() {
+    final provider = _profileImage();
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final palette = SeyirPalette.of(context);
         return Dialog(
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(SeyirTokens.space4),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Profil Resmi Önizleme',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
+                Text('Profil Resmi Önizleme', style: palette.headline()),
+                const SizedBox(height: SeyirTokens.space4),
                 ClipOval(
                   child: Container(
                     width: 200,
                     height: 200,
                     decoration: BoxDecoration(
-                      color: Colors.grey[200],
+                      color: palette.surfaceMuted,
                       shape: BoxShape.circle,
                     ),
-                    child: _selectedImageFile != null
-                        ? Image.file(
-                            _selectedImageFile!,
+                    child: provider == null
+                        ? Icon(Icons.account_circle, size: 100, color: palette.textMuted)
+                        : Image(
+                            image: provider,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
-                              return const Icon(Icons.error, size: 50);
+                              return Icon(Icons.error, size: 50, color: palette.textMuted);
                             },
-                          )
-                        : _profileImageController.text.isNotEmpty
-                            ? Image.network(
-                                _profileImageController.text,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(Icons.error, size: 50);
-                                },
-                              )
-                            : const Icon(Icons.account_circle, size: 100),
+                          ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: SeyirTokens.space4),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                  ),
                   child: const Text('Kapat'),
                 ),
               ],
@@ -603,4 +925,24 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
       },
     );
   }
+}
+
+/// Kayıtlı profil resmini çözer. Base64 veri adresi bellekten, http adresi ağdan okunur.
+ImageProvider<Object>? profileImageFromStored(String? raw) {
+  if (raw == null || raw.isEmpty) return null;
+  if (raw.startsWith('data:image')) {
+    try {
+      final parts = raw.split(',');
+      if (parts.length < 2) return null;
+      final bytes = base64Decode(parts[1]);
+      if (bytes.isEmpty) return null;
+      return MemoryImage(bytes);
+    } catch (_) {
+      return null;
+    }
+  }
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    return NetworkImage(raw);
+  }
+  return null;
 }

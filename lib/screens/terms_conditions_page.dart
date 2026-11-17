@@ -1,22 +1,28 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+
 /// Koşullarınız sayfası. Metin parametre ile alınabilir.
 class TermsConditionsPage extends StatelessWidget {
   const TermsConditionsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Koşullar'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(SeyirTokens.space4),
         child: SingleChildScrollView(
           child: RichText(
-            text: const TextSpan(
-              style: TextStyle(fontSize: 15, color: Colors.black),
-              children: [
+            text: TextSpan(
+              style: palette.body(weight: FontWeight.w400).copyWith(
+                fontSize: SeyirTokens.typeTitle,
+                color: palette.textPrimary,
+              ),
+              children: const [
                 TextSpan(
                   text: 'WhoBoom Kullanım Koşulları\n',
                   style: TextStyle(

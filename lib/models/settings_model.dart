@@ -107,6 +107,7 @@ class SettingsModel extends HiveObject {
   SettingsModel copyWith({
     String? userEmail,
     Map<String, bool>? privacySettings,
+    Map<String, String>? stringSettings,
     String? profileImageUrl,
     String? philosophy,
     String? postrestantAddress,
@@ -116,7 +117,8 @@ class SettingsModel extends HiveObject {
   }) {
     return SettingsModel(
       userEmail: userEmail ?? this.userEmail,
-      privacySettings: privacySettings ?? Map.from(this.privacySettings),
+      privacySettings: privacySettings ?? Map<String, bool>.from(this.privacySettings),
+      stringSettings: stringSettings ?? Map<String, String>.from(this.stringSettings),
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       philosophy: philosophy ?? this.philosophy,
       postrestantAddress: postrestantAddress ?? this.postrestantAddress,
