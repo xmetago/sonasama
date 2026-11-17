@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/seyir_tokens.dart';
+
 /// Solunda ince renk çubuğu olan bölüm başlığı.
 ///
 /// Kaydedilenler sayfalarında çubuk mor, istatistik panosunda tema ana rengidir.
@@ -16,8 +18,9 @@ class AppAccentSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
       child: Row(
         children: [
           Container(
@@ -28,14 +31,12 @@ class AppAccentSectionHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(width: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.grey[800],
-                ),
+          const SizedBox(width: SeyirTokens.space3),
+          Expanded(
+            child: Text(
+              title,
+              style: palette.headline(),
+            ),
           ),
         ],
       ),

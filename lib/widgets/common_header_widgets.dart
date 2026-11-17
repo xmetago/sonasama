@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../screens/home_page.dart';
 import '../screens/chat_page.dart';
 import '../screens/chat_detail_page.dart';
+import '../screens/user_gamified_score_page.dart';
 import '../screens/friendship_management_page.dart';
 import '../screens/davetler_page.dart';
 import '../screens/uyarilar_page.dart';
@@ -12,6 +13,7 @@ import '../services/durtme_service.dart';
 import '../services/hive_database_service.dart';
 import '../services/local_notification_service.dart';
 import '../theme/seyir_tokens.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/timed_action_buttons.dart';
 import '../widgets/profile_icons_row.dart';
 import '../widgets/verified_users_management_dialog.dart';
@@ -514,11 +516,11 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
 
     final text = Text(
       label,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-        color: isKotu ? Colors.red[800] : Colors.amber[900],
-        letterSpacing: 0.4,
+      style: SeyirPalette.of(context).caption(
+        weight: FontWeight.w800,
+        color: SeyirPalette.of(context).foreground(
+          isKotu ? SeyirTokens.reject : SeyirTokens.warning,
+        ),
       ),
     );
 
@@ -693,35 +695,54 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
 
   // Bu fonksiyonlar artık gerekli değil, TimedActionButtons widget'ı kendi kontrolünü yapıyor
 
+  bool get _isOwnProfile {
+    final String? target = widget.targetUserEmail?.trim().toLowerCase();
+    final String? mine = widget.userEmail?.trim().toLowerCase();
+    if (target == null || target.isEmpty) return true;
+    return mine != null && mine == target;
+  }
+
+  void _openPuanKarti({required bool readOnly}) {
+    final String? email = widget.targetUserEmail ?? widget.userEmail;
+    if (email == null || email.isEmpty) return;
+    final user = HiveDatabaseService.getRegistrationByEmail(email);
+    if (user == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserGamifiedScorePage(
+          targetUser: user,
+          readOnly: readOnly,
+        ),
+      ),
+    );
+  }
+
   Widget _buildProfileActionChip({
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
     bool emphasized = true,
   }) {
-    final color = emphasized ? Colors.black87 : Colors.black54;
-    final borderColor = emphasized ? Colors.black26 : Colors.black12;
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color color =
+        emphasized ? palette.textPrimary : palette.textSecondary;
 
     return OutlinedButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon, size: 14, color: color),
+      icon: Icon(icon, size: 16, color: color),
       label: Text(
         label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
+        style: palette.caption(color: color, weight: FontWeight.w600),
       ),
       style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: SeyirTokens.space3),
+        minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+        tapTargetSize: MaterialTapTargetSize.padded,
         foregroundColor: color,
-        side: BorderSide(color: borderColor),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: palette.border),
+        shape: const RoundedRectangleBorder(
+          borderRadius: SeyirTokens.radiusLgAll,
         ),
       ),
     );
@@ -746,10 +767,11 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
           minChildSize: 0.45,
           maxChildSize: 0.85,
           builder: (context, scrollController) {
+            final SeyirPalette sheetPalette = SeyirPalette.of(context);
             return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              decoration: BoxDecoration(
+                color: sheetPalette.card,
+                borderRadius: SeyirTokens.sheetTop,
               ),
               child: Column(
                 children: [
@@ -758,7 +780,7 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: sheetPalette.border,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -772,21 +794,17 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Dürt',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
+                                style: sheetPalette.headline(),
                               ),
                               Text(
                                 isSelfDurtme
                                     ? '...'
                                     : '$targetJudgeName\'e hızlı tepki gönder',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
+                                style: sheetPalette.body(
+                                  weight: FontWeight.w400,
+                                  color: sheetPalette.textSecondary,
                                 ),
                               ),
                             ],
@@ -796,6 +814,9 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
                           icon: const Icon(Icons.close),
                           onPressed: () => Navigator.pop(sheetContext),
                           tooltip: 'Kapat',
+                          style: delilIconButtonStyle(
+                            foreground: sheetPalette.textPrimary,
+                          ),
                         ),
                       ],
                     ),
@@ -957,17 +978,9 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
         children: [
           // Adım 2: CircleAvatar'a GestureDetector ekle - profil resmine tıklanınca profil sayfasına git
           GestureDetector(
-            onTap: isTargetUser && targetUserEmail != null
-                ? () {
-                    // Başka bir kullanıcının profil sayfasına git
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => HomePage(userEmail: targetUserEmail),
-                      ),
-                    );
-                  }
-                : null, // Kendi profilini gösteriyorsa tıklama yok
+            onTap: targetUser != null
+                ? () => _openPuanKarti(readOnly: !_isOwnProfile)
+                : null,
             child: CircleAvatar( //PROFİL RESMİ ALANI //rengini değiştir
               radius: 30,
               backgroundColor: SeyirPalette.of(context).surfaceMuted,
@@ -998,15 +1011,16 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  judgeName,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Theme.of(context).colorScheme.onSurface,
+                GestureDetector(
+                  onTap: _isOwnProfile && targetUser != null
+                      ? () => _openPuanKarti(readOnly: false)
+                      : null,
+                  child: Text(
+                    judgeName,
+                    style: SeyirPalette.of(context).title(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 const ProfileIconsRow(),

@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/seyir_tokens.dart';
+
 /// Yuvarlatılmış, gölgeli arama alanı.
 ///
 /// Kaydedilen haykırlar, kaydedilen widget'lar ve istatistik panosundaki
-/// özel arama kutularının ortak görüntüsüdür. Odak rengi tema `primaryColor`
-/// değerinden gelir; kutu renkleri bu adımda bilinçli olarak gri/beyaz bırakıldı.
+/// özel arama kutularının ortak görüntüsüdür. Kutu ve yazı renkleri
+/// Seyir paletinden gelir; odak çizgisi marka yeşilidir.
 class AppSearchField extends StatelessWidget {
   const AppSearchField({
     super.key,
     required this.hintText,
     required this.onChanged,
     this.suffixIcon,
+    this.focusNode,
   });
 
   final String hintText;
@@ -19,42 +22,44 @@ class AppSearchField extends StatelessWidget {
   /// İstatistik ekranındaki filtre ikonu gibi isteğe bağlı sağ ikon.
   final Widget? suffixIcon;
 
+  final FocusNode? focusNode;
+
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: SeyirTokens.radiusLgAll,
+        boxShadow: palette.cardShadow,
       ),
       child: TextField(
+        focusNode: focusNode,
+        style: palette.body(),
         decoration: InputDecoration(
           prefixIcon: Icon(
             Icons.search_rounded,
-            color: Colors.grey[600],
+            color: palette.textSecondary,
           ),
           suffixIcon: suffixIcon,
           hintText: hintText,
-          hintStyle: TextStyle(color: Colors.grey[500]),
+          hintStyle: palette.body(
+            weight: FontWeight.w400,
+            color: palette.textMuted,
+          ),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: palette.card,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
+            borderRadius: SeyirTokens.radiusLgAll,
+            borderSide: BorderSide(color: palette.border, width: 1),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
+            borderRadius: SeyirTokens.radiusLgAll,
+            borderSide: BorderSide(color: palette.border, width: 1),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: SeyirTokens.radiusLgAll,
             borderSide: BorderSide(
-              color: Theme.of(context).primaryColor,
+              color: palette.foreground(SeyirTokens.brand),
               width: 2,
             ),
           ),

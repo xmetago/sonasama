@@ -25,6 +25,9 @@ class ItibarOzeti {
   final double itibarEndeksi;
   final List<ItibarTrendNoktasi> trend;
 
+  /// Bu aydan önce kayıtlı kesit var mı?
+  final bool hasHistory;
+
   const ItibarOzeti({
     required this.sosyalLigHam,
     required this.sosyalLig,
@@ -34,6 +37,7 @@ class ItibarOzeti {
     required this.direnEndeksi,
     required this.itibarEndeksi,
     required this.trend,
+    this.hasHistory = false,
   });
 }
 
@@ -253,7 +257,8 @@ class ItibarEndeksiService {
       levhMahfuz: levh,
       direnEndeksi: diren,
       itibarEndeksi: ortalama,
-      trend: trend,
+      trend: trend.points,
+      hasHistory: trend.hasHistory,
     );
   }
 
@@ -271,6 +276,13 @@ class ItibarEndeksiService {
       }
     }
     final idx = list.indexWhere((e) => e['month'] == monthKey);
+    final previous = idx >= 0 ? (list[idx]['value'] as num?)?.toDouble() : null;
+    // Aynı ay ve aynı değer için diske yeniden yazmak, widget testinde
+    // ikinci Hive yazmasını kilitliyor. Değer değişmeden zaman damgasını
+    // yenilemeye gerek yok.
+    if (previous != null && (previous - value).abs() < 0.0001) {
+      return;
+    }
     final entry = {
       'month': monthKey,
       'value': value,
@@ -284,13 +296,17 @@ class ItibarEndeksiService {
     await box.put(key, list);
   }
 
-  static Future<List<ItibarTrendNoktasi>> _buildTrend(
+  static Future<({List<ItibarTrendNoktasi> points, bool hasHistory})>
+      _buildTrend(
     String userId,
     double current,
   ) async {
     final box = await _ensureBox();
     final raw = box.get(_snapshotsKey(userId));
     final snapshots = <DateTime, double>{};
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month);
+    var hasHistory = false;
     if (raw is List) {
       for (final item in raw) {
         if (item is! Map) continue;
@@ -298,12 +314,13 @@ class ItibarEndeksiService {
         final value = (item['value'] as num?)?.toDouble();
         if (at == null || value == null) continue;
         snapshots[at] = value;
+        final month = DateTime(at.year, at.month);
+        if (month.isBefore(currentMonth)) hasHistory = true;
       }
     }
 
     const windows = [0, 3, 6, 9, 12];
-    final now = DateTime.now();
-    return windows.map((months) {
+    final points = windows.map((months) {
       final label = months == 0
           ? '0 ay'
           : months == 12
@@ -317,12 +334,13 @@ class ItibarEndeksiService {
         );
       }
       final from = DateTime(now.year, now.month - months, now.day);
-      final values = snapshots.entries
-          .where((e) => !e.key.isBefore(from))
-          .map((e) => e.value)
-          .toList();
+      final values = snapshots.entries.where((entry) {
+        if (entry.key.isBefore(from)) return false;
+        final month = DateTime(entry.key.year, entry.key.month);
+        return month.isBefore(currentMonth);
+      }).map((entry) => entry.value).toList();
       final avg = values.isEmpty
-          ? current
+          ? 0.0
           : values.reduce((a, b) => a + b) / values.length;
       return ItibarTrendNoktasi(
         monthsBack: months,
@@ -330,5 +348,6 @@ class ItibarEndeksiService {
         average: avg,
       );
     }).toList();
+    return (points: points, hasHistory: hasHistory);
   }
 }

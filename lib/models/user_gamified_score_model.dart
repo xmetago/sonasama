@@ -42,6 +42,9 @@ class UserGamifiedScoreModel {
   /// 0 / 3 / 6 / 9 / 12 aylık itibar ortalamaları.
   final List<ItibarTrendPoint> trendPoints;
 
+  /// Bu aydan önce itibar kesiti var mı? Yoksa grafik uydurulmaz.
+  final bool hasItibarHistory;
+
   /// Varsayılan kurucu.
   UserGamifiedScoreModel({
     required this.targetUser,
@@ -57,6 +60,7 @@ class UserGamifiedScoreModel {
     required this.caseHighlights,
     this.itibarEndeksi = 0,
     this.trendPoints = const [],
+    this.hasItibarHistory = false,
   });
 }
 

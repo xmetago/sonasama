@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 
+import '../theme/seyir_tokens.dart';
+
 /// Profil bölümünde temel değerleri simgeleyen ikonları gösterir.
 class ProfileIconsRow extends StatelessWidget {
   const ProfileIconsRow({super.key});
 
   static const iconSize = 19.0;
-  static const iconColor = Colors.black54;
+  static const iconColor = SeyirTokens.neutral900;
 
   /// Puan kartı lig sırasına göre ikon döndürür: 1 Pusula … 5 ⑲.
   static Widget ligIcon(
@@ -68,7 +70,7 @@ class ProfileIconsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = Theme.of(context).colorScheme.onSurfaceVariant;
+    final Color color = SeyirPalette.of(context).textPrimary;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [

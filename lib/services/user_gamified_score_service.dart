@@ -218,6 +218,7 @@ class UserGamifiedScoreService {
       interactionMetrics: interactionMetrics,
       caseHighlights: caseHighlights,
       itibarEndeksi: itibar.itibarEndeksi,
+      hasItibarHistory: itibar.hasHistory,
       trendPoints: itibar.trend
           .map(
             (point) => ItibarTrendPoint(
