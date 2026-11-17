@@ -3817,7 +3817,7 @@ class HiveDatabaseService {
       return reklamlar;
     } catch (e) {
       print('❌ Tüm reklamlar getirilirken hata: $e');
-      return [];
+      rethrow;
     }
   }
 

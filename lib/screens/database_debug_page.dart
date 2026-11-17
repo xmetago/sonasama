@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
-import '../services/hive_database_service.dart';
+
 import '../models/registration_model.dart';
+import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
+import '../widgets/delil_surface.dart';
 
 class DatabaseDebugPage extends StatefulWidget {
-  const DatabaseDebugPage({super.key});
+  const DatabaseDebugPage({super.key, this.userEmail});
+
+  final String? userEmail;
 
   @override
   State<DatabaseDebugPage> createState() => _DatabaseDebugPageState();
@@ -13,302 +18,336 @@ class _DatabaseDebugPageState extends State<DatabaseDebugPage> {
   List<RegistrationModel> users = [];
   Map<String, int> stats = {};
 
+  static const Map<String, String> _statLabels = {
+    'davalar': 'Davalar',
+    'acilan_davalar': 'Açılan davalar',
+    'kaydedilen_davalar': 'Kaydedilen davalar',
+    'gelen_davalar': 'Gelen davalar',
+    'kullanicilar': 'Kullanıcılar',
+    'kayitlar': 'Kayıtlar',
+    'yorumlar': 'Yorumlar',
+    'kategoriler': 'Kategoriler',
+    'aktif_kategoriler': 'Aktif kategoriler',
+  };
+
+  bool get _authorized => HiveDatabaseService.isAdmin(widget.userEmail);
+
   @override
   void initState() {
     super.initState();
-    _loadData();
+    if (_authorized) {
+      _loadData();
+    }
   }
 
   void _loadData() {
+    if (!_authorized) return;
     setState(() {
       users = HiveDatabaseService.getAllRegistrations();
       stats = HiveDatabaseService.getDatabaseStats();
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Veritabanı Debug'),
-        backgroundColor: const Color(0xFF059669),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadData,
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // İstatistikler
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '📊 Veritabanı İstatistikleri',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...stats.entries.map((entry) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${entry.key}:',
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF059669),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${entry.value}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )),
-                  ],
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Kullanıcılar Listesi
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                                                 Text(
-                           '👥 Kayıtlı Kullanıcılar (${users.length})',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.refresh),
-                          onPressed: _loadData,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (users.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32),
-                          child: Text(
-                            'Henüz kayıtlı kullanıcı bulunmuyor',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
-                      )
-                    else
-                      ...users.map((user) => _buildUserCard(user)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+  String _statLabel(String key) => _statLabels[key] ?? key;
+
+  ButtonStyle _iconTap(SeyirPalette palette) {
+    return IconButton.styleFrom(
+      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+      tapTargetSize: MaterialTapTargetSize.padded,
+      foregroundColor: Colors.white,
     );
   }
 
-  Widget _buildUserCard(RegistrationModel user) {
+  @override
+  Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final accent = palette.isDark ? SeyirTokens.brand : const Color(0xFF059669);
+    return Scaffold(
+      backgroundColor: palette.surface,
+      appBar: AppBar(
+        title: Text('Veritabanı Debug', style: palette.headline(color: Colors.white)),
+        backgroundColor: const Color(0xFF059669),
+        foregroundColor: Colors.white,
+        actions: [
+          if (_authorized)
+            IconButton(
+              style: _iconTap(palette),
+              tooltip: 'Yenile',
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadData,
+            ),
+        ],
+      ),
+      body: !_authorized
+          ? const Padding(
+              padding: EdgeInsets.all(SeyirTokens.space4),
+              child: DelilSoftEmpty(
+                title: 'Yetkiniz yok',
+                message: 'Bu sayfayı yalnızca yöneticiler kullanabilir.',
+                icon: Icons.lock_outline,
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(SeyirTokens.space4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Card(
+                    color: palette.card,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: SeyirTokens.radiusMdAll,
+                      side: BorderSide(color: palette.border),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(SeyirTokens.space4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '📊 Veritabanı İstatistikleri',
+                            style: palette.headline(),
+                          ),
+                          const SizedBox(height: SeyirTokens.space3),
+                          ...stats.entries.map((entry) => Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: SeyirTokens.space1,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '${_statLabel(entry.key)}:',
+                                      style: palette.body(),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: SeyirTokens.space2,
+                                        vertical: SeyirTokens.space1,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: accent,
+                                        borderRadius: SeyirTokens.radiusMdAll,
+                                      ),
+                                      child: Text(
+                                        '${entry.value}',
+                                        style: palette.body(
+                                          color: palette.onSolid(accent),
+                                          weight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: SeyirTokens.space6),
+                  Card(
+                    color: palette.card,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: SeyirTokens.radiusMdAll,
+                      side: BorderSide(color: palette.border),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(SeyirTokens.space4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '👥 Kayıtlı Kullanıcılar (${users.length})',
+                                  style: palette.headline(),
+                                ),
+                              ),
+                              IconButton(
+                                style: IconButton.styleFrom(
+                                  minimumSize: const Size(
+                                    SeyirTokens.tapTarget,
+                                    SeyirTokens.tapTarget,
+                                  ),
+                                  tapTargetSize: MaterialTapTargetSize.padded,
+                                  foregroundColor: accent,
+                                ),
+                                tooltip: 'Yenile',
+                                icon: const Icon(Icons.refresh),
+                                onPressed: _loadData,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: SeyirTokens.space3),
+                          if (users.isEmpty)
+                            const DelilSoftEmpty(
+                              title: 'Henüz kayıtlı kullanıcı yok',
+                              message: 'Kayıtlı kullanıcı listesi boş.',
+                              icon: Icons.people_outline,
+                            )
+                          else
+                            ...users.map((user) => _buildUserCard(user, palette)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildUserCard(RegistrationModel user, SeyirPalette palette) {
+    final adminColor = palette.isDark ? const Color(0xFFF87171) : SeyirTokens.reject;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: SeyirTokens.space3),
+      padding: const EdgeInsets.all(SeyirTokens.space4),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
+        color: palette.surfaceMuted,
+        borderRadius: SeyirTokens.radiusMdAll,
         border: Border.all(
-          color: user.isAdmin ? Colors.red : Colors.grey[300]!,
+          color: user.isAdmin ? adminColor : palette.border,
           width: user.isAdmin ? 2 : 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Başlık Satırı
           Row(
             children: [
               Icon(
                 user.isAdmin ? Icons.admin_panel_settings : Icons.person,
-                color: user.isAdmin ? Colors.red : Colors.grey[600],
+                color: user.isAdmin ? adminColor : palette.textSecondary,
                 size: 20,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: SeyirTokens.space2),
               Expanded(
                 child: Text(
                   user.judgeName,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: user.isAdmin ? Colors.red : Colors.black,
+                  style: palette.title(
+                    color: user.isAdmin ? adminColor : palette.textPrimary,
                   ),
                 ),
               ),
               if (user.isAdmin)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SeyirTokens.space2,
+                    vertical: SeyirTokens.space1,
                   ),
-                  child: const Text(
+                  decoration: BoxDecoration(
+                    color: adminColor,
+                    borderRadius: SeyirTokens.radiusSmAll,
+                  ),
+                  child: Text(
                     'ADMİN',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                    style: palette.caption(
+                      color: palette.onSolid(adminColor),
+                      weight: FontWeight.w700,
                     ),
                   ),
                 ),
             ],
           ),
-          
-          const SizedBox(height: 8),
-          
-          // E-posta
+          const SizedBox(height: SeyirTokens.space2),
           Row(
             children: [
-              const Icon(Icons.email, size: 16, color: Colors.grey),
-              const SizedBox(width: 8),
+              Icon(Icons.email, size: 16, color: palette.textMuted),
+              const SizedBox(width: SeyirTokens.space2),
               Expanded(
-                child: Text(
-                  user.email,
-                  style: const TextStyle(fontSize: 14),
-                ),
+                child: Text(user.email, style: palette.body()),
               ),
             ],
           ),
-          
-          const SizedBox(height: 4),
-          
-          // Ülke
+          const SizedBox(height: SeyirTokens.space1),
           Row(
             children: [
-              const Icon(Icons.location_on, size: 16, color: Colors.grey),
-              const SizedBox(width: 8),
-              Text(
-                user.country,
-                style: const TextStyle(fontSize: 14),
-              ),
+              Icon(Icons.location_on, size: 16, color: palette.textMuted),
+              const SizedBox(width: SeyirTokens.space2),
+              Text(user.country, style: palette.body()),
             ],
           ),
-          
-          const SizedBox(height: 8),
-          
-          // Durum Bilgileri
+          const SizedBox(height: SeyirTokens.space2),
           Wrap(
-            spacing: 8,
-            runSpacing: 4,
+            spacing: SeyirTokens.space2,
+            runSpacing: SeyirTokens.space1,
             children: [
               _buildStatusChip(
                 'Aktif',
-                user.isActive ? Colors.green : Colors.red,
+                user.isActive ? SeyirTokens.accept : SeyirTokens.reject,
                 user.isActive,
+                palette,
               ),
               _buildStatusChip(
                 'E-posta Doğrulandı',
-                user.isEmailVerified ? Colors.blue : Colors.orange,
+                user.isEmailVerified ? const Color(0xFF2563EB) : SeyirTokens.warning,
                 user.isEmailVerified,
+                palette,
               ),
               _buildStatusChip(
                 'Giriş Yapabilir',
-                user.canLogin ? Colors.green : Colors.red,
+                user.canLogin ? SeyirTokens.accept : SeyirTokens.reject,
                 user.canLogin,
+                palette,
               ),
               if (user.isLocked)
-                _buildStatusChip(
-                  'Kilitli',
-                  Colors.red,
-                  true,
-                ),
+                _buildStatusChip('Kilitli', SeyirTokens.reject, true, palette),
             ],
           ),
-          
-          const SizedBox(height: 8),
-          
-          // Zaman Bilgileri
+          const SizedBox(height: SeyirTokens.space2),
           Text(
             'Kayıt Tarihi: ${_formatDateTime(user.createdAt)}',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+            style: palette.caption(),
           ),
           Text(
             'Son Giriş: ${_formatDateTime(user.lastLoginAt)}',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+            style: palette.caption(),
           ),
-          
-          // Dava ve Haykır Zamanları
           if (user.lastDavaAcTime != null)
             Text(
               'Son Dava Açma: ${_formatDateTime(user.lastDavaAcTime!)}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: palette.caption(),
             ),
           if (user.lastHaykirTime != null)
             Text(
               'Son Haykırma: ${_formatDateTime(user.lastHaykirTime!)}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: palette.caption(),
             ),
-          
-          // Giriş Denemeleri
           if (user.loginAttempts > 0)
             Text(
               'Giriş Denemeleri: ${user.loginAttempts}',
-              style: const TextStyle(fontSize: 12, color: Colors.orange),
+              style: palette.caption(
+                color: palette.foreground(SeyirTokens.warning),
+              ),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusChip(String label, Color color, bool isActive) {
+  Widget _buildStatusChip(
+    String label,
+    Color color,
+    bool isActive,
+    SeyirPalette palette,
+  ) {
+    final foreground = isActive ? palette.foreground(color) : palette.textMuted;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space2,
+        vertical: SeyirTokens.space1,
+      ),
       decoration: BoxDecoration(
-        color: isActive ? color.withOpacity(0.1) : Colors.grey[200],
-        borderRadius: BorderRadius.circular(12),
+        color: isActive ? palette.tint(color) : palette.surfaceMuted,
+        borderRadius: SeyirTokens.radiusMdAll,
         border: Border.all(
-          color: isActive ? color : Colors.grey[300]!,
-          width: 1,
+          color: isActive ? palette.tintBorder(color) : palette.border,
         ),
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 10,
-          color: isActive ? color : Colors.grey[600],
-          fontWeight: FontWeight.w500,
-        ),
+        style: palette.caption(color: foreground),
       ),
     );
   }
@@ -316,4 +355,4 @@ class _DatabaseDebugPageState extends State<DatabaseDebugPage> {
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.day.toString().padLeft(2, '0')}.${dateTime.month.toString().padLeft(2, '0')}.${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
-} 
+}

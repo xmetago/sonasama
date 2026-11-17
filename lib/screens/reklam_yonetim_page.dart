@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:its19/utils/feather_icons.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
+import '../widgets/admin_stat_card.dart';
+import '../widgets/delil_surface.dart';
 
 /// Reklam Yönetim Sayfası
 /// Admin panelinden erişilen reklam yönetim sayfası
@@ -19,6 +22,10 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
   List<Map<String, dynamic>> filteredReklamlar = [];
   final TextEditingController _searchController = TextEditingController();
   String _filterStatus = 'all'; // all, aktif, pasif, taslak
+  bool _loading = true;
+  String? _loadError;
+
+  bool get _authorized => HiveDatabaseService.isAdmin(widget.adminEmail);
 
   // Ana kategoriler listesi
   final List<String> _kategoriler = [
@@ -49,8 +56,12 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
   @override
   void initState() {
     super.initState();
-    _loadReklamlar();
     _searchController.addListener(_filterReklamlar);
+    if (_authorized) {
+      _loadReklamlar();
+    } else {
+      _loading = false;
+    }
   }
 
   @override
@@ -61,23 +72,28 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
 
   /// Reklamları Hive'dan yükle
   Future<void> _loadReklamlar() async {
+    if (!_authorized) return;
+    if (mounted && !_loading) {
+      setState(() {
+        _loading = true;
+        _loadError = null;
+      });
+    }
     try {
-      // Tüm reklamları getir (aktif, pasif, taslak)
       final reklamlar = await HiveDatabaseService.getAllReklamlar();
-      
+      if (!mounted) return;
       setState(() {
         allReklamlar = reklamlar;
-        _filterReklamlar();
+        _loading = false;
+        _loadError = null;
       });
+      _filterReklamlar();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Reklamlar yüklenirken hata: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = 'Reklamlar yüklenemedi.';
+      });
     }
   }
 
@@ -113,213 +129,259 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
     });
   }
 
+  Color _green(SeyirPalette palette) =>
+      palette.isDark ? SeyirTokens.brand : const Color(0xFF059669);
+
+  BoxDecoration _mint(SeyirPalette palette) {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: palette.isDark
+            ? [
+                const Color(0xFF06352A),
+                Color.alphaBlend(
+                  SeyirTokens.brand.withValues(alpha: 0.16),
+                  palette.surface,
+                ),
+              ]
+            : const [Color(0xFFF0FDFA), Color(0xFFD1FAE5)],
+      ),
+    );
+  }
+
+  ButtonStyle _iconTap(Color foreground) {
+    return IconButton.styleFrom(
+      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+      tapTargetSize: MaterialTapTargetSize.padded,
+      foregroundColor: foreground,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final green = _green(palette);
     return Scaffold(
+      backgroundColor: palette.surface,
       appBar: AppBar(
-        title: const Text('Reklam Yönetimi'),
+        title: Text('Reklam Yönetimi', style: palette.headline(color: Colors.white)),
         backgroundColor: const Color(0xFF059669),
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(FeatherIcons.refreshCw),
-            onPressed: _loadReklamlar,
-            tooltip: 'Yenile',
-          ),
+          if (_authorized)
+            IconButton(
+              style: _iconTap(Colors.white),
+              icon: const Icon(FeatherIcons.refreshCw),
+              onPressed: _loadReklamlar,
+              tooltip: 'Yenile',
+            ),
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFF0FDFA), Color(0xFFD1FAE5)],
-          ),
-        ),
-        child: Column(
-          children: [
-            // İstatistikler
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      'Toplam',
-                      '${allReklamlar.length}',
-                      Icons.campaign,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildStatCard(
-                      'Aktif',
-                      '${allReklamlar.where((r) => r['durum'] == 'aktif').length}',
-                      Icons.check_circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildStatCard(
-                      'Pasif',
-                      '${allReklamlar.where((r) => r['durum'] == 'pasif').length}',
-                      Icons.cancel,
-                    ),
-                  ),
-                ],
+      body: !_authorized
+          ? const Padding(
+              padding: EdgeInsets.all(SeyirTokens.space4),
+              child: DelilSoftEmpty(
+                title: 'Yetkiniz yok',
+                message: 'Bu sayfayı yalnızca yöneticiler kullanabilir.',
+                icon: Icons.lock_outline,
               ),
-            ),
-            
-            // Arama ve filtre
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            )
+          : Container(
+              decoration: _mint(palette),
               child: Column(
                 children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Reklam ara (ad, başlık, kod, kategori)...',
-                      prefixIcon: const Icon(FeatherIcons.search, color: Color(0xFF059669)),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
+                  Padding(
+                    padding: const EdgeInsets.all(SeyirTokens.space4),
                     child: Row(
                       children: [
-                        _buildFilterChip('Tümü', 'all'),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('Aktif', 'aktif'),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('Pasif', 'pasif'),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('Taslak', 'taslak'),
+                        Expanded(
+                          child: _buildStatCard(
+                            'Toplam',
+                            '${allReklamlar.length}',
+                            Icons.campaign,
+                          ),
+                        ),
+                        const SizedBox(width: SeyirTokens.space2),
+                        Expanded(
+                          child: _buildStatCard(
+                            'Aktif',
+                            '${allReklamlar.where((r) => r['durum'] == 'aktif').length}',
+                            Icons.check_circle,
+                          ),
+                        ),
+                        const SizedBox(width: SeyirTokens.space2),
+                        Expanded(
+                          child: _buildStatCard(
+                            'Pasif',
+                            '${allReklamlar.where((r) => r['durum'] == 'pasif').length}',
+                            Icons.cancel,
+                          ),
+                        ),
                       ],
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: SeyirTokens.space4),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _searchController,
+                          style: palette.body(),
+                          decoration: InputDecoration(
+                            hintText: 'Reklam ara (ad, başlık, kod, kategori)...',
+                            hintStyle: palette.body(
+                              color: palette.textMuted,
+                              weight: FontWeight.w400,
+                            ),
+                            prefixIcon: Icon(FeatherIcons.search, color: green),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    style: _iconTap(palette.textSecondary),
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: _searchController.clear,
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: palette.surfaceMuted,
+                            border: const OutlineInputBorder(borderRadius: SeyirTokens.radiusMdAll),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: SeyirTokens.radiusMdAll,
+                              borderSide: BorderSide(color: palette.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: SeyirTokens.radiusMdAll,
+                              borderSide: BorderSide(color: green, width: 1.4),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: SeyirTokens.space3),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildFilterChip('Tümü', 'all'),
+                              const SizedBox(width: SeyirTokens.space2),
+                              _buildFilterChip('Aktif', 'aktif'),
+                              const SizedBox(width: SeyirTokens.space2),
+                              _buildFilterChip('Pasif', 'pasif'),
+                              const SizedBox(width: SeyirTokens.space2),
+                              _buildFilterChip('Taslak', 'taslak'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: SeyirTokens.space4),
+                  Expanded(child: _buildReklamList(palette)),
                 ],
               ),
             ),
-            
-            const SizedBox(height: 16),
-            
-            // Reklam listesi
-            Expanded(
-              child: filteredReklamlar.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.campaign, size: 64, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Reklam bulunamadı',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: filteredReklamlar.length,
-                      itemBuilder: (context, index) {
-                        final reklam = filteredReklamlar[index];
-                        return _buildReklamCard(reklam);
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addNewReklam(),
-        backgroundColor: const Color(0xFF059669),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Yeni Reklam'),
-      ),
+      floatingActionButton: _authorized
+          ? FloatingActionButton.extended(
+              onPressed: _addNewReklam,
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+              extendedPadding: const EdgeInsets.symmetric(
+                horizontal: SeyirTokens.space4,
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('Yeni Reklam'),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildReklamList(SeyirPalette palette) {
+    if (_loading) {
+      return Center(
+        child: CircularProgressIndicator(color: _green(palette)),
+      );
+    }
+    if (_loadError != null) {
+      return DelilLoadError(
+        message: _loadError!,
+        onRetry: _loadReklamlar,
+      );
+    }
+    if (filteredReklamlar.isEmpty) {
+      final query = _searchController.text.trim();
+      return ListView(
+        padding: const EdgeInsets.symmetric(horizontal: SeyirTokens.space4),
+        children: [
+          DelilSoftEmpty(
+            title: 'Reklam bulunamadı',
+            message: query.isEmpty
+                ? 'Henüz kayıtlı reklam yok.'
+                : '"$query" için eşleşme yok.',
+            icon: Icons.campaign_outlined,
+          ),
+        ],
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: SeyirTokens.space4),
+      itemCount: filteredReklamlar.length,
+      itemBuilder: (context, index) {
+        return _buildReklamCard(filteredReklamlar[index]);
+      },
     );
   }
 
   /// İstatistik kartı
   Widget _buildStatCard(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: const Color(0xFF059669)),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF059669),
-            ),
-          ),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
+    return AdminStatCard(title: title, value: value, icon: icon);
   }
 
   /// Filtre chip'i
   Widget _buildFilterChip(String label, String filterValue) {
+    final palette = SeyirPalette.of(context);
+    final green = _green(palette);
     final isSelected = _filterStatus == filterValue;
     return FilterChip(
       label: Text(label),
       selected: isSelected,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space2,
+        vertical: SeyirTokens.space2,
+      ),
       onSelected: (selected) {
         setState(() {
           _filterStatus = filterValue;
           _filterReklamlar();
         });
       },
-      selectedColor: const Color(0xFF059669).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF059669),
-      labelStyle: TextStyle(
-        color: isSelected ? const Color(0xFF059669) : Colors.grey[700],
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      backgroundColor: palette.surfaceMuted,
+      selectedColor: green.withValues(alpha: 0.2),
+      checkmarkColor: green,
+      side: BorderSide(color: isSelected ? green : palette.border),
+      labelStyle: palette.body(
+        color: isSelected ? green : palette.textSecondary,
+        weight: isSelected ? FontWeight.w700 : FontWeight.w500,
       ),
     );
   }
 
   /// Reklam kartı
   Widget _buildReklamCard(Map<String, dynamic> reklam) {
+    final palette = SeyirPalette.of(context);
     final durum = reklam['durum'] as String? ?? 'taslak';
     final durumColor = durum == 'aktif'
         ? Colors.green
         : durum == 'pasif'
             ? Colors.red
             : Colors.orange;
-    
+    final durumText = palette.foreground(durumColor);
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      color: palette.card,
+      margin: const EdgeInsets.only(bottom: SeyirTokens.space3),
+      shape: RoundedRectangleBorder(
+        borderRadius: SeyirTokens.radiusMdAll,
+        side: BorderSide(color: palette.border),
+      ),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: durumColor,
@@ -334,41 +396,49 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
         ),
         title: Text(
           reklam['reklamBasligi'] as String? ?? 'Başlık yok',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: palette.body(weight: FontWeight.w700),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 4),
-            Text('Kategori: ${reklam['reklamKategorisi'] as String? ?? 'DİĞER'}'),
-            Text('Kod: ${reklam['reklamKodu'] as String? ?? 'Kod yok'}'),
+            const SizedBox(height: SeyirTokens.space1),
+            Text(
+              'Kategori: ${reklam['reklamKategorisi'] as String? ?? 'DİĞER'}',
+              style: palette.body(weight: FontWeight.w400, color: palette.textSecondary),
+            ),
+            Text(
+              'Kod: ${reklam['reklamKodu'] as String? ?? 'Kod yok'}',
+              style: palette.body(weight: FontWeight.w400, color: palette.textSecondary),
+            ),
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SeyirTokens.space2,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: durumColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: durumColor),
+                    color: palette.tint(durumColor),
+                    borderRadius: SeyirTokens.radiusMdAll,
+                    border: Border.all(color: palette.tintBorder(durumColor)),
                   ),
                   child: Text(
                     durum.toUpperCase(),
-                    style: TextStyle(
-                      color: durumColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                    style: palette.caption(
+                      color: durumText,
+                      weight: FontWeight.w700,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: SeyirTokens.space2),
                 Text(
                   'Gösterim: ${reklam['gosterimSayisi'] ?? 0}',
-                  style: const TextStyle(fontSize: 11),
+                  style: palette.caption(),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: SeyirTokens.space2),
                 Text(
                   'Tıklama: ${reklam['tiklanmaSayisi'] ?? 0}',
-                  style: const TextStyle(fontSize: 11),
+                  style: palette.caption(),
                 ),
               ],
             ),
@@ -470,6 +540,9 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            ),
             child: const Text('İptal'),
           ),
           ElevatedButton(
@@ -502,7 +575,11 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            ),
             child: const Text('Sil'),
           ),
         ],
@@ -720,6 +797,9 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                ),
                 child: const Text('İptal'),
               ),
               ElevatedButton(
@@ -785,6 +865,7 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF059669),
                   foregroundColor: Colors.white,
+                  minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
                 ),
                 child: Text(isEdit ? 'Kaydet' : 'Ekle'),
               ),

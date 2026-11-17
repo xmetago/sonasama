@@ -1639,7 +1639,7 @@ class _HomePageState extends State<HomePage> {
                     onTap: () =>
                         Navigator.of(context).pop(_PostSheetAction.admin),
                   ),
-                if (!isAdmin)
+                if (isAdmin)
                   _buildPostTypeOption(
                     icon: Icons.storage_outlined,
                     title: 'Veritabanı Debug',
@@ -1673,7 +1673,7 @@ class _HomePageState extends State<HomePage> {
     if (selectedAction == _PostSheetAction.debug) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => const DatabaseDebugPage(),
+          builder: (context) => DatabaseDebugPage(userEmail: widget.userEmail),
         ),
       );
       return;
@@ -1828,7 +1828,9 @@ class _HomePageState extends State<HomePage> {
         return Scaffold(
           floatingActionButton: FloatingActionButton(
             onPressed: () =>
-                _showPostOptionsSheet(isAdmin: authProvider.isAdmin),
+                _showPostOptionsSheet(
+                  isAdmin: HiveDatabaseService.isAdmin(widget.userEmail),
+                ),
             backgroundColor: SeyirTokens.brand,
             foregroundColor:
                 SeyirPalette.of(context).onSolid(SeyirTokens.brand),
