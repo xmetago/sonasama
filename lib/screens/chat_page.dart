@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:shimmer/shimmer.dart';
+import '../theme/seyir_tokens.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../services/hive_database_service.dart';
 import '../utils/dialog_utils.dart';
@@ -11,6 +13,7 @@ import '../services/user_session_service.dart';
 import '../services/chat_service.dart';
 import '../models/registration_model.dart';
 import 'chat_detail_page.dart';
+import 'friendship_management_page.dart';
 
 class Friend {
   final String name;
@@ -32,8 +35,10 @@ class Friend {
 
 class ChatPage extends StatefulWidget {
   final String? userEmail; // Kullanıcı e-posta adresi
+  /// Test: sohbet listesi yüklenemesin.
+  final bool forceLoadError;
 
-  const ChatPage({super.key, this.userEmail});
+  const ChatPage({super.key, this.userEmail, this.forceLoadError = false});
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -41,6 +46,7 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   bool _isLoading = true;
+  String? _loadError;
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
   
   // Gerçek veriler için friends listesi
@@ -57,22 +63,45 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
+  /// Oturum yoksa sayfaya verilen e-postadan kullanıcıyı aç.
+  RegistrationModel? _resolveCurrentUser() {
+    final session = UserSessionService.getCurrentUser();
+    if (session != null) return session;
+    final email = widget.userEmail?.trim();
+    if (email == null || email.isEmpty) return null;
+    try {
+      final user = HiveDatabaseService.getRegistrationByEmail(email);
+      if (user != null) {
+        UserSessionService.setCurrentUser(user);
+      }
+      return user;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Grup-19 kategorisindeki kullanıcıları yükle
   Future<void> _loadGrup19Friends({bool isRefresh = false}) async {
     if (!isRefresh) {
       setState(() {
         _isLoading = true;
+        _loadError = null;
       });
     }
 
     try {
-      final currentUser = UserSessionService.getCurrentUser();
+      if (widget.forceLoadError) {
+        throw Exception('Sohbetler yüklenemedi');
+      }
+      final currentUser = _resolveCurrentUser();
       if (currentUser == null) {
         setState(() {
           _isLoading = false;
+          friends = [];
+          _loadError = 'Giriş gerekli. Sohbetleri görmek için oturum aç.';
         });
         if (isRefresh) {
-          _refreshController.refreshCompleted();
+          _refreshController.refreshFailed();
         }
         return;
       }
@@ -155,6 +184,7 @@ class _ChatPageState extends State<ChatPage> {
       
       setState(() {
         _isLoading = false;
+        _loadError = null;
       });
       
       if (isRefresh) {
@@ -164,6 +194,8 @@ class _ChatPageState extends State<ChatPage> {
       print('❌ Arkadaşlar yüklenirken hata: $e');
       setState(() {
         _isLoading = false;
+        friends = [];
+        _loadError = 'Sohbetler yüklenemedi';
       });
       
       if (isRefresh) {
@@ -175,6 +207,45 @@ class _ChatPageState extends State<ChatPage> {
   /// Pull to refresh callback
   void _onRefresh() async {
     await _loadGrup19Friends(isRefresh: true);
+  }
+
+  String? get _sessionEmail =>
+      widget.userEmail ?? UserSessionService.getCurrentUser()?.email;
+
+  Future<void> _openChat(Friend friend) async {
+    final user = friend.userModel;
+    if (user == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatDetailPage(
+          receiverId: user.id,
+          receiverEmail: user.email,
+          receiverName: friend.name,
+          receiverAvatarUrl: friend.avatarUrl,
+          userEmail: widget.userEmail,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _loadGrup19Friends();
+  }
+
+  void _openAddFriend() {
+    final email = _sessionEmail;
+    if (email == null || email.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FriendshipManagementPage(userEmail: email),
+      ),
+    );
+  }
+
+  void _openSavedDavalar() {
+    final email = _sessionEmail;
+    if (email == null || email.isEmpty) return;
+    showSavedDavalarDialog(context, email);
   }
 
   /// Son giriş zamanını formatla
@@ -221,34 +292,55 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  Widget _mutedRailIcon(SeyirPalette palette, IconData icon) {
+    return IgnorePointer(
+      child: SizedBox(
+        width: SeyirTokens.tapTarget,
+        height: SeyirTokens.tapTarget,
+        child: Icon(icon, size: 24, color: palette.textMuted),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final email = _sessionEmail;
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: AppExpandableIconMenu(
           expandBody: true,
-          inset: _isLoading ? EdgeInsets.zero : const EdgeInsets.all(16),
-          openGap: _isLoading ? 0 : 16,
+          inset: _isLoading ? EdgeInsets.zero : const EdgeInsets.all(SeyirTokens.space4),
+          openGap: _isLoading ? 0 : SeyirTokens.space4,
           panelWidth: _isLoading ? 0 : 60,
           items: [
             AppExpandableIconMenuItem(
               onTap: () {},
-              customChild: IconButton(
-                icon: const Icon(Icons.campaign, size: 24, color: Colors.black54),
-                onPressed: () {},
-              ),
+              customChild: _mutedRailIcon(palette, Icons.campaign),
             ),
             AppExpandableIconMenuItem(
               onTap: () {},
               customChild: Column(
                 children: [
                   const SizedBox(height: 76),
-                  const Icon(Icons.save_as_outlined, size: 24, color: Colors.black54),
+                  if (email == null || email.isEmpty)
+                    _mutedRailIcon(palette, Icons.save_as_outlined)
+                  else
+                    IconButton(
+                      tooltip: 'Kayıtlı davalar',
+                      style: delilIconButtonStyle(foreground: palette.textPrimary),
+                      onPressed: _openSavedDavalar,
+                      icon: Icon(Icons.save_as_outlined, size: 24, color: palette.textPrimary),
+                    ),
                   const SizedBox(height: 76),
-                  const Icon(Icons.edit_document, size: 24, color: Colors.black54),
+                  _mutedRailIcon(palette, Icons.edit_document),
                   const SizedBox(height: 76),
-                  Image.asset('lib/icons/06_left_row_ahizelitelefon_icon.png', width: 24, height: 24),
+                  Image.asset(
+                    'lib/icons/06_left_row_ahizelitelefon_icon.png',
+                    width: 24,
+                    height: 24,
+                  ),
                 ],
               ),
             ),
@@ -259,7 +351,7 @@ class _ChatPageState extends State<ChatPage> {
               children: [
             // Header Section
             Container(
-              color: Colors.white,
+              color: palette.card,
               child: Column(
                 children: [
                   ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
@@ -267,7 +359,6 @@ class _ChatPageState extends State<ChatPage> {
                   SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
                     userEmail: widget.userEmail,
                     onShowSavedDavalar: () {
-                      // Global utility fonksiyonunu kullan
                       if (widget.userEmail != null) {
                         showSavedDavalarDialog(context, widget.userEmail!);
                       }
@@ -279,58 +370,48 @@ class _ChatPageState extends State<ChatPage> {
             
             // Chat Header
             Container(
-              color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              color: palette.card,
+              padding: const EdgeInsets.symmetric(
+                horizontal: SeyirTokens.space4,
+                vertical: SeyirTokens.space2,
+              ),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: toggle,
-                    child: Icon(
+                  IconButton(
+                    tooltip: 'Menü',
+                    style: delilIconButtonStyle(foreground: Colors.red),
+                    onPressed: toggle,
+                    icon: const Icon(
                       MdiIcons.menuOpen,
-                      size: 34,
+                      size: 28,
                       color: Colors.red,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: SeyirTokens.space4),
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      decoration: BoxDecoration(
+                      padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space3),
+                      decoration: const BoxDecoration(
                         color: Colors.orangeAccent,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: SeyirTokens.radiusMdAll,
                       ),
                       child: Text(
                         'SOHBETLER (${friends.length}/19)',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                        style: palette.title(color: Colors.white),
                       ),
                     ),
                   ),
                   if (friends.length < 19)
                     IconButton(
+                      tooltip: 'Arkadaş ekle',
+                      style: delilIconButtonStyle(foreground: Colors.green),
                       icon: const Icon(Icons.person_add_alt_1, color: Colors.green),
-                      onPressed: () {
-                        // Yeni arkadaş ekle - friendship_management_page'e yönlendir
-                        if (widget.userEmail != null) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const Scaffold(
-                                body: Center(
-                                  child: Text('Arkadaş ekleme sayfasına yönlendirilecek'),
-                                ),
-                              ),
-                            ),
-                          );
-                        }
-                      },
+                      onPressed: _openAddFriend,
                     ),
-                  // Yenile butonu
                   IconButton(
+                    tooltip: 'Yenile',
+                    style: delilIconButtonStyle(foreground: Colors.blue),
                     icon: const Icon(Icons.refresh, color: Colors.blue),
                     onPressed: () {
                       _loadGrup19Friends();
@@ -345,25 +426,25 @@ class _ChatPageState extends State<ChatPage> {
           },
           body: _isLoading
                   ? Shimmer.fromColors(
-                      baseColor: Colors.grey[300]!,
-                      highlightColor: Colors.grey[100]!,
+                      baseColor: palette.surfaceMuted,
+                      highlightColor: palette.card,
                       child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(SeyirTokens.space4),
                         itemCount: 5,
                         itemBuilder: (context, index) {
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.only(bottom: SeyirTokens.space3),
                             child: Row(
                               children: [
                                 Container(
                                   width: 50,
                                   height: 50,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
+                                  decoration: BoxDecoration(
+                                    color: palette.border,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: SeyirTokens.space3),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,17 +453,17 @@ class _ChatPageState extends State<ChatPage> {
                                         width: double.infinity,
                                         height: 16,
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: palette.border,
+                                          borderRadius: SeyirTokens.radiusSmAll,
                                         ),
                                       ),
-                                      const SizedBox(height: 8),
+                                      const SizedBox(height: SeyirTokens.space2),
                                       Container(
                                         width: 150,
                                         height: 12,
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: palette.border,
+                                          borderRadius: SeyirTokens.radiusSmAll,
                                         ),
                                       ),
                                     ],
@@ -406,16 +487,14 @@ class _ChatPageState extends State<ChatPage> {
                       child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Aktif arkadaşlar
                                 if (activeFriends.isNotEmpty) ...[
                                   Padding(
-                                    padding: const EdgeInsets.only(bottom: 16.0),
+                                    padding: const EdgeInsets.only(bottom: SeyirTokens.space4),
                                     child: Text(
                                       "🟢 Şu an Aktif Olanlar",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: Colors.grey[700],
+                                      style: palette.body(
+                                        weight: FontWeight.w700,
+                                        color: palette.textSecondary,
                                       ),
                                     ),
                                   ),
@@ -427,7 +506,7 @@ class _ChatPageState extends State<ChatPage> {
                                       itemBuilder: (context, index) {
                                         final friend = activeFriends[index];
                                         return Padding(
-                                          padding: const EdgeInsets.only(right: 16),
+                                          padding: const EdgeInsets.only(right: SeyirTokens.space4),
                                           child: Column(
                                             children: [
                                               Stack(
@@ -435,9 +514,7 @@ class _ChatPageState extends State<ChatPage> {
                                                   CircleAvatar(
                                                     radius: 32,
                                                     backgroundImage: NetworkImage(friend.avatarUrl),
-                                                    onBackgroundImageError: (_, __) {
-                                                      // Hata durumunda varsayılan avatar göster
-                                                    },
+                                                    onBackgroundImageError: (_, __) {},
                                                     child: friend.avatarUrl.contains('ui-avatars.com') 
                                                         ? null 
                                                         : const Icon(Icons.person, size: 32),
@@ -451,7 +528,7 @@ class _ChatPageState extends State<ChatPage> {
                                                       decoration: BoxDecoration(
                                                         shape: BoxShape.circle,
                                                         color: Colors.green,
-                                                        border: Border.all(color: Colors.white, width: 2),
+                                                        border: Border.all(color: palette.card, width: 2),
                                                       ),
                                                     ),
                                                   )
@@ -461,26 +538,13 @@ class _ChatPageState extends State<ChatPage> {
                                               SizedBox(
                                                 width: 70,
                                                 child: GestureDetector(
-                                                  onTap: () {
-                                                    // Aktif arkadaşa tıklandığında da sohbet sayfasına git
-                                                    if (friend.userModel != null) {
-                                                      Navigator.push(
-                                                        context,
-                                                        MaterialPageRoute(
-                                                          builder: (context) => ChatDetailPage(
-                                                            receiverId: friend.userModel!.id,
-                                                            receiverEmail: friend.userModel!.email,
-                                                            receiverName: friend.name,
-                                                            receiverAvatarUrl: friend.avatarUrl,
-                                                            userEmail: widget.userEmail,
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
-                                                  },
+                                                  onTap: () => _openChat(friend),
                                                   child: Text(
                                                     friend.name,
-                                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                                    style: palette.caption(
+                                                      weight: FontWeight.w500,
+                                                      color: palette.textPrimary,
+                                                    ),
                                                     textAlign: TextAlign.center,
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
@@ -493,49 +557,31 @@ class _ChatPageState extends State<ChatPage> {
                                       },
                                     ),
                                   ),
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: SeyirTokens.space6),
                                 ],
 
-                                // Tüm arkadaşlar listesi
-                                Text(
-                                  "👥 Tüm Arkadaşlar",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
+                                if (_loadError == null) ...[
+                                  Text(
+                                    "👥 Tüm Arkadaşlar",
+                                    style: palette.body(
+                                      weight: FontWeight.w700,
+                                      color: palette.textSecondary,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 12),
+                                  const SizedBox(height: SeyirTokens.space3),
+                                ],
                                 Expanded(
-                                  child: friends.isEmpty
-                                      ? Center(
-                                          child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.people_outline,
-                                                size: 64,
-                                                color: Colors.grey[400],
-                                              ),
-                                              const SizedBox(height: 16),
-                                              Text(
-                                                'Grup-19 kategorisinde henüz arkadaş yok',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.grey[600],
-                                                ),
-                                                textAlign: TextAlign.center,
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                'Arkadaş eklemek için yukarıdaki + butonunu kullanın',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey[500],
-                                                ),
-                                                textAlign: TextAlign.center,
-                                              ),
-                                            ],
+                                  child: _loadError != null
+                                      ? DelilLoadError(
+                                          message: _loadError!,
+                                          onRetry: _loadGrup19Friends,
+                                        )
+                                      : friends.isEmpty
+                                      ? const Center(
+                                          child: DelilSoftEmpty(
+                                            title: 'Grup-19 kategorisinde henüz arkadaş yok',
+                                            message: 'Arkadaş eklemek için yukarıdaki + butonunu kullanın',
+                                            icon: Icons.people_outline,
                                           ),
                                         )
                                       : ListView.builder(
@@ -543,10 +589,12 @@ class _ChatPageState extends State<ChatPage> {
                                           itemBuilder: (context, index) {
                                             final friend = friends[index];
                                             return Card(
-                                              margin: const EdgeInsets.only(bottom: 8),
-                                              elevation: 2,
+                                              color: palette.card,
+                                              margin: const EdgeInsets.only(bottom: SeyirTokens.space2),
+                                              elevation: 0,
                                               shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(12),
+                                                borderRadius: SeyirTokens.radiusMdAll,
+                                                side: BorderSide(color: palette.border),
                                               ),
                                               child: ListTile(
                                                 leading: Stack(
@@ -554,9 +602,7 @@ class _ChatPageState extends State<ChatPage> {
                                                     CircleAvatar(
                                                       radius: 25,
                                                       backgroundImage: NetworkImage(friend.avatarUrl),
-                                                      onBackgroundImageError: (_, __) {
-                                                        // Hata durumunda varsayılan avatar göster
-                                                      },
+                                                      onBackgroundImageError: (_, __) {},
                                                       child: friend.avatarUrl.contains('ui-avatars.com') 
                                                           ? null 
                                                           : const Icon(Icons.person, size: 25),
@@ -571,7 +617,7 @@ class _ChatPageState extends State<ChatPage> {
                                                           decoration: BoxDecoration(
                                                             shape: BoxShape.circle,
                                                             color: Colors.green,
-                                                            border: Border.all(color: Colors.white, width: 2),
+                                                            border: Border.all(color: palette.card, width: 2),
                                                           ),
                                                         ),
                                                       )
@@ -579,44 +625,19 @@ class _ChatPageState extends State<ChatPage> {
                                                 ),
                                                 title: Text(
                                                   friend.name,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                  ),
+                                                  style: palette.body(weight: FontWeight.w700),
                                                 ),
                                                 subtitle: Text(
                                                   friend.lastMessage,
-                                                  style: TextStyle(
-                                                    color: Colors.grey[600],
-                                                    fontSize: 12,
-                                                  ),
+                                                  style: palette.caption(color: palette.textSecondary),
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
                                                 trailing: Text(
                                                   friend.lastMessageTime,
-                                                  style: TextStyle(
-                                                    color: Colors.grey[500],
-                                                    fontSize: 10,
-                                                  ),
+                                                  style: palette.caption(color: palette.textMuted),
                                                 ),
-                                                onTap: () {
-                                                  // Sohbet detay sayfasına git
-                                                  if (friend.userModel != null) {
-                                                    Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder: (context) => ChatDetailPage(
-                                                          receiverId: friend.userModel!.id,
-                                                          receiverEmail: friend.userModel!.email,
-                                                          receiverName: friend.name,
-                                                          receiverAvatarUrl: friend.avatarUrl,
-                                                          userEmail: widget.userEmail,
-                                                        ),
-                                                      ),
-                                                    );
-                                                  }
-                                                },
+                                                onTap: () => _openChat(friend),
                                               ),
                                             );
                                           },
@@ -629,4 +650,4 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
   }
-} 
+}

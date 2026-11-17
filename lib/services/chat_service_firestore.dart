@@ -1,11 +1,14 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/chat_message_model.dart';
 import 'hive_database_service.dart';
 import 'user_session_service.dart';
-import 'dart:async';
 
 /// Real-time mesajlaşma için Firestore entegrasyonlu Chat Service
 /// Hive offline cache olarak kullanılır, Firestore real-time sync için
@@ -205,6 +208,15 @@ class ChatServiceFirestore {
 
     final conversationId = ChatMessageModel.createConversationId(userId1, userId2);
 
+    if (!_firebaseReady) {
+      // Dinleyici kutu yazısının içinde çalışabilir. Okundu işaretini
+      // yazının bitmesini bekleyecek şekilde sonraya bırak.
+      scheduleMicrotask(
+        () => _markConversationReadInHive(conversationId, currentUser.id),
+      );
+      return;
+    }
+
     try {
       // Firestore'da batch update
       final snapshot = await _firestore
@@ -223,15 +235,23 @@ class ChatServiceFirestore {
       }
       await batch.commit();
 
-      // Hive'da da güncelle
-      final messages = getMessagesFromHive(conversationId);
-      for (final message in messages) {
-        if (message.receiverId == currentUser.id && !message.isRead) {
-          await markAsRead(message.id);
-        }
-      }
+      await _markConversationReadInHive(conversationId, currentUser.id);
     } catch (e) {
       print('⚠️ Konuşma okundu işaretlenirken hata: $e');
+      await _markConversationReadInHive(conversationId, currentUser.id);
+    }
+  }
+
+  static Future<void> _markConversationReadInHive(
+    String conversationId,
+    String currentUserId,
+  ) async {
+    final messages = getMessagesFromHive(conversationId);
+    for (final message in messages) {
+      if (message.receiverId != currentUserId || message.isRead) continue;
+      message.isRead = true;
+      message.readAt = DateTime.now();
+      await _chatMessageBox?.put(message.id, message);
     }
   }
 
@@ -276,12 +296,21 @@ class ChatServiceFirestore {
       return Stream.value([]);
     }
 
-    return _chatMessageBox!.watch().map((event) {
+    List<ChatMessageModel> current() {
       final allMessages = _chatMessageBox!.values
           .where((message) => message.conversationId == conversationId)
           .toList();
       allMessages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       return allMessages;
+    }
+
+    // watch() ilk değeri vermez. Açılışta Hive'daki mesajlar da aksın.
+    return Stream<List<ChatMessageModel>>.multi((controller) {
+      controller.add(current());
+      final sub = _chatMessageBox!.watch().listen((_) {
+        if (!controller.isClosed) controller.add(current());
+      });
+      controller.onCancel = sub.cancel;
     });
   }
 
@@ -401,6 +430,30 @@ class ChatServiceFirestore {
       }
     } catch (e) {
       print('⚠️ Konuşma silinirken hata: $e');
+    }
+  }
+
+  /// Sohbet ekini Storage'a yükler. Firebase yoksa veya yükleme
+  /// düşerse yerel dosya yolunu döner; sohbet yine de gönderilebilir.
+  static Future<String?> storeChatFile({
+    required String filePath,
+    required String conversationId,
+    required String messageId,
+  }) async {
+    if (!_firebaseReady) return filePath;
+    try {
+      final file = File(filePath);
+      if (!file.existsSync()) return filePath;
+      final segments = file.uri.pathSegments;
+      final name = segments.isEmpty ? messageId : segments.last;
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('chat_files/$conversationId/$messageId/$name');
+      await ref.putFile(file);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      print('⚠️ Dosya yüklenemedi, yerel yol kullanılacak: $e');
+      return filePath;
     }
   }
 }
