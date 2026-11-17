@@ -6,7 +6,9 @@ import 'package:its19/models/registration_model.dart';
 import 'package:its19/models/category_model.dart';
 import 'database_debug_page.dart';
 import 'reklam_yonetim_page.dart';
+import '../theme/seyir_tokens.dart';
 import '../widgets/admin_stat_card.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/shared/app_snack.dart';
 
 /// Admin sayfası - Sadece admin yetkisine sahip kullanıcılar erişebilir
@@ -41,16 +43,24 @@ class _AdminPageState extends State<AdminPage> {
   // Toplu seçim
   bool _isSelectionMode = false;
   Set<String> _selectedUserIds = {};
+  bool _loading = true;
+  String? _loadError;
+
+  bool get _authorized => HiveDatabaseService.isAdmin(widget.adminEmail);
 
   @override
   void initState() {
     super.initState();
-    _loadData();
-    
-    // Arama dinleyicileri ekle
     _userSearchController.addListener(_filterUsers);
     _categorySearchController.addListener(_filterCategories);
     _davaSearchController.addListener(_filterDavalar);
+    if (_authorized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadData();
+      });
+    } else {
+      _loading = false;
+    }
   }
 
   @override
@@ -62,27 +72,48 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   /// Veritabanından kullanıcı listesi, kategori listesi ve istatistikleri yükler
-  void _loadData() {
+  Future<void> _loadData() async {
+    if (!_authorized) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = null;
+        });
+      }
+      return;
+    }
     setState(() {
-      allUsers = HiveDatabaseService.getAllRegistrations();
-      allCategories = HiveDatabaseService.getAllCategories();
-      databaseStats = HiveDatabaseService.getDatabaseStats();
-      
-      // Tüm davaları yükle (açılan + kaydedilen)
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final users = HiveDatabaseService.getAllRegistrations();
+      final categories = HiveDatabaseService.getAllCategories();
+      final stats = HiveDatabaseService.getDatabaseStats();
       final openedDavalar = HiveDatabaseService.getOpenedDavalar();
       final savedDavalar = HiveDatabaseService.getSavedDavalar();
-      
-      // Davaları birleştir ve işaretle
-      allDavalar = [
-        ...openedDavalar.map((d) => {...d, 'davaType': 'opened'}),
-        ...savedDavalar.map((d) => {...d, 'davaType': 'saved'}),
-      ];
-      
-      // Filtreleme uygula
+      if (!mounted) return;
+      setState(() {
+        allUsers = users;
+        allCategories = categories;
+        databaseStats = stats;
+        allDavalar = [
+          ...openedDavalar.map((d) => {...d, 'davaType': 'opened'}),
+          ...savedDavalar.map((d) => {...d, 'davaType': 'saved'}),
+        ];
+        _loading = false;
+        _loadError = null;
+      });
       _filterUsers();
       _filterCategories();
       _filterDavalar();
-    });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = 'Veriler yüklenemedi.';
+      });
+    }
   }
 
   /// Kullanıcıları arama ve filtre kriterlerine göre filtreler
@@ -159,29 +190,119 @@ class _AdminPageState extends State<AdminPage> {
     });
   }
 
+  Color _green(SeyirPalette palette) =>
+      palette.isDark ? SeyirTokens.brand : const Color(0xFF059669);
+
+  BoxDecoration _mint(SeyirPalette palette) {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: palette.isDark
+            ? [
+                const Color(0xFF06352A),
+                Color.alphaBlend(
+                  SeyirTokens.brand.withValues(alpha: 0.16),
+                  palette.surface,
+                ),
+              ]
+            : const [Color(0xFFF0FDFA), Color(0xFFD1FAE5)],
+      ),
+    );
+  }
+
+  ButtonStyle _iconTap(Color foreground) {
+    return IconButton.styleFrom(
+      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+      tapTargetSize: MaterialTapTargetSize.padded,
+      foregroundColor: foreground,
+    );
+  }
+
+  ButtonStyle _greenButton() {
+    final inherited = Theme.of(context).textTheme.labelLarge;
+    return ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFF059669),
+      foregroundColor: Colors.white,
+      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space3,
+        vertical: SeyirTokens.space3,
+      ),
+      textStyle: TextStyle(
+        fontSize: SeyirTokens.typeBody,
+        fontWeight: FontWeight.w700,
+        fontFamily: inherited?.fontFamily,
+        fontFamilyFallback: inherited?.fontFamilyFallback,
+      ),
+    );
+  }
+
+  InputDecoration _searchField(
+    SeyirPalette palette,
+    String hint,
+    TextEditingController controller,
+  ) {
+    final green = _green(palette);
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: palette.body(color: palette.textMuted, weight: FontWeight.w400),
+      prefixIcon: Icon(FeatherIcons.search, color: green),
+      suffixIcon: controller.text.isNotEmpty
+          ? IconButton(
+              style: _iconTap(palette.textSecondary),
+              icon: const Icon(Icons.clear),
+              onPressed: controller.clear,
+            )
+          : null,
+      filled: true,
+      fillColor: palette.surfaceMuted,
+      border: const OutlineInputBorder(borderRadius: SeyirTokens.radiusMdAll),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: SeyirTokens.radiusMdAll,
+        borderSide: BorderSide(color: palette.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: SeyirTokens.radiusMdAll,
+        borderSide: BorderSide(color: green, width: 1.4),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Scaffold(
+      backgroundColor: palette.surface,
       appBar: AppBar(
-        title: const Text('Admin Paneli'),
+        title: Text('Admin Paneli', style: palette.headline(color: Colors.white)),
         backgroundColor: const Color(0xFF059669),
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(FeatherIcons.refreshCw),
-            onPressed: _loadData,
-            tooltip: 'Yenile',
-          ),
+          if (_authorized)
+            IconButton(
+              style: _iconTap(Colors.white),
+              icon: const Icon(FeatherIcons.refreshCw),
+              onPressed: _loadData,
+              tooltip: 'Yenile',
+            ),
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFF0FDFA), Color(0xFFD1FAE5)],
-          ),
-        ),
+      body: !_authorized
+          ? const Padding(
+              padding: EdgeInsets.all(SeyirTokens.space4),
+              child: DelilSoftEmpty(
+                title: 'Yetkiniz yok',
+                message: 'Bu sayfayı yalnızca yöneticiler kullanabilir.',
+                icon: Icons.lock_outline,
+              ),
+            )
+          : _loading
+              ? Center(child: CircularProgressIndicator(color: _green(palette)))
+              : _loadError != null
+                  ? DelilLoadError(message: _loadError!, onRetry: _loadData)
+                  : Container(
+        decoration: _mint(palette),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -201,7 +322,7 @@ class _AdminPageState extends State<AdminPage> {
                           Text(
                             'Admin Bilgileri',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: SeyirTokens.typeHeadline,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -230,7 +351,7 @@ class _AdminPageState extends State<AdminPage> {
                           Text(
                             'Veritabanı Debug',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: SeyirTokens.typeHeadline,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -243,17 +364,15 @@ class _AdminPageState extends State<AdminPage> {
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (context) => const DatabaseDebugPage(),
+                                builder: (context) => DatabaseDebugPage(
+                                  userEmail: widget.adminEmail,
+                                ),
                               ),
                             );
                           },
                           icon: const Icon(FeatherIcons.eye),
                           label: const Text('Veritabanı Detaylarını Görüntüle'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF059669),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
+                          style: _greenButton(),
                         ),
                       ),
                     ],
@@ -277,7 +396,7 @@ class _AdminPageState extends State<AdminPage> {
                           Text(
                             'Reklam Yönetimi',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: SeyirTokens.typeHeadline,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -296,11 +415,7 @@ class _AdminPageState extends State<AdminPage> {
                           },
                           icon: const Icon(Icons.ads_click),
                           label: const Text('Reklamları Yönet'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF059669),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
+                          style: _greenButton(),
                         ),
                       ),
                     ],
@@ -324,7 +439,7 @@ class _AdminPageState extends State<AdminPage> {
                           Text(
                             'Veritabanı İstatistikleri',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: SeyirTokens.typeHeadline,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -399,25 +514,18 @@ class _AdminPageState extends State<AdminPage> {
                             child: Text(
                               'Kategori Yönetimi (${filteredCategories.length}/${allCategories.length})',
                               style: const TextStyle(
-                                fontSize: 18,
+                                fontSize: SeyirTokens.typeHeadline,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
                           SizedBox(
-                            width: 148,
+                            width: 176,
                             child: ElevatedButton.icon(
                               onPressed: _addNewCategory,
                               icon: const Icon(Icons.add),
                               label: const Text('Yeni Kategori'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF059669),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                              ),
+                              style: _greenButton(),
                             ),
                           ),
                         ],
@@ -427,23 +535,8 @@ class _AdminPageState extends State<AdminPage> {
                       // Kategori arama çubuğu
                       TextField(
                         controller: _categorySearchController,
-                        decoration: InputDecoration(
-                          hintText: 'Kategori ara...',
-                          prefixIcon: const Icon(FeatherIcons.search, color: Color(0xFF059669)),
-                          suffixIcon: _categorySearchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _categorySearchController.clear();
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
+                        style: palette.body(),
+                        decoration: _searchField(palette, 'Kategori ara...', _categorySearchController),
                       ),
                       const SizedBox(height: 16),
                       
@@ -463,19 +556,10 @@ class _AdminPageState extends State<AdminPage> {
                         height: 300,
                         child: filteredCategories.isEmpty
                             ? const Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.category_outlined, size: 48, color: Colors.grey),
-                                    SizedBox(height: 16),
-                                    Text(
-                                      'Kategori bulunamadı',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
+                                child: DelilSoftEmpty(
+                                  title: 'Kategori bulunamadı',
+                                  message: 'Aramayla eşleşen kategori yok.',
+                                  icon: Icons.category_outlined,
                                 ),
                               )
                             : ListView.builder(
@@ -494,35 +578,45 @@ class _AdminPageState extends State<AdminPage> {
                                 ),
                                 title: Text(
                                   category.name,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: category.isActive ? Colors.black : Colors.grey,
+                                  style: palette.body(
+                                    weight: FontWeight.w700,
+                                    color: category.isActive
+                                        ? palette.textPrimary
+                                        : palette.textMuted,
                                   ),
                                 ),
                                 subtitle: Text(
                                   '${category.subCategories.length} alt kategori • ${category.totalDavalar} dava',
-                                  style: TextStyle(
-                                    color: category.isActive ? Colors.grey[600] : Colors.grey,
+                                  style: palette.caption(
+                                    color: category.isActive
+                                        ? palette.textSecondary
+                                        : palette.textMuted,
                                   ),
                                 ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
+                                      style: _iconTap(
+                                        category.isActive
+                                            ? _green(palette)
+                                            : palette.textMuted,
+                                      ),
                                       icon: Icon(
                                         category.isActive ? Icons.visibility : Icons.visibility_off,
-                                        color: category.isActive ? const Color(0xFF059669) : Colors.grey,
                                       ),
                                       onPressed: () => _toggleCategoryVisibility(category),
                                       tooltip: category.isActive ? 'Gizle' : 'Göster',
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.edit, color: Color(0xFF059669)),
+                                      style: _iconTap(_green(palette)),
+                                      icon: const Icon(Icons.edit),
                                       onPressed: () => _editCategory(category),
                                       tooltip: 'Düzenle',
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                      style: _iconTap(SeyirTokens.reject),
+                                      icon: const Icon(Icons.delete),
                                       onPressed: () => _deleteCategory(category),
                                       tooltip: 'Sil',
                                     ),
@@ -554,7 +648,7 @@ class _AdminPageState extends State<AdminPage> {
                             child: Text(
                               'Dava Listesi (${filteredDavalar.length}/${allDavalar.length})',
                               style: const TextStyle(
-                                fontSize: 18,
+                                fontSize: SeyirTokens.typeHeadline,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -566,22 +660,11 @@ class _AdminPageState extends State<AdminPage> {
                       // Dava arama çubuğu
                       TextField(
                         controller: _davaSearchController,
-                        decoration: InputDecoration(
-                          hintText: 'Dava ara (ID, ad, davacı, davalı)...',
-                          prefixIcon: const Icon(FeatherIcons.search, color: Color(0xFF059669)),
-                          suffixIcon: _davaSearchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _davaSearchController.clear();
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
+                        style: palette.body(),
+                        decoration: _searchField(
+                          palette,
+                          'Dava ara (ID, ad, davacı, davalı)...',
+                          _davaSearchController,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -628,19 +711,10 @@ class _AdminPageState extends State<AdminPage> {
                         height: 400,
                         child: filteredDavalar.isEmpty
                             ? const Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.gavel, size: 48, color: Colors.grey),
-                                    SizedBox(height: 16),
-                                    Text(
-                                      'Dava bulunamadı',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
+                                child: DelilSoftEmpty(
+                                  title: 'Dava bulunamadı',
+                                  message: 'Arama veya filtreyle eşleşen dava yok.',
+                                  icon: Icons.gavel,
                                 ),
                               )
                             : ListView.builder(
@@ -674,20 +748,16 @@ class _AdminPageState extends State<AdminPage> {
                                         children: [
                                           Text(
                                             'ID: ${dava['id'] ?? 'Bilinmiyor'}',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.grey[600],
-                                              fontFamily: 'monospace',
-                                            ),
+                                            style: palette.caption().copyWith(fontFamily: 'monospace'),
                                           ),
                                           Row(
                                             children: [
-                                              const Icon(Icons.person, size: 12, color: Colors.grey),
+                                              Icon(Icons.person, size: 12, color: palette.textMuted),
                                               const SizedBox(width: 4),
                                               Expanded(
                                                 child: Text(
                                                   'Davacı: ${dava['davaci'] ?? 'Bilinmiyor'}',
-                                                  style: const TextStyle(fontSize: 12),
+                                                  style: palette.caption(color: palette.textPrimary),
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
@@ -697,12 +767,12 @@ class _AdminPageState extends State<AdminPage> {
                                           if (dava['davali'] != null && dava['davali'].toString().isNotEmpty)
                                             Row(
                                               children: [
-                                                const Icon(Icons.person_outline, size: 12, color: Colors.grey),
+                                                Icon(Icons.person_outline, size: 12, color: palette.textMuted),
                                                 const SizedBox(width: 4),
                                                 Expanded(
                                                   child: Text(
                                                     'Davalı: ${dava['davali']}',
-                                                    style: const TextStyle(fontSize: 12),
+                                                    style: palette.caption(color: palette.textPrimary),
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
                                                   ),
@@ -713,21 +783,23 @@ class _AdminPageState extends State<AdminPage> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: isOpened 
-                                                  ? const Color(0xFF059669).withOpacity(0.1)
-                                                  : Colors.orange.withOpacity(0.1),
+                                              color: palette.tint(
+                                                isOpened ? const Color(0xFF059669) : Colors.orange,
+                                              ),
                                               borderRadius: BorderRadius.circular(12),
                                               border: Border.all(
-                                                color: isOpened ? const Color(0xFF059669) : Colors.orange,
-                                                width: 1,
+                                                color: palette.tintBorder(
+                                                  isOpened ? const Color(0xFF059669) : Colors.orange,
+                                                ),
                                               ),
                                             ),
                                             child: Text(
                                               isOpened ? 'AÇILDI' : 'KAYDEDİLDİ',
-                                              style: TextStyle(
-                                                color: isOpened ? const Color(0xFF059669) : Colors.orange,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
+                                              style: palette.caption(
+                                                color: palette.foreground(
+                                                  isOpened ? const Color(0xFF059669) : Colors.orange,
+                                                ),
+                                                weight: FontWeight.w700,
                                               ),
                                             ),
                                           ),
@@ -793,7 +865,7 @@ class _AdminPageState extends State<AdminPage> {
                                   ? 'Seçili: ${_selectedUserIds.length} kullanıcı'
                                   : 'Kullanıcı Listesi (${filteredUsers.length}/${allUsers.length})',
                               style: const TextStyle(
-                                fontSize: 18,
+                                fontSize: SeyirTokens.typeHeadline,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -916,22 +988,11 @@ class _AdminPageState extends State<AdminPage> {
                       // Arama çubuğu
                       TextField(
                         controller: _userSearchController,
-                        decoration: InputDecoration(
-                          hintText: 'Kullanıcı ara (email, isim, ülke)...',
-                          prefixIcon: const Icon(FeatherIcons.search, color: Color(0xFF059669)),
-                          suffixIcon: _userSearchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _userSearchController.clear();
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
+                        style: palette.body(),
+                        decoration: _searchField(
+                          palette,
+                          'Kullanıcı ara (email, isim, ülke)...',
+                          _userSearchController,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -958,20 +1019,15 @@ class _AdminPageState extends State<AdminPage> {
                       SizedBox(
                         height: 400,
                         child: filteredUsers.isEmpty
-                            ? const Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(FeatherIcons.userX, size: 48, color: Colors.grey),
-                                    SizedBox(height: 16),
-                                    Text(
-                                      'Kullanıcı bulunamadı',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
+                            ? Center(
+                                child: DelilSoftEmpty(
+                                  title: allUsers.isEmpty
+                                      ? 'Henüz kayıtlı kullanıcı yok'
+                                      : 'Kullanıcı bulunamadı',
+                                  message: allUsers.isEmpty
+                                      ? 'Kayıtlı kullanıcı listesi boş.'
+                                      : 'Arama veya filtreyle eşleşen kullanıcı yok.',
+                                  icon: FeatherIcons.userX,
                                 ),
                               )
                             : ListView.builder(
@@ -1034,7 +1090,7 @@ class _AdminPageState extends State<AdminPage> {
                                             ),
                                             child: const Text(
                                               'ADMIN',
-                                              style: TextStyle(color: Colors.white, fontSize: 10),
+                                              style: TextStyle(color: Colors.white, fontSize: SeyirTokens.typeCaption),
                                             ),
                                           ),
                                         if (user.isEmailVerified)
@@ -1047,7 +1103,7 @@ class _AdminPageState extends State<AdminPage> {
                                             ),
                                             child: const Text(
                                               'DOĞRULANDI',
-                                              style: TextStyle(color: Colors.white, fontSize: 10),
+                                              style: TextStyle(color: Colors.white, fontSize: SeyirTokens.typeCaption),
                                             ),
                                           ),
                                       ],
@@ -1161,44 +1217,58 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   /// Kullanıcı filtre chip'i oluşturur
-  Widget _buildFilterChip(String label, String filterValue) {
-    final isSelected = _userFilter == filterValue;
+  Widget _filterChip({
+    required String label,
+    required bool selected,
+    required ValueChanged<bool> onSelected,
+  }) {
+    final palette = SeyirPalette.of(context);
+    final green = _green(palette);
     return FilterChip(
       label: Text(label),
-      selected: isSelected,
+      selected: selected,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space2,
+        vertical: SeyirTokens.space2,
+      ),
+      onSelected: onSelected,
+      backgroundColor: palette.surfaceMuted,
+      selectedColor: green.withValues(alpha: 0.2),
+      checkmarkColor: green,
+      side: BorderSide(color: selected ? green : palette.border),
+      labelStyle: palette.body(
+        color: selected ? green : palette.textSecondary,
+        weight: selected ? FontWeight.w700 : FontWeight.w500,
+      ),
+    );
+  }
+
+  /// Kullanıcı filtre chip'i oluşturur
+  Widget _buildFilterChip(String label, String filterValue) {
+    return _filterChip(
+      label: label,
+      selected: _userFilter == filterValue,
       onSelected: (selected) {
         setState(() {
           _userFilter = filterValue;
           _filterUsers();
         });
       },
-      selectedColor: const Color(0xFF059669).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF059669),
-      labelStyle: TextStyle(
-        color: isSelected ? const Color(0xFF059669) : Colors.grey[700],
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-      ),
     );
   }
 
   /// Dava filtre chip'i oluşturur
   Widget _buildDavaFilterChip(String label, String filterValue) {
-    final isSelected = _davaFilter == filterValue;
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
+    return _filterChip(
+      label: label,
+      selected: _davaFilter == filterValue,
       onSelected: (selected) {
         setState(() {
           _davaFilter = filterValue;
           _filterDavalar();
         });
       },
-      selectedColor: const Color(0xFF059669).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF059669),
-      labelStyle: TextStyle(
-        color: isSelected ? const Color(0xFF059669) : Colors.grey[700],
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-      ),
     );
   }
 
@@ -1399,7 +1469,9 @@ class _AdminPageState extends State<AdminPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF059669),
                   foregroundColor: Colors.white,
-                ),
+                
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            ),
                 child: const Text('Kaydet'),
               ),
             ],
@@ -1520,6 +1592,8 @@ class _AdminPageState extends State<AdminPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF059669),
               foregroundColor: Colors.white,
+            
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
             ),
           ),
         ],
@@ -1539,7 +1613,7 @@ class _AdminPageState extends State<AdminPage> {
             Text(
               title,
               style: const TextStyle(
-                fontSize: 16,
+                fontSize: SeyirTokens.typeTitle,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF059669),
               ),
@@ -1554,8 +1628,9 @@ class _AdminPageState extends State<AdminPage> {
 
   /// Detay satırı widget'ı
   Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
+    final palette = SeyirPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space1),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1563,18 +1638,14 @@ class _AdminPageState extends State<AdminPage> {
             width: 140,
             child: Text(
               '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.grey,
-              ),
+              style: palette.body(color: palette.textSecondary),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: valueColor ?? Colors.black87,
+              style: palette.body(
+                color: valueColor ?? palette.textPrimary,
               ),
             ),
           ),
@@ -1668,7 +1739,11 @@ class _AdminPageState extends State<AdminPage> {
               
               showAppSnack(context, '${user.judgeName} silindi', backgroundColor: Colors.red);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            ),
             child: const Text('Sil'),
           ),
         ],
@@ -1719,24 +1794,24 @@ class _AdminPageState extends State<AdminPage> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Dava Konusu:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF059669),
+                        style: SeyirPalette.of(context).body(
+                          weight: FontWeight.w700,
+                          color: _green(SeyirPalette.of(context)),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
+                          color: SeyirPalette.of(context).surfaceMuted,
+                          borderRadius: SeyirTokens.radiusSmAll,
+                          border: Border.all(color: SeyirPalette.of(context).border),
                         ),
                         child: Text(
                           dava['davaKonusu'].toString(),
-                          style: const TextStyle(fontSize: 14),
+                          style: SeyirPalette.of(context).body(weight: FontWeight.w400),
                         ),
                       ),
                       const Divider(height: 24),
@@ -1770,6 +1845,8 @@ class _AdminPageState extends State<AdminPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
+            
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
             ),
           ),
         ],
@@ -1838,6 +1915,8 @@ class _AdminPageState extends State<AdminPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
+            
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
             ),
             child: const Text('Sil'),
           ),
@@ -2014,6 +2093,8 @@ class _AdminPageState extends State<AdminPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: lock ? Colors.red : Colors.orange,
               foregroundColor: Colors.white,
+            
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
             ),
             child: const Text('Onayla'),
           ),
@@ -2067,6 +2148,8 @@ class _AdminPageState extends State<AdminPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: activate ? Colors.green : Colors.grey,
               foregroundColor: Colors.white,
+            
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
             ),
             child: const Text('Onayla'),
           ),
@@ -2163,7 +2246,11 @@ class _AdminPageState extends State<AdminPage> {
               
               showAppSnack(context, '${selectedUsers.length} kullanıcı silindi', backgroundColor: Colors.red);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            ),
             child: const Text('Sil', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -2191,7 +2278,11 @@ class _AdminPageState extends State<AdminPage> {
               Navigator.pop(context);
               _loadData();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            ),
             child: const Text('Sil'),
           ),
         ],

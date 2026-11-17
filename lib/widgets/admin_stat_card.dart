@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Admin panosundaki beyaz istatistik kutusu.
+import '../theme/seyir_tokens.dart';
+
+/// Admin panosundaki istatistik kutusu.
 class AdminStatCard extends StatelessWidget {
   const AdminStatCard({
     super.key,
@@ -15,28 +17,29 @@ class AdminStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final accent = palette.isDark ? SeyirTokens.brand : const Color(0xFF059669);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(SeyirTokens.space3),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
+        color: palette.card,
+        borderRadius: SeyirTokens.radiusSmAll,
+        border: Border.all(color: palette.border),
       ),
       child: Column(
         children: [
-          Icon(icon, color: const Color(0xFF059669)),
-          const SizedBox(height: 8),
+          Icon(icon, color: accent),
+          const SizedBox(height: SeyirTokens.space2),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF059669),
-            ),
+            style: palette.display(color: accent),
           ),
           Text(
             title,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+            style: palette.body(
+              color: palette.textSecondary,
+              weight: FontWeight.w500,
+            ),
             textAlign: TextAlign.center,
           ),
         ],

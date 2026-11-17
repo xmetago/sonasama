@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../services/hive_database_service.dart';
 import '../services/local_notification_service.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/timeago_helper.dart';
 import '../widgets/cached_avatar_widget.dart';
 import '../widgets/cached_avatar_widget.dart' as cached;
+import '../widgets/delil_surface.dart';
 
 /// Test Sayfası - Bildirimler ve Performans İyileştirmeleri
 /// Bu sayfa yerel bildirimleri ve performans özelliklerini test etmek için kullanılır
 class TestNotificationsPage extends StatefulWidget {
-  const TestNotificationsPage({super.key});
+  const TestNotificationsPage({super.key, this.userEmail});
+
+  final String? userEmail;
 
   @override
   State<TestNotificationsPage> createState() => _TestNotificationsPageState();
@@ -17,132 +22,185 @@ class TestNotificationsPage extends StatefulWidget {
 class _TestNotificationsPageState extends State<TestNotificationsPage> {
   List<Map<String, dynamic>> _bildirimler = [];
 
+  bool get _authorized => HiveDatabaseService.isAdmin(widget.userEmail);
+
   @override
   void initState() {
     super.initState();
-    _loadBildirimler();
+    if (_authorized) {
+      _loadBildirimler();
+    }
   }
 
   void _loadBildirimler() {
+    if (!_authorized) return;
     setState(() {
       _bildirimler = LocalNotificationService.getAllNotifications();
     });
   }
 
+  Color _orange(SeyirPalette palette) {
+    return palette.isDark ? const Color(0xFFFFB074) : Colors.orange.shade700;
+  }
+
+  ButtonStyle _filledButton(Color background) {
+    final inherited = Theme.of(context).textTheme.labelLarge;
+    return ElevatedButton.styleFrom(
+      backgroundColor: background,
+      foregroundColor: Colors.white,
+      minimumSize: const Size(double.infinity, SeyirTokens.tapTarget),
+      padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space3),
+      textStyle: TextStyle(
+        fontSize: SeyirTokens.typeBody,
+        fontWeight: FontWeight.w700,
+        fontFamily: inherited?.fontFamily,
+        fontFamilyFallback: inherited?.fontFamilyFallback,
+      ),
+    );
+  }
+
+  Future<bool> _confirm({required String title, required String message}) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final dialogPalette = SeyirPalette.of(ctx);
+        return AlertDialog(
+          backgroundColor: dialogPalette.card,
+          shape: const RoundedRectangleBorder(borderRadius: SeyirTokens.radiusLgAll),
+          title: Text(title, style: dialogPalette.title()),
+          content: Text(message, style: dialogPalette.body(weight: FontWeight.w400)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                foregroundColor: dialogPalette.textPrimary,
+              ),
+              child: const Text('İptal'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                foregroundColor: SeyirTokens.reject,
+              ),
+              child: const Text('Sil'),
+            ),
+          ],
+        );
+      },
+    );
+    return result == true && mounted;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final orange = _orange(palette);
+    if (!_authorized) {
+      return Scaffold(
+        backgroundColor: palette.surface,
+        appBar: AppBar(
+          title: Text('Test Sayfası', style: palette.headline(color: Colors.white)),
+          backgroundColor: orange,
+          foregroundColor: palette.onSolid(orange),
+        ),
+        body: const Padding(
+          padding: EdgeInsets.all(SeyirTokens.space4),
+          child: DelilSoftEmpty(
+            title: 'Yetkiniz yok',
+            message: 'Bu sayfayı yalnızca yöneticiler kullanabilir.',
+            icon: Icons.lock_outline,
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
+      backgroundColor: palette.surface,
       appBar: AppBar(
-        title: const Text('Test Sayfası'),
-        backgroundColor: Colors.orange.shade700,
-        foregroundColor: Colors.white,
+        title: Text('Test Sayfası', style: palette.headline(color: Colors.white)),
+        backgroundColor: orange,
+        foregroundColor: palette.onSolid(orange),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(SeyirTokens.space4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Başlık
             Card(
-              color: Colors.orange.shade50,
+              color: palette.tint(orange),
+              shape: RoundedRectangleBorder(
+                borderRadius: SeyirTokens.radiusMdAll,
+                side: BorderSide(color: palette.tintBorder(orange)),
+              ),
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(SeyirTokens.space4),
                 child: Column(
                   children: [
                     Icon(
                       MdiIcons.testTube,
                       size: 48,
-                      color: Colors.orange.shade700,
+                      color: orange,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: SeyirTokens.space2),
                     Text(
                       'Bildirimler ve Performans Testi',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade700,
-                      ),
+                      textAlign: TextAlign.center,
+                      style: palette.headline(color: orange),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: SeyirTokens.space6),
 
-            // Bildirim Testleri Bölümü
-            _buildSectionTitle('🔔 Bildirim Testleri'),
-            const SizedBox(height: 12),
-            _buildNotificationTestButtons(),
-            const SizedBox(height: 24),
+            _buildSectionTitle('🔔 Bildirim Testleri', orange),
+            const SizedBox(height: SeyirTokens.space3),
+            _buildNotificationTestButtons(palette, orange),
+            const SizedBox(height: SeyirTokens.space6),
 
-            // Mevcut Bildirimler
-            _buildSectionTitle('📋 Mevcut Bildirimler (${_bildirimler.length})'),
-            const SizedBox(height: 12),
+            _buildSectionTitle('📋 Mevcut Bildirimler (${_bildirimler.length})', orange),
+            const SizedBox(height: SeyirTokens.space3),
             if (_bildirimler.isEmpty)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(
-                          MdiIcons.bellOff,
-                          size: 48,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Henüz bildirim yok',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              const DelilSoftEmpty(
+                title: 'Henüz bildirim yok',
+                message: 'Gösterilecek bir test bildirimi bulunmuyor.',
+                icon: MdiIcons.bellOff,
               )
             else
-              ..._bildirimler.map((bildirim) => _buildBildirimCard(bildirim)),
-            const SizedBox(height: 24),
+              ..._bildirimler.map((bildirim) => _buildBildirimCard(bildirim, palette)),
+            const SizedBox(height: SeyirTokens.space6),
 
-            // Performans Testleri Bölümü
-            _buildSectionTitle('⚡ Performans Testleri'),
-            const SizedBox(height: 12),
-            _buildPerformanceTests(),
-            const SizedBox(height: 24),
+            _buildSectionTitle('⚡ Performans Testleri', orange),
+            const SizedBox(height: SeyirTokens.space3),
+            _buildPerformanceTests(palette),
+            const SizedBox(height: SeyirTokens.space6),
 
-            // Timeago Testleri
-            _buildSectionTitle('⏰ Timeago Testleri'),
-            const SizedBox(height: 12),
-            _buildTimeagoTests(),
-            const SizedBox(height: 24),
+            _buildSectionTitle('⏰ Timeago Testleri', orange),
+            const SizedBox(height: SeyirTokens.space3),
+            _buildTimeagoTests(palette),
+            const SizedBox(height: SeyirTokens.space6),
 
-            // Cached Image Testleri
-            _buildSectionTitle('🖼️ Cached Image Testleri'),
-            const SizedBox(height: 12),
-            _buildCachedImageTests(),
+            _buildSectionTitle('🖼️ Cached Image Testleri', orange),
+            const SizedBox(height: SeyirTokens.space3),
+            _buildCachedImageTests(palette),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, Color orange) {
     return Text(
       title,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Colors.orange.shade700,
-      ),
+      style: SeyirPalette.of(context).headline(color: orange),
     );
   }
 
-  Widget _buildNotificationTestButtons() {
+  Widget _buildNotificationTestButtons(SeyirPalette palette, Color orange) {
     return Column(
       children: [
-        // Basit Bildirim
         ElevatedButton.icon(
           onPressed: () async {
             await LocalNotificationService.showNotification(
@@ -155,15 +213,10 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
           },
           icon: const Icon(Icons.notifications),
           label: const Text('Basit Bildirim Göster'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade700,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-          ),
+          style: _filledButton(const Color(0xFF1D4ED8)),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: SeyirTokens.space2),
 
-        // Dava Bildirimi
         ElevatedButton.icon(
           onPressed: () async {
             await LocalNotificationService.showDavaNotification(
@@ -176,15 +229,10 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
           },
           icon: const Icon(Icons.gavel),
           label: const Text('Dava Bildirimi Göster'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange.shade700,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-          ),
+          style: _filledButton(orange),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: SeyirTokens.space2),
 
-        // Uyarı Bildirimi
         ElevatedButton.icon(
           onPressed: () async {
             await LocalNotificationService.showUyariNotification(
@@ -197,15 +245,10 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
           },
           icon: const Icon(Icons.warning),
           label: const Text('Uyarı Bildirimi Göster'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red.shade700,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-          ),
+          style: _filledButton(SeyirTokens.reject),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: SeyirTokens.space2),
 
-        // Zamanlanmış Bildirim (30 saniye sonra)
         ElevatedButton.icon(
           onPressed: () async {
             final scheduledDate = DateTime.now().add(const Duration(seconds: 30));
@@ -219,17 +262,17 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
           },
           icon: const Icon(Icons.schedule),
           label: const Text('Zamanlanmış Bildirim (30 sn)'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade700,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-          ),
+          style: _filledButton(SeyirTokens.accept),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: SeyirTokens.space2),
 
-        // Tüm Bildirimleri Sil
         OutlinedButton.icon(
           onPressed: () async {
+            final ok = await _confirm(
+              title: 'Tüm bildirimleri sil',
+              message: 'Tüm bildirimleri silmek istediğine emin misin?',
+            );
+            if (!ok) return;
             await LocalNotificationService.deleteAllNotifications();
             _loadBildirimler();
             _showSuccess('Tüm bildirimler silindi!');
@@ -237,15 +280,24 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
           icon: const Icon(Icons.delete_sweep),
           label: const Text('Tüm Bildirimleri Sil'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.red.shade700,
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            foregroundColor: SeyirTokens.reject,
+            minimumSize: const Size(double.infinity, SeyirTokens.tapTarget),
+            padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space3),
+            side: const BorderSide(color: SeyirTokens.reject),
+            textStyle: TextStyle(
+              fontSize: SeyirTokens.typeBody,
+              fontWeight: FontWeight.w700,
+              fontFamily: Theme.of(context).textTheme.labelLarge?.fontFamily,
+              fontFamilyFallback:
+                  Theme.of(context).textTheme.labelLarge?.fontFamilyFallback,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildBildirimCard(Map<String, dynamic> bildirim) {
+  Widget _buildBildirimCard(Map<String, dynamic> bildirim, SeyirPalette palette) {
     final title = bildirim['title'] as String? ?? '';
     final body = bildirim['body'] as String? ?? '';
     final timestampStr = bildirim['timestamp'] as String?;
@@ -254,58 +306,59 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
     final channelId = bildirim['channelId'] as String? ?? '';
     final isScheduled = bildirim['isScheduled'] as bool? ?? false;
 
-    // Timeago ile tarih formatlama
     String tarihText = '';
     if (timestampStr != null) {
       tarihText = TimeAgoHelper.formatFromString(timestampStr);
     }
 
-    Color kanalRengi = Colors.blue.shade700;
+    Color kanalRengi = const Color(0xFF1D4ED8);
     if (channelId == 'mesaj_bildirimleri') {
-      kanalRengi = Colors.green.shade700;
+      kanalRengi = SeyirTokens.accept;
     } else if (channelId == 'dava_bildirimleri') {
-      kanalRengi = Colors.orange.shade700;
+      kanalRengi = _orange(palette);
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      color: palette.card,
+      margin: const EdgeInsets.only(bottom: SeyirTokens.space2),
+      shape: RoundedRectangleBorder(
+        borderRadius: SeyirTokens.radiusMdAll,
+        side: BorderSide(color: palette.border),
+      ),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: kanalRengi,
           child: Icon(
             isScheduled ? Icons.schedule : Icons.notifications,
-            color: Colors.white,
+            color: palette.onSolid(kanalRengi),
             size: 20,
           ),
         ),
         title: Text(
           title,
-          style: TextStyle(
-            fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-            color: isRead ? Colors.grey.shade600 : Colors.black87,
+          style: palette.body(
+            weight: isRead ? FontWeight.w500 : FontWeight.w700,
+            color: isRead ? palette.textSecondary : palette.textPrimary,
           ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 4),
-            Text(body),
-            const SizedBox(height: 4),
+            const SizedBox(height: SeyirTokens.space1),
+            Text(body, style: palette.body(weight: FontWeight.w400)),
+            const SizedBox(height: SeyirTokens.space1),
             Row(
               children: [
-                Icon(Icons.access_time, size: 12, color: Colors.grey.shade600),
-                const SizedBox(width: 4),
-                Text(
-                  tarihText,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                ),
+                Icon(Icons.access_time, size: 12, color: palette.textMuted),
+                const SizedBox(width: SeyirTokens.space1),
+                Text(tarihText, style: palette.caption()),
                 if (!isRead) ...[
-                  const SizedBox(width: 8),
+                  const SizedBox(width: SeyirTokens.space2),
                   Container(
                     width: 8,
                     height: 8,
                     decoration: const BoxDecoration(
-                      color: Colors.blue,
+                      color: Color(0xFF1D4ED8),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -319,6 +372,7 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
           children: [
             if (!isRead)
               IconButton(
+                style: delilIconButtonStyle(foreground: palette.textSecondary),
                 icon: const Icon(Icons.mark_email_read, size: 20),
                 onPressed: () async {
                   await LocalNotificationService.markAsRead(notificationId);
@@ -327,8 +381,14 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
                 tooltip: 'Okundu olarak işaretle',
               ),
             IconButton(
+              style: delilIconButtonStyle(foreground: SeyirTokens.reject),
               icon: const Icon(Icons.delete, size: 20),
               onPressed: () async {
+                final ok = await _confirm(
+                  title: 'Bildirimi sil',
+                  message: 'Bu bildirimi silmek istediğine emin misin?',
+                );
+                if (!ok) return;
                 await LocalNotificationService.deleteNotification(notificationId);
                 _loadBildirimler();
               },
@@ -340,42 +400,47 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
     );
   }
 
-  Widget _buildPerformanceTests() {
+  Widget _buildPerformanceTests(SeyirPalette palette) {
     return Card(
+      color: palette.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: SeyirTokens.radiusMdAll,
+        side: BorderSide(color: palette.border),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(SeyirTokens.space4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Performans İyileştirmeleri Aktif:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: palette.body(weight: FontWeight.w700),
             ),
-            const SizedBox(height: 8),
-            _buildCheckItem('✅ Cached Network Image aktif'),
-            _buildCheckItem('✅ Timeago Türkçe dil desteği aktif'),
-            _buildCheckItem('✅ Otomatik cache yönetimi'),
-            _buildCheckItem('✅ Bellek optimizasyonu'),
+            const SizedBox(height: SeyirTokens.space2),
+            _buildCheckItem('✅ Cached Network Image aktif', palette),
+            _buildCheckItem('✅ Timeago Türkçe dil desteği aktif', palette),
+            _buildCheckItem('✅ Otomatik cache yönetimi', palette),
+            _buildCheckItem('✅ Bellek optimizasyonu', palette),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCheckItem(String text) {
+  Widget _buildCheckItem(String text, SeyirPalette palette) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space1),
       child: Row(
         children: [
-          Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
-          const SizedBox(width: 8),
-          Text(text),
+          const Icon(Icons.check_circle, size: 16, color: SeyirTokens.accept),
+          const SizedBox(width: SeyirTokens.space2),
+          Expanded(child: Text(text, style: palette.body(weight: FontWeight.w400))),
         ],
       ),
     );
   }
 
-  Widget _buildTimeagoTests() {
+  Widget _buildTimeagoTests(SeyirPalette palette) {
     final now = DateTime.now();
     final testDates = [
       {'date': now.subtract(const Duration(minutes: 5)), 'label': '5 dakika önce'},
@@ -386,16 +451,21 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
     ];
 
     return Card(
+      color: palette.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: SeyirTokens.radiusMdAll,
+        side: BorderSide(color: palette.border),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(SeyirTokens.space4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Timeago Format Testleri:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: palette.body(weight: FontWeight.w700),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: SeyirTokens.space3),
             ...testDates.map((test) {
               final date = test['date'] as DateTime;
               final label = test['label'] as String;
@@ -403,27 +473,21 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
               final shortFormatted = TimeAgoHelper.formatShort(date);
 
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space1),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
                         label,
-                        style: TextStyle(color: Colors.grey.shade700),
+                        style: palette.body(
+                          color: palette.textSecondary,
+                          weight: FontWeight.w400,
+                        ),
                       ),
                     ),
-                    Text(
-                      formatted,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '($shortFormatted)',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
+                    Text(formatted, style: palette.body(weight: FontWeight.w700)),
+                    const SizedBox(width: SeyirTokens.space2),
+                    Text('($shortFormatted)', style: palette.caption()),
                   ],
                 ),
               );
@@ -434,26 +498,31 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
     );
   }
 
-  Widget _buildCachedImageTests() {
+  Widget _buildCachedImageTests(SeyirPalette palette) {
     return Card(
+      color: palette.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: SeyirTokens.radiusMdAll,
+        side: BorderSide(color: palette.border),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(SeyirTokens.space4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Cached Image Widget Testleri:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: palette.body(weight: FontWeight.w700),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: SeyirTokens.space4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                const Column(
+                Column(
                   children: [
-                    Text('Avatar Widget', style: TextStyle(fontSize: 12)),
-                    SizedBox(height: 8),
-                    CachedAvatarWidget(
+                    Text('Avatar Widget', style: palette.caption()),
+                    const SizedBox(height: SeyirTokens.space2),
+                    const CachedAvatarWidget(
                       imageUrl: 'https://ui-avatars.com/api/?name=Test+User&size=128',
                       radius: 30,
                       userName: 'Test User',
@@ -462,22 +531,22 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
                 ),
                 Column(
                   children: [
-                    const Text('Network Image', style: TextStyle(fontSize: 12)),
-                    const SizedBox(height: 8),
-                    cached.CachedNetworkImageWidget(
+                    Text('Network Image', style: palette.caption()),
+                    const SizedBox(height: SeyirTokens.space2),
+                    const cached.CachedNetworkImageWidget(
                       imageUrl: 'https://picsum.photos/100/100?random=1',
                       width: 60,
                       height: 60,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: SeyirTokens.radiusSmAll,
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            const Text(
+            const SizedBox(height: SeyirTokens.space4),
+            Text(
               'Not: İlk yüklemede placeholder gösterilir, sonraki yüklemelerde cache\'den gelir.',
-              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+              style: palette.caption(fontStyle: FontStyle.italic),
             ),
           ],
         ),
@@ -489,10 +558,9 @@ class _TestNotificationsPageState extends State<TestNotificationsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green.shade700,
+        backgroundColor: SeyirTokens.accept,
         duration: const Duration(seconds: 2),
       ),
     );
   }
 }
-

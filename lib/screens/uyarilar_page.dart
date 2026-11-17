@@ -265,7 +265,9 @@ class _UyarilarPageState extends State<UyarilarPage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const TestNotificationsPage(),
+                                builder: (context) => TestNotificationsPage(
+                                  userEmail: widget.userEmail,
+                                ),
                               ),
                             );
                           },
