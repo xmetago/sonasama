@@ -6,7 +6,9 @@ import '../services/hive_database_service.dart';
 import '../services/itibar_endeksi_service.dart';
 import '../services/user_gamified_score_service.dart';
 import '../services/user_session_service.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/app_theme.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/profile_icons_row.dart';
 
 /// Kullanıcının oyunlaştırılmış puan kartını gösteren ekran.
@@ -17,11 +19,19 @@ class UserGamifiedScorePage extends StatefulWidget {
   /// Kullanıcının kategorisini yönetmek için çağrılacak geri çağırım.
   final VoidCallback? onManageCategory;
 
+  /// Başkasının kartı. Düzenleme düğmeleri gizlenir.
+  final bool readOnly;
+
+  /// Widget testi: yükleme hatasını gösterir.
+  final bool forceLoadError;
+
   /// Varsayılan kurucu.
   const UserGamifiedScorePage({
     super.key,
     required this.targetUser,
     this.onManageCategory,
+    this.readOnly = false,
+    this.forceLoadError = false,
   });
 
   @override
@@ -171,6 +181,24 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
   bool _levhBusy = false;
   String? _errorMessage;
 
+  SeyirPalette get _palette => SeyirPalette.of(context);
+
+  BoxDecoration _scoreCard({Color? accent}) {
+    final SeyirPalette palette = _palette;
+    return BoxDecoration(
+      color: accent == null ? palette.card : palette.tint(accent),
+      borderRadius: SeyirTokens.radiusLgAll,
+      border: Border.all(
+        color: accent == null ? palette.border : palette.tintBorder(accent),
+      ),
+      boxShadow: palette.cardShadow,
+    );
+  }
+
+  Color get _positive => _palette.foreground(SeyirTokens.accept);
+
+  Color get _negative => _palette.foreground(SeyirTokens.reject);
+
   bool get _viewerIsAdmin {
     final email = UserSessionService.getCurrentUser()?.email;
     return HiveDatabaseService.isAdmin(email);
@@ -179,6 +207,11 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
   @override
   void initState() {
     super.initState();
+    if (widget.forceLoadError) {
+      _isLoading = false;
+      _errorMessage = 'Puan kartı yüklenirken bir sorun oluştu.';
+      return;
+    }
     _loadScore();
   }
 
@@ -220,18 +253,22 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = _palette;
+    final Color header = SeyirTokens.brand;
+    final Color headerInk = palette.onSolid(header);
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackgroundColor,
+      backgroundColor: palette.surface,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppTheme.successColor,
-        foregroundColor: AppTheme.textOnPrimary,
-        title: const Text('Puan Kartı'),
+        backgroundColor: header,
+        foregroundColor: headerInk,
+        title: Text('Puan Kartı', style: palette.display(color: headerInk)),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Yenile',
             onPressed: _isLoading ? null : _loadScore,
+            style: delilIconButtonStyle(foreground: headerInk),
           ),
         ],
       ),
@@ -244,45 +281,31 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(
-          color: AppTheme.successColor,
+          color: SeyirTokens.brand,
         ),
       );
     }
 
     if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 48,
-                color: AppTheme.errorColor.withOpacity(0.8),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _errorMessage!,
-                style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _loadScore,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Tekrar Dene'),
-                style: AppTheme.primaryButtonStyle,
-              ),
-            ],
-          ),
+      return Padding(
+        padding: const EdgeInsets.all(SeyirTokens.space4),
+        child: DelilLoadError(
+          message: _errorMessage!,
+          onRetry: _loadScore,
         ),
       );
     }
 
     final score = _scoreModel;
     if (score == null) {
-      return const SizedBox.shrink();
+      return const Padding(
+        padding: EdgeInsets.all(SeyirTokens.space4),
+        child: DelilSoftEmpty(
+          title: 'Puan kartı yok',
+          message: 'Bu yargıç için gösterilecek puan kaydı yok.',
+          icon: Icons.emoji_events_outlined,
+        ),
+      );
     }
 
     final currentLevel = _resolveCurrentLevel(score.totalScore);
@@ -294,7 +317,7 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     );
 
     return RefreshIndicator(
-      color: AppTheme.successColor,
+      color: SeyirTokens.brand,
       onRefresh: _loadScore,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -364,7 +387,7 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
                 child: Text(
                   initials,
                   style: const TextStyle(
-                    fontSize: 26,
+                    fontSize: SeyirTokens.typeDisplay,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.textOnPrimary,
                   ),
@@ -377,14 +400,13 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
                   children: [
                     Text(
                       widget.targetUser.judgeName,
-                      style: AppTheme.headline4.copyWith(
-                        color: AppTheme.textOnPrimary,
-                      ),
+                      style: _palette.headline(color: AppTheme.textOnPrimary),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.targetUser.email,
-                      style: AppTheme.bodySmall.copyWith(
+                      style: _palette.body(
+                        weight: FontWeight.w400,
                         color: AppTheme.textOnPrimary.withOpacity(0.8),
                       ),
                     ),
@@ -438,7 +460,7 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
           const SizedBox(height: 14),
           Text(
             '1-Hassas Vicdanlı Kişisi\'nden  --> 2- Empatik(Rahmet) Kişisi\'ne  değer yolculuğu',
-            style: AppTheme.caption.copyWith(
+            style: _palette.caption(
               color: AppTheme.textOnPrimary.withOpacity(0.85),
             ),
           ),
@@ -525,7 +547,7 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
             label,
             style: TextStyle(
               color: AppTheme.textOnPrimary.withOpacity(0.75),
-              fontSize: 11,
+              fontSize: SeyirTokens.typeCaption,
             ),
           ),
           const SizedBox(height: 4),
@@ -534,7 +556,7 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
             style: const TextStyle(
               color: AppTheme.textOnPrimary,
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: SeyirTokens.typeBody,
             ),
           ),
         ],
@@ -549,7 +571,7 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     double progressValue,
   ) {
     return Container(
-      decoration: AppTheme.cardDecoration(bordered: true),
+      decoration: _scoreCard(),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,22 +581,22 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
               Expanded(
                 child: Text(
                   'Seviye İlerlemeniz',
-                  style: AppTheme.headline4,
+                  style: _palette.headline(),
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppTheme.calmGreenUltraLight,
+                  color: _palette.brandSoft,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   nextLevel == null
                       ? 'Zirvedesiniz'
                       : '${_formatPoints(nextLevel.points)} puana',
-                  style: AppTheme.caption.copyWith(
-                    color: AppTheme.successDarkColor,
-                    fontWeight: FontWeight.w600,
+                  style: _palette.caption(
+                    color: _positive,
+                    weight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -584,7 +606,10 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
             const SizedBox(height: 6),
             Text(
               nextLevel.concept,
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.textSecondary),
+              style: _palette.body(
+                weight: FontWeight.w400,
+                color: _palette.textSecondary,
+              ),
             ),
           ],
           const SizedBox(height: 16),
@@ -593,7 +618,7 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
             child: LinearProgressIndicator(
               minHeight: 10,
               value: progressValue,
-              backgroundColor: AppTheme.dividerColor,
+              backgroundColor: _palette.border,
               valueColor: AlwaysStoppedAnimation<Color>(currentLevel.color),
             ),
           ),
@@ -603,18 +628,18 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
             children: [
               Text(
                 'Başlangıç: ${_formatPoints(currentLevel.points)}',
-                style: AppTheme.caption,
+                style: _palette.caption(),
               ),
               Text(
                 '%${(progressValue * 100).round()}',
-                style: AppTheme.caption.copyWith(
-                  color: AppTheme.successDarkColor,
-                  fontWeight: FontWeight.bold,
+                style: _palette.caption(
+                  color: _positive,
+                  weight: FontWeight.w700,
                 ),
               ),
               Text(
                 'Zirve: ${_formatPoints(_maxScore)}',
-                style: AppTheme.caption,
+                style: _palette.caption(),
               ),
             ],
           ),
@@ -628,12 +653,15 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('İtibar Endeksi', style: AppTheme.headline4),
+        Text('İtibar Endeksi', style: _palette.headline()),
         const SizedBox(height: 4),
         Text(
           'Sosyal Lig, Dava Enerjisi, Masraf/Hediye Sadakati, '
           'Levh-i Mahfûz Defteri ve Diren Endeksi ortalaması.',
-          style: AppTheme.bodySmall,
+          style: _palette.body(
+            weight: FontWeight.w400,
+            color: _palette.textSecondary,
+          ),
         ),
         const SizedBox(height: 12),
         ...score.breakdownItems.map((item) {
@@ -657,17 +685,22 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     final valueColor = _pointsColor(item);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: AppTheme.cardDecoration(bordered: true),
+      decoration: _scoreCard(),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: item.color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
+              color: _palette.tint(item.color),
+              borderRadius: SeyirTokens.radiusMdAll,
+              border: Border.all(color: _palette.tintBorder(item.color)),
             ),
-            child: Icon(item.icon, color: item.color, size: 22),
+            child: Icon(
+              item.icon,
+              color: _palette.foreground(item.color),
+              size: 22,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -676,13 +709,11 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
               children: [
                 Text(
                   item.title,
-                  style: AppTheme.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: _palette.title(weight: FontWeight.w600),
                 ),
                 Text(
                   item.description,
-                  style: AppTheme.caption,
+                  style: _palette.caption(),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -690,9 +721,9 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
                   const SizedBox(height: 4),
                   Text(
                     'Trend grafiği',
-                    style: AppTheme.caption.copyWith(
-                      color: item.color,
-                      fontWeight: FontWeight.w600,
+                    style: _palette.caption(
+                      color: _palette.foreground(item.color),
+                      weight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -705,19 +736,17 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
             children: [
               Text(
                 _formatMetricValue(item),
-                style: AppTheme.bodyMedium.copyWith(
-                  color: valueColor,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: _palette.title(color: valueColor),
               ),
-              if (item.metricId == 'levh' && _viewerIsAdmin)
+              if (item.metricId == 'levh' && _viewerIsAdmin && !widget.readOnly)
                 TextButton(
                   onPressed: _levhBusy ? null : _incrementLevh,
                   style: TextButton.styleFrom(
-                    foregroundColor: item.color,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    foregroundColor: _palette.foreground(item.color),
+                    minimumSize: const Size(
+                      SeyirTokens.tapTarget,
+                      SeyirTokens.tapTarget,
+                    ),
                   ),
                   child: Text(_levhBusy ? '...' : '+0'),
                 ),
@@ -730,9 +759,9 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
 
   Color _pointsColor(ScoreBreakdownItem item) {
     final value = item.preciseValue ?? item.points.toDouble();
-    if (value < 0) return AppTheme.errorColor;
-    if (value > 0) return AppTheme.successDarkColor;
-    return AppTheme.textSecondary;
+    if (value < 0) return _negative;
+    if (value > 0) return _positive;
+    return _palette.textSecondary;
   }
 
   String _formatMetricValue(ScoreBreakdownItem item) {
@@ -773,17 +802,7 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
   }
 
   void _showItibarTrend(UserGamifiedScoreModel score) {
-    final points = score.trendPoints.isEmpty
-        ? const [0, 3, 6, 9, 12]
-            .map(
-              (months) => ItibarTrendPoint(
-                monthsBack: months,
-                label: months == 12 ? '12 ay (yıllık)' : '$months ay',
-                average: score.itibarEndeksi,
-              ),
-            )
-            .toList()
-        : score.trendPoints;
+    final points = score.trendPoints;
     var maxAbs = 1.0;
     for (final point in points) {
       final abs = point.average.abs();
@@ -792,9 +811,14 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
 
     showDialog<void>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
+        final SeyirPalette palette = SeyirPalette.of(dialogContext);
+        final Color valueColor = score.itibarEndeksi < 0
+            ? palette.foreground(SeyirTokens.reject)
+            : palette.foreground(SeyirTokens.accept);
         return AlertDialog(
-          title: const Text('İtibar Endeksi'),
+          backgroundColor: palette.card,
+          title: Text('İtibar Endeksi', style: palette.headline()),
           content: SizedBox(
             width: 320,
             child: Column(
@@ -803,63 +827,82 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
               children: [
                 Text(
                   _formatSignedDouble(score.itibarEndeksi),
-                  style: AppTheme.headline4.copyWith(
-                    color: score.itibarEndeksi < 0
-                        ? AppTheme.errorColor
-                        : AppTheme.successDarkColor,
-                  ),
+                  style: palette.headline(color: valueColor),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   '(Sosyal Lig + Dava Enerjisi + Masraf/Hediye Sadakati + '
                   'Levh-i Mahfûz + Diren Endeksi) / 5',
-                  style: AppTheme.caption,
+                  style: palette.caption(),
                 ),
                 const SizedBox(height: 16),
-                ...points.map((point) {
-                  final fraction = (point.average.abs() / maxAbs).clamp(0.0, 1.0);
-                  final barColor = point.average < 0
-                      ? AppTheme.errorColor
-                      : AppTheme.successColor;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(point.label, style: AppTheme.bodySmall),
-                            ),
-                            Text(
-                              _formatSignedDouble(point.average),
-                              style: AppTheme.bodySmall.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: barColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: LinearProgressIndicator(
-                            minHeight: 8,
-                            value: fraction == 0 ? 0.04 : fraction,
-                            backgroundColor: AppTheme.dividerColor,
-                            valueColor: AlwaysStoppedAnimation<Color>(barColor),
-                          ),
-                        ),
-                      ],
+                if (!score.hasItibarHistory)
+                  Text(
+                    'Henüz geçmiş yok',
+                    style: palette.body(
+                      weight: FontWeight.w400,
+                      color: palette.textSecondary,
                     ),
-                  );
-                }),
+                  )
+                else
+                  ...points.map((point) {
+                    final fraction =
+                        (point.average.abs() / maxAbs).clamp(0.0, 1.0);
+                    final barColor = point.average < 0
+                        ? palette.foreground(SeyirTokens.reject)
+                        : palette.foreground(SeyirTokens.accept);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  point.label,
+                                  style: palette.body(
+                                    weight: FontWeight.w400,
+                                    color: palette.textSecondary,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                _formatSignedDouble(point.average),
+                                style: palette.body(
+                                  weight: FontWeight.w700,
+                                  color: barColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: SeyirTokens.radiusSmAll,
+                            child: LinearProgressIndicator(
+                              minHeight: 8,
+                              value: fraction == 0 ? 0.04 : fraction,
+                              backgroundColor: palette.border,
+                              valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
               ],
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(
+                  SeyirTokens.tapTarget,
+                  SeyirTokens.tapTarget,
+                ),
+                foregroundColor: palette.textPrimary,
+              ),
               child: const Text('Kapat'),
             ),
           ],
@@ -878,20 +921,20 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
   /// Seviye tablosunu oluşturur.
   Widget _buildLevelsTable(_ScoreLevelDefinition currentLevel) {
     return Container(
-      decoration: AppTheme.cardDecoration(bordered: true),
+      decoration: _scoreCard(),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Değer Seviyeleri ve Puanları', style: AppTheme.headline4),
+          Text('Değer Seviyeleri ve Puanları', style: _palette.headline()),
           const SizedBox(height: 4),
           Text(
             'Mevcut seviyeniz vurgulanmıştır.',
-            style: AppTheme.caption,
+            style: _palette.caption(),
           ),
           const SizedBox(height: 14),
           _buildTableHeader(),
-          const Divider(height: 1, color: AppTheme.dividerColor),
+          Divider(height: 1, color: _palette.border),
           ..._scoreLevels.map((level) {
             final isCurrent = level.rank == currentLevel.rank;
             return _buildTableRow(level, isCurrent);
@@ -926,11 +969,10 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     );
   }
 
-  static const TextStyle _tableHeaderStyle = TextStyle(
-    color: AppTheme.textSecondary,
-    fontWeight: FontWeight.bold,
-    fontSize: 12,
-  );
+  TextStyle get _tableHeaderStyle => _palette.caption(
+        color: _palette.textSecondary,
+        weight: FontWeight.w700,
+      );
 
   /// Tablo satırını üretir.
   Widget _buildTableRow(_ScoreLevelDefinition level, bool isCurrent) {
@@ -938,10 +980,10 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
       decoration: BoxDecoration(
-        color: isCurrent ? AppTheme.calmGreenUltraLight : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
+        color: isCurrent ? _palette.brandSoft : Colors.transparent,
+        borderRadius: SeyirTokens.radiusMdAll,
         border: isCurrent
-            ? Border.all(color: AppTheme.successColor.withOpacity(0.3))
+            ? Border.all(color: _palette.tintBorder(SeyirTokens.brand))
             : null,
       ),
       child: Row(
@@ -953,16 +995,15 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
                 ProfileIconsRow.ligIcon(
                   level.lig,
                   size: 16,
-                  color: level.color,
+                  color: _palette.foreground(level.color),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'Lig ${level.lig}',
-                    style: TextStyle(
-                      color: level.color,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11,
+                    style: _palette.caption(
+                      color: _palette.foreground(level.color),
+                      weight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -973,9 +1014,9 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
             child: Text(
               level.rank.toString(),
               textAlign: TextAlign.center,
-              style: AppTheme.bodySmall.copyWith(
-                fontWeight: FontWeight.w600,
-                color: isCurrent ? AppTheme.successDarkColor : AppTheme.textPrimary,
+              style: _palette.body(
+                weight: FontWeight.w600,
+                color: isCurrent ? _positive : _palette.textPrimary,
               ),
             ),
           ),
@@ -984,15 +1025,15 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
             child: Row(
               children: [
                 if (isCurrent) ...[
-                  Icon(Icons.arrow_forward, size: 14, color: AppTheme.successColor),
+                  Icon(Icons.arrow_forward, size: 14, color: _positive),
                   const SizedBox(width: 4),
                 ],
                 Expanded(
                   child: Text(
                     level.concept,
-                    style: AppTheme.bodySmall.copyWith(
-                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                      color: isCurrent ? AppTheme.successDarkColor : AppTheme.textPrimary,
+                    style: _palette.body(
+                      weight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                      color: isCurrent ? _positive : _palette.textPrimary,
                     ),
                   ),
                 ),
@@ -1003,9 +1044,9 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
             child: Text(
               _formatPoints(level.points),
               textAlign: TextAlign.right,
-              style: AppTheme.bodySmall.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
+              style: _palette.body(
+                weight: FontWeight.w700,
+                color: _palette.textPrimary,
               ),
             ),
           ),
@@ -1023,7 +1064,7 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Değer Yolculuğu Rehberi', style: AppTheme.headline4),
+        Text('Değer Yolculuğu Rehberi', style: _palette.headline()),
         const SizedBox(height: 12),
         _buildInsightCard(
           title: 'Motto',
@@ -1070,20 +1111,18 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: AppTheme.cardDecoration(
-        color: color.withOpacity(0.05),
-        bordered: true,
-      ),
+      decoration: _scoreCard(accent: color),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
+              color: _palette.tint(color),
+              borderRadius: SeyirTokens.radiusMdAll,
+              border: Border.all(color: _palette.tintBorder(color)),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: _palette.foreground(color), size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1092,12 +1131,15 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
               children: [
                 Text(
                   title,
-                  style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+                  style: _palette.title(),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: AppTheme.bodySmall.copyWith(height: 1.5),
+                  style: _palette.body(
+                    weight: FontWeight.w400,
+                    color: _palette.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -1111,21 +1153,23 @@ class _UserGamifiedScorePageState extends State<UserGamifiedScorePage> {
   Widget _buildActionButtons() {
     return Column(
       children: [
-        if (widget.onManageCategory != null)
+        if (widget.onManageCategory != null && !widget.readOnly)
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _handleManageCategory,
               icon: const Icon(Icons.category_outlined),
               label: const Text('Kategori Yönet'),
-              style: AppTheme.primaryButtonStyle.copyWith(
-                padding: WidgetStateProperty.all(
-                  const EdgeInsets.symmetric(vertical: 16),
-                ),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, SeyirTokens.tapTarget),
+                backgroundColor: SeyirTokens.brand,
+                foregroundColor: _palette.onSolid(SeyirTokens.brand),
+                padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space4),
               ),
             ),
           ),
-        if (widget.onManageCategory != null) const SizedBox(height: 10),
+        if (widget.onManageCategory != null && !widget.readOnly)
+          const SizedBox(height: 10),
 
       ],
     );

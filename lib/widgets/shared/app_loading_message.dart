@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/seyir_tokens.dart';
+
 /// Ortada tema renginde dönen gösterge ve altındaki yükleme metni.
 class AppLoadingMessage extends StatelessWidget {
   const AppLoadingMessage({
@@ -23,10 +25,9 @@ class AppLoadingMessage extends StatelessWidget {
           const SizedBox(height: 24),
           Text(
             message,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+            style: SeyirPalette.of(context).title(
+              weight: FontWeight.w500,
+              color: SeyirPalette.of(context).textSecondary,
             ),
           ),
         ],

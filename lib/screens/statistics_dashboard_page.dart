@@ -4,6 +4,8 @@ import 'package:flutter_material_design_icons/flutter_material_design_icons.dart
 import '../services/statistics_analytics_service.dart';
 import '../services/dava_hukum_service.dart';
 import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
+import '../widgets/delil_surface.dart';
 import 'home_page.dart';
 import 'chat_page.dart';
 import '../widgets/verified_users_management_dialog.dart';
@@ -14,8 +16,19 @@ class StatisticsDashboardPage extends StatefulWidget {
   /// İsteğe bağlı kullanıcı e-postası.
   final String? userEmail;
 
+  /// Widget testi: yükleme hatasını gösterir.
+  final bool forceLoadError;
+
+  /// Widget testi: ilk karedeki yükleme göstergesini sabitler.
+  final bool forceLoading;
+
   /// Kurucu.
-  const StatisticsDashboardPage({super.key, this.userEmail});
+  const StatisticsDashboardPage({
+    super.key,
+    this.userEmail,
+    this.forceLoadError = false,
+    this.forceLoading = false,
+  });
 
   @override
   State<StatisticsDashboardPage> createState() =>
@@ -25,9 +38,11 @@ class StatisticsDashboardPage extends StatefulWidget {
 class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
   final _service = const StatisticsAnalyticsService();
   final _haykirService = const HaykirStatisticsAnalyticsService();
+  final _davaSearchFocus = FocusNode();
+  final _statsScroll = ScrollController();
   StatisticsAnalyticsResult? _result;
   HaykirStatisticsAnalyticsResult? _haykirResult;
-  bool _isLoading = false;
+  bool _isLoading = true;
   String? _error;
   String _searchQuery = '';
   String _haykirSearchQuery = '';
@@ -38,7 +53,31 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.forceLoadError) {
+      _isLoading = false;
+      _error = 'İstatistikler yüklenemedi. Lütfen tekrar deneyin.';
+      return;
+    }
+    if (widget.forceLoading) return;
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _davaSearchFocus.dispose();
+    _statsScroll.dispose();
+    super.dispose();
+  }
+
+  void _focusDavaSearch() {
+    if (_statsScroll.hasClients) {
+      _statsScroll.animateTo(
+        0,
+        duration: SeyirTokens.motion,
+        curve: Curves.easeOut,
+      );
+    }
+    _davaSearchFocus.requestFocus();
   }
 
   Future<void> _loadData() async {
@@ -69,25 +108,28 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Scaffold(
+      backgroundColor: palette.surface,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Dava İstatistikleri',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
+          style: palette.display(),
         ),
         elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: palette.surface,
+        foregroundColor: palette.textPrimary,
         actions: [
           IconButton(
             icon: Icon(
               Icons.refresh_rounded,
-              color: _isLoading ? Colors.grey : Theme.of(context).primaryColor,
+              color: _isLoading ? palette.textMuted : palette.textPrimary,
             ),
             onPressed: _isLoading ? null : _loadData,
             tooltip: 'Yenile',
+            style: delilIconButtonStyle(
+              foreground: _isLoading ? palette.textMuted : palette.textPrimary,
+            ),
           ),
         ],
       ),
@@ -106,6 +148,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
 
   /// Üst header widget'ını oluşturur.
   Widget _buildTopHeader() {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(
@@ -140,7 +183,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                   child: const Text(
                     'Who',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: SeyirTokens.typeTitle,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -158,7 +201,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                   child: const Text(
                     'Boom',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: SeyirTokens.typeTitle,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -169,11 +212,15 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
           ),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.search, size: 24),
-            onPressed: () {},
+            icon: Icon(Icons.search, size: 22, color: palette.textPrimary),
+            tooltip: 'Aramaya git',
+            onPressed: _focusDavaSearch,
+            style: delilIconButtonStyle(foreground: palette.textPrimary),
           ),
-          GestureDetector(
-            onTap: () {
+          IconButton(
+            tooltip: 'Sohbet',
+            style: delilIconButtonStyle(foreground: palette.textPrimary),
+            onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -181,10 +228,10 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                 ),
               );
             },
-            child: Icon(
+            icon: Icon(
               MdiIcons.chatOutline,
-              size: 24,
-              color: Colors.black54,
+              size: 22,
+              color: palette.textPrimary,
             ),
           ),
         ],
@@ -199,37 +246,25 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
       );
     }
     if (_error != null) {
-      return AppErrorRetryView(
+      return DelilLoadError(
         message: _error!,
         onRetry: _loadData,
       );
     }
     final data = _result;
-    if (data == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.inbox_rounded,
-                size: 80,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Veri bulunamadı',
-                style: TextStyle(
-                  color: Colors.grey[700],
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+    final haykirPreview = _haykirResult;
+    const Widget emptyStats = Padding(
+      padding: EdgeInsets.all(SeyirTokens.space4),
+      child: DelilSoftEmpty(
+        title: 'Veri bulunamadı',
+        message: 'Henüz istatistiğe dönüşecek dava veya haykırış yok.',
+        icon: Icons.inbox_outlined,
+      ),
+    );
+    if (data == null) return emptyStats;
+    if (data.summary.totalCases == 0 &&
+        (haykirPreview == null || haykirPreview.alphabetical.isEmpty)) {
+      return emptyStats;
     }
     final filtered = _resolveFilteredList(data)
         .where((item) => item.matchesQuery(_searchQuery))
@@ -248,6 +283,8 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
     return RefreshIndicator(
       onRefresh: _loadData,
       child: _SimplifiedStatisticsView(
+        scrollController: _statsScroll,
+        searchFocusNode: _davaSearchFocus,
         searchResults: filtered,
         todaysOpened: data.todaysOpened,
         searchQuery: _searchQuery,
@@ -440,7 +477,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
-            fillColor: Colors.grey[50],
+            fillColor: SeyirPalette.of(context).surfaceMuted,
           ),
           autofocus: true,
           onSubmitted: (value) {
@@ -541,17 +578,12 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final SeyirPalette sheet = SeyirPalette.of(context);
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, -5),
-              ),
-            ],
+            color: sheet.card,
+            borderRadius: SeyirTokens.sheetTop,
+            boxShadow: sheet.cardShadow,
           ),
           child: Padding(
             padding: EdgeInsets.only(
@@ -572,7 +604,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 20),
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        color: SeyirPalette.of(context).border,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -581,7 +613,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                     insight.title,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey[900],
+                          color: SeyirPalette.of(context).textPrimary,
                         ),
                   ),
                   if (insight.slogan.isNotEmpty) ...[
@@ -589,8 +621,8 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                     Text(
                       insight.slogan,
                       style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
+                        fontSize: SeyirTokens.typeBody,
+                        color: SeyirPalette.of(context).textSecondary,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -675,7 +707,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                       onPressed: () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: Colors.grey[300]!),
+                        side: BorderSide(color: SeyirPalette.of(context).border),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -698,17 +730,12 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final SeyirPalette sheet = SeyirPalette.of(context);
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, -5),
-              ),
-            ],
+            color: sheet.card,
+            borderRadius: SeyirTokens.sheetTop,
+            boxShadow: sheet.cardShadow,
           ),
           child: Padding(
             padding: EdgeInsets.only(
@@ -729,7 +756,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 20),
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        color: SeyirPalette.of(context).border,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -738,7 +765,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                     insight.title,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey[900],
+                          color: SeyirPalette.of(context).textPrimary,
                         ),
                   ),
                   const SizedBox(height: 20),
@@ -895,7 +922,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
                       onPressed: () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: Colors.grey[300]!),
+                        side: BorderSide(color: SeyirPalette.of(context).border),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -916,6 +943,8 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
 /// Basitleştirilmiş istatistik görünümü.
 class _SimplifiedStatisticsView extends StatelessWidget {
   const _SimplifiedStatisticsView({
+    required this.scrollController,
+    required this.searchFocusNode,
     required this.searchResults,
     required this.todaysOpened,
     required this.searchQuery,
@@ -928,6 +957,8 @@ class _SimplifiedStatisticsView extends StatelessWidget {
     required this.onHaykirTap,
   });
 
+  final ScrollController scrollController;
+  final FocusNode searchFocusNode;
   final List<CaseInsight> searchResults;
   final List<CaseInsight> todaysOpened;
   final String searchQuery;
@@ -950,12 +981,13 @@ class _SimplifiedStatisticsView extends StatelessWidget {
             accentColor: accent,
           ),
       (_) => const SizedBox(height: 12),
-      (_) => AppSearchField(
+      (context) => AppSearchField(
             hintText: 'Dava, kategori veya hashtag ara...',
             onChanged: onQueryChanged,
+            focusNode: searchFocusNode,
             suffixIcon: Icon(
               Icons.tune_rounded,
-              color: Colors.grey[400],
+              color: SeyirPalette.of(context).textMuted,
             ),
           ),
       (_) => const SizedBox(height: 16),
@@ -995,12 +1027,15 @@ class _SimplifiedStatisticsView extends StatelessWidget {
     ]);
     if (todaysOpened.isEmpty) {
       itemBuilders.add(
-        (_) => const AppInfoBanner(
+        (_) => AppInfoBanner(
           icon: Icons.info_outline_rounded,
           message: 'Bugün açılan dava bulunamadı',
-          backgroundColor: Color(0xFFEFF6FF),
-          borderColor: Color(0xFFBFDBFE),
-          iconColor: Color(0xFF1D4ED8),
+          backgroundColor:
+              SeyirPalette.of(context).tint(const Color(0xFF1D4ED8)),
+          borderColor:
+              SeyirPalette.of(context).tintBorder(const Color(0xFF1D4ED8)),
+          iconColor:
+              SeyirPalette.of(context).foreground(const Color(0xFF1D4ED8)),
         ),
       );
     } else {
@@ -1063,12 +1098,15 @@ class _SimplifiedStatisticsView extends StatelessWidget {
     ]);
     if (haykirTodaysOpened.isEmpty) {
       itemBuilders.add(
-        (_) => const AppInfoBanner(
+        (_) => AppInfoBanner(
           icon: Icons.info_outline_rounded,
           message: 'Bugün açılan haykırış bulunamadı',
-          backgroundColor: Color(0xFFEFF6FF),
-          borderColor: Color(0xFFBFDBFE),
-          iconColor: Color(0xFF1D4ED8),
+          backgroundColor:
+              SeyirPalette.of(context).tint(const Color(0xFF1D4ED8)),
+          borderColor:
+              SeyirPalette.of(context).tintBorder(const Color(0xFF1D4ED8)),
+          iconColor:
+              SeyirPalette.of(context).foreground(const Color(0xFF1D4ED8)),
         ),
       );
     } else {
@@ -1085,6 +1123,7 @@ class _SimplifiedStatisticsView extends StatelessWidget {
     itemBuilders.add((_) => const SizedBox(height: 32));
 
     return ListView.builder(
+      controller: scrollController,
       padding: const EdgeInsets.all(16),
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: itemBuilders.length,
@@ -1253,7 +1292,7 @@ class _SummaryCard extends StatelessWidget {
               child: Text(
                 value,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: SeyirTokens.typeDisplay,
                   fontWeight: FontWeight.bold,
                   color: color,
                   height: 1.1,
@@ -1266,7 +1305,7 @@ class _SummaryCard extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.grey[700],
+                  color: SeyirPalette.of(context).textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
                 maxLines: 2,
@@ -1361,8 +1400,8 @@ class _CaseTile extends StatelessWidget {
                       insight.title,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: dense ? 15 : 16,
-                        color: Colors.grey[900],
+                        fontSize: SeyirTokens.typeTitle,
+                        color: SeyirPalette.of(context).textPrimary,
                         height: 1.3,
                       ),
                       maxLines: 2,
@@ -1379,14 +1418,14 @@ class _CaseTile extends StatelessWidget {
                             Icon(
                               Icons.category_rounded,
                               size: 14,
-                              color: Colors.grey[600],
+                              color: SeyirPalette.of(context).textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               insight.category,
                               style: TextStyle(
-                                fontSize: dense ? 12 : 13,
-                                color: Colors.grey[600],
+                                fontSize: SeyirTokens.typeBody,
+                                color: SeyirPalette.of(context).textSecondary,
                               ),
                             ),
                           ],
@@ -1397,14 +1436,14 @@ class _CaseTile extends StatelessWidget {
                             Icon(
                               Icons.calendar_today_rounded,
                               size: 14,
-                              color: Colors.grey[600],
+                              color: SeyirPalette.of(context).textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               _formatDate(insight.createdAt),
                               style: TextStyle(
-                                fontSize: dense ? 12 : 13,
-                                color: Colors.grey[600],
+                                fontSize: SeyirTokens.typeBody,
+                                color: SeyirPalette.of(context).textSecondary,
                               ),
                             ),
                           ],
@@ -1421,20 +1460,20 @@ class _CaseTile extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.green[50],
+                      color: SeyirPalette.of(context).tint(SeyirTokens.accept),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.thumb_up_rounded, size: 16, color: Colors.green[700]),
+                        Icon(Icons.thumb_up_rounded, size: 16, color: SeyirPalette.of(context).foreground(SeyirTokens.accept)),
                         const SizedBox(width: 4),
                         Text(
                           '${insight.supportCount}',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.green[700],
-                            fontSize: dense ? 13 : 14,
+                            color: SeyirPalette.of(context).foreground(SeyirTokens.accept),
+                            fontSize: SeyirTokens.typeBody,
                           ),
                         ),
                       ],
@@ -1444,20 +1483,20 @@ class _CaseTile extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.red[50],
+                      color: SeyirPalette.of(context).tint(SeyirTokens.reject),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.thumb_down_rounded, size: 16, color: Colors.red[700]),
+                        Icon(Icons.thumb_down_rounded, size: 16, color: SeyirPalette.of(context).foreground(SeyirTokens.reject)),
                         const SizedBox(width: 4),
                         Text(
                           '${insight.opposeCount}',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: Colors.red[700],
-                            fontSize: dense ? 13 : 14,
+                            color: SeyirPalette.of(context).foreground(SeyirTokens.reject),
+                            fontSize: SeyirTokens.typeBody,
                           ),
                         ),
                       ],
@@ -1516,7 +1555,7 @@ class _DetailRow extends StatelessWidget {
         textAlign: TextAlign.right,
         style: const TextStyle(
           fontWeight: FontWeight.w500,
-          fontSize: 14,
+          fontSize: SeyirTokens.typeBody,
         ),
       ),
     );
@@ -1533,7 +1572,7 @@ class _DetailRow extends StatelessWidget {
       child: Row(
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 18, color: Colors.grey[600]),
+            Icon(icon, size: 18, color: SeyirPalette.of(context).textSecondary),
             const SizedBox(width: 12),
           ],
           Expanded(
@@ -1541,8 +1580,8 @@ class _DetailRow extends StatelessWidget {
               label,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
-                fontSize: 14,
+                color: SeyirPalette.of(context).textSecondary,
+                fontSize: SeyirTokens.typeBody,
               ),
             ),
           ),
@@ -1586,7 +1625,7 @@ class _DetailStatCard extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              fontSize: 20,
+              fontSize: SeyirTokens.typeHeadline,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -1596,7 +1635,7 @@ class _DetailStatCard extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 11,
-              color: Colors.grey[600],
+              color: SeyirPalette.of(context).textSecondary,
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
@@ -1663,8 +1702,8 @@ class _HaykirTile extends StatelessWidget {
                       insight.title,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: dense ? 15 : 16,
-                        color: Colors.grey[900],
+                        fontSize: SeyirTokens.typeTitle,
+                        color: SeyirPalette.of(context).textPrimary,
                         height: 1.3,
                       ),
                       maxLines: 2,
@@ -1675,8 +1714,8 @@ class _HaykirTile extends StatelessWidget {
                       Text(
                         insight.slogan,
                         style: TextStyle(
-                          fontSize: dense ? 12 : 13,
-                          color: Colors.grey[600],
+                          fontSize: SeyirTokens.typeBody,
+                          color: SeyirPalette.of(context).textSecondary,
                           fontStyle: FontStyle.italic,
                         ),
                         maxLines: 1,
@@ -1694,14 +1733,14 @@ class _HaykirTile extends StatelessWidget {
                             Icon(
                               Icons.category_rounded,
                               size: 14,
-                              color: Colors.grey[600],
+                              color: SeyirPalette.of(context).textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               insight.direme,
                               style: TextStyle(
-                                fontSize: dense ? 12 : 13,
-                                color: Colors.grey[600],
+                                fontSize: SeyirTokens.typeBody,
+                                color: SeyirPalette.of(context).textSecondary,
                               ),
                             ),
                           ],
@@ -1712,14 +1751,14 @@ class _HaykirTile extends StatelessWidget {
                             Icon(
                               Icons.calendar_today_rounded,
                               size: 14,
-                              color: Colors.grey[600],
+                              color: SeyirPalette.of(context).textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               _formatDate(insight.createdAt),
                               style: TextStyle(
-                                fontSize: dense ? 12 : 13,
-                                color: Colors.grey[600],
+                                fontSize: SeyirTokens.typeBody,
+                                color: SeyirPalette.of(context).textSecondary,
                               ),
                             ),
                           ],
@@ -1736,20 +1775,20 @@ class _HaykirTile extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.green[50],
+                      color: SeyirPalette.of(context).tint(SeyirTokens.accept),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.thumb_up_rounded, size: 16, color: Colors.green[700]),
+                        Icon(Icons.thumb_up_rounded, size: 16, color: SeyirPalette.of(context).foreground(SeyirTokens.accept)),
                         const SizedBox(width: 4),
                         Text(
                           '${insight.likeCount}',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.green[700],
-                            fontSize: dense ? 13 : 14,
+                            color: SeyirPalette.of(context).foreground(SeyirTokens.accept),
+                            fontSize: SeyirTokens.typeBody,
                           ),
                         ),
                       ],
@@ -1759,20 +1798,20 @@ class _HaykirTile extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.red[50],
+                      color: SeyirPalette.of(context).tint(SeyirTokens.reject),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.thumb_down_rounded, size: 16, color: Colors.red[700]),
+                        Icon(Icons.thumb_down_rounded, size: 16, color: SeyirPalette.of(context).foreground(SeyirTokens.reject)),
                         const SizedBox(width: 4),
                         Text(
                           '${insight.kinaCount}',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: Colors.red[700],
-                            fontSize: dense ? 13 : 14,
+                            color: SeyirPalette.of(context).foreground(SeyirTokens.reject),
+                            fontSize: SeyirTokens.typeBody,
                           ),
                         ),
                       ],
@@ -1783,20 +1822,20 @@ class _HaykirTile extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.blue[50],
+                        color: SeyirPalette.of(context).tint(const Color(0xFF1D4ED8)),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.comment_rounded, size: 16, color: Colors.blue[700]),
+                          Icon(Icons.comment_rounded, size: 16, color: SeyirPalette.of(context).foreground(const Color(0xFF1D4ED8))),
                           const SizedBox(width: 4),
                           Text(
                             '${insight.commentCount}',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              color: Colors.blue[700],
-                              fontSize: dense ? 13 : 14,
+                              color: SeyirPalette.of(context).foreground(const Color(0xFF1D4ED8)),
+                              fontSize: SeyirTokens.typeBody,
                             ),
                           ),
                         ],

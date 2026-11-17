@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/seyir_tokens.dart';
+
 /// Yükseklik 0, 16 köşe, `grey[200]` kenar, 16 iç boşluk.
 class AppOutlinedCard extends StatelessWidget {
   const AppOutlinedCard({
@@ -17,13 +19,15 @@ class AppOutlinedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     final Widget padded = Padding(padding: padding, child: child);
     return Card(
       margin: margin,
       elevation: 0,
+      color: palette.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey[200]!, width: 1),
+        borderRadius: SeyirTokens.radiusLgAll,
+        side: BorderSide(color: palette.border, width: 1),
       ),
       child: onTap == null
           ? padded
