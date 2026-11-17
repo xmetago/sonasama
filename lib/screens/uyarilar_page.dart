@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../services/hive_database_service.dart';
 import '../services/local_notification_service.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/timeago_helper.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/delil_surface.dart';
+import 'chat_detail_page.dart';
+import 'delilleri_incele_page.dart';
 import 'test_notifications_page.dart';
 
 /// Uyarılar/Bildirimler Sayfası
@@ -16,10 +20,27 @@ class UyarilarPage extends StatefulWidget {
   State<UyarilarPage> createState() => _UyarilarPageState();
 }
 
+class _ChatTarget {
+  const _ChatTarget({
+    required this.id,
+    required this.email,
+    required this.name,
+  });
+
+  final String id;
+  final String email;
+  final String name;
+}
+
 class _UyarilarPageState extends State<UyarilarPage> {
   List<Map<String, dynamic>> _bildirimler = [];
   List<Map<String, dynamic>> _yerelBildirimler = [];
-  String _aktifTab = 'hive'; // 'hive' veya 'yerel'
+  String _aktifTab = 'uygulama';
+
+  bool get _needsLogin {
+    final email = widget.userEmail?.trim();
+    return email == null || email.isEmpty;
+  }
 
   @override
   void initState() {
@@ -28,36 +49,186 @@ class _UyarilarPageState extends State<UyarilarPage> {
   }
 
   void _loadBildirimler() {
-    if (widget.userEmail == null || widget.userEmail!.isEmpty) {
+    if (_needsLogin) {
+      setState(() {
+        _bildirimler = [];
+        _yerelBildirimler = [];
+      });
       return;
     }
-    
+
     setState(() {
-      // Hive bildirimleri
       _bildirimler = HiveDatabaseService.getBildirimler(widget.userEmail!);
-      
-      // Yerel bildirimler (LocalNotificationService)
       _yerelBildirimler = LocalNotificationService.getAllNotifications();
     });
   }
 
+  Color _orange(SeyirPalette palette) {
+    return palette.isDark ? const Color(0xFFFFB074) : Colors.orange.shade700;
+  }
+
+  Color _deviceAccent(SeyirPalette palette) {
+    return palette.isDark ? const Color(0xFF90CAF9) : const Color(0xFF1565C0);
+  }
+
+  Future<bool> _confirmDelete() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final dialogPalette = SeyirPalette.of(ctx);
+        return AlertDialog(
+          backgroundColor: dialogPalette.card,
+          shape: const RoundedRectangleBorder(borderRadius: SeyirTokens.radiusLgAll),
+          title: Text(
+            'Silmek istediğine emin misin?',
+            style: dialogPalette.title(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                foregroundColor: dialogPalette.textPrimary,
+              ),
+              child: const Text('İptal'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                foregroundColor: SeyirTokens.reject,
+              ),
+              child: const Text('Sil'),
+            ),
+          ],
+        );
+      },
+    );
+    return result == true && mounted;
+  }
+
+  bool _isChat(Map<String, dynamic> bildirim) {
+    final type = bildirim['type']?.toString();
+    if (type == 'durtme') return true;
+    if (type == 'gelen_dava' || type == 'uyari') return false;
+    final channel = bildirim['channelId']?.toString() ?? '';
+    final payload = bildirim['payload']?.toString() ?? '';
+    if (channel == 'mesaj_bildirimleri') return true;
+    if (payload.startsWith('chat_') ||
+        payload.startsWith('chat:') ||
+        payload.startsWith('mesaj_')) {
+      return true;
+    }
+    final sender = bildirim['senderEmail']?.toString();
+    return sender != null &&
+        sender.contains('@') &&
+        (bildirim['davaId'] == null || bildirim['davaId'].toString().isEmpty);
+  }
+
+  _ChatTarget? _chatTarget(Map<String, dynamic> bildirim) {
+    String? email = bildirim['senderEmail']?.toString();
+    final payload = bildirim['payload']?.toString() ?? '';
+    if ((email == null || !email.contains('@')) && payload.contains('@')) {
+      final at = payload.indexOf('@');
+      final start = payload.lastIndexOf(RegExp(r'[\s:_]'), at);
+      email = payload.substring(start + 1).trim();
+    }
+    if (email == null || !email.contains('@')) return null;
+    final user = HiveDatabaseService.getRegistrationByEmail(email);
+    final name = bildirim['senderName']?.toString() ??
+        user?.judgeName ??
+        email.split('@').first;
+    return _ChatTarget(
+      id: user?.id ?? email,
+      email: email,
+      name: name,
+    );
+  }
+
+  String? _davaIdOf(Map<String, dynamic> bildirim) {
+    final direct = bildirim['davaId']?.toString();
+    if (direct != null && direct.isNotEmpty) return direct;
+    final payload = bildirim['payload']?.toString() ?? '';
+    if (payload.isEmpty) return null;
+    if (payload.startsWith('uyari_')) {
+      final id = payload.substring('uyari_'.length);
+      return id.isEmpty ? null : id;
+    }
+    if (payload.startsWith('dava:')) {
+      final id = payload.substring('dava:'.length);
+      return id.isEmpty ? null : id;
+    }
+    final channel = bildirim['channelId']?.toString() ?? '';
+    if (channel == 'dava_bildirimleri' || payload.startsWith('dava_')) {
+      return payload;
+    }
+    return null;
+  }
+
+  Future<void> _openRelated(Map<String, dynamic> bildirim) async {
+    if (_isChat(bildirim)) {
+      final chat = _chatTarget(bildirim);
+      if (chat == null || !mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatDetailPage(
+            receiverId: chat.id,
+            receiverEmail: chat.email,
+            receiverName: chat.name,
+            userEmail: widget.userEmail,
+          ),
+        ),
+      );
+      return;
+    }
+    final davaId = _davaIdOf(bildirim);
+    if (davaId == null || davaId.isEmpty || !mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DelilleriIncelePage(
+          userEmail: widget.userEmail,
+          davaId: davaId,
+        ),
+      ),
+    );
+  }
+
+  String _kanalAdi(String channelId) {
+    switch (channelId) {
+      case 'mesaj_bildirimleri':
+        return 'Mesaj';
+      case 'dava_bildirimleri':
+        return 'Dava';
+      case 'uyari_bildirimleri':
+        return 'Uyarı';
+      default:
+        return 'Bildirim';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final orange = _orange(palette);
+    final device = _deviceAccent(palette);
+    final showTestPage = HiveDatabaseService.isAdmin(widget.userEmail);
+    final uygulama = _aktifTab == 'uygulama';
+
     return Scaffold(
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: OneFriendPhoneBellMenu(
                 userEmail: widget.userEmail,
-                isBildirimlerPage: true, // Adım 1: Bildirimler sayfasında olduğumuzu belirt
+                isBildirimlerPage: true,
               ),
             ),
-            
-            // Başlık ve Tab Seçimi
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -67,147 +238,96 @@ class _UyarilarPageState extends State<UyarilarPage> {
                       Icon(
                         MdiIcons.bell,
                         size: 28,
-                        color: Colors.orange.shade700,
+                        color: orange,
                       ),
                       const SizedBox(width: 12),
                       Text(
                         'UYARILAR',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange.shade700,
+                        style: palette.headline(color: orange),
+                      ),
+                      const Spacer(),
+                      if (showTestPage)
+                        IconButton(
+                          tooltip: 'Test Sayfası',
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(
+                              SeyirTokens.tapTarget,
+                              SeyirTokens.tapTarget,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.padded,
+                          ),
+                          icon: Icon(
+                            MdiIcons.testTube,
+                            color: device,
+                            size: 24,
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const TestNotificationsPage(),
+                              ),
+                            );
+                          },
+                        ),
+                      if (showTestPage) const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: palette.tint(orange),
+                          borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
+                          border: Border.all(color: palette.tintBorder(orange)),
+                        ),
+                        child: Text(
+                          '${_bildirimler.length + _yerelBildirimler.length}',
+                          style: TextStyle(
+                            fontSize: SeyirTokens.typeBody,
+                            fontWeight: FontWeight.bold,
+                            color: orange,
+                          ),
                         ),
                       ),
-                  const Spacer(),
-                  // Test butonu
-                  IconButton(
-                    icon: Icon(
-                      MdiIcons.testTube,
-                      color: Colors.blue.shade700,
-                      size: 24,
-                    ),
-                    tooltip: 'Test Sayfası',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TestNotificationsPage(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  // Toplam bildirim sayısı
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${_bildirimler.length + _yerelBildirimler.length}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade700,
-                      ),
-                    ),
-                  ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Tab Seçimi
                   Row(
                     children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _aktifTab = 'hive';
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _aktifTab == 'hive' 
-                                  ? Colors.orange.shade700 
-                                  : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Hive Bildirimleri (${_bildirimler.length})',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: _aktifTab == 'hive' 
-                                      ? Colors.white 
-                                      : Colors.grey.shade700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                      _buildTab(
+                        label: 'Uygulama uyarıları (${_bildirimler.length})',
+                        selected: uygulama,
+                        accent: orange,
+                        onTap: () => setState(() => _aktifTab = 'uygulama'),
                       ),
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _aktifTab = 'yerel';
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _aktifTab == 'yerel' 
-                                  ? Colors.blue.shade700 
-                                  : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Yerel Bildirimler (${_yerelBildirimler.length})',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: _aktifTab == 'yerel' 
-                                      ? Colors.white 
-                                      : Colors.grey.shade700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                      _buildTab(
+                        label: 'Cihaz bildirimleri (${_yerelBildirimler.length})',
+                        selected: !uygulama,
+                        accent: device,
+                        onTap: () => setState(() => _aktifTab = 'cihaz'),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            
-            // Bildirimler Listesi
             Expanded(
-              child: _aktifTab == 'hive'
+              child: _needsLogin
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: DelilSoftEmpty(
+                        title: 'Giriş gerekli',
+                        message: 'Uyarıları görmek için oturum aç.',
+                        icon: Icons.lock_outline,
+                      ),
+                    )
+                  : uygulama
                   ? _bildirimler.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                MdiIcons.bellOff,
-                                size: 64,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Henüz Hive uyarısı yok',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: DelilSoftEmpty(
+                            title: 'Henüz uygulama uyarısı yok',
+                            message: 'Dava ve hediye uyarıları burada görünecek',
+                            icon: MdiIcons.bellOff,
                           ),
                         )
                       : RefreshIndicator(
@@ -218,30 +338,17 @@ class _UyarilarPageState extends State<UyarilarPage> {
                             padding: const EdgeInsets.all(8),
                             itemCount: _bildirimler.length,
                             itemBuilder: (context, index) {
-                              final bildirim = _bildirimler[index];
-                              return _buildBildirimCard(bildirim);
+                              return _buildBildirimCard(_bildirimler[index]);
                             },
                           ),
                         )
                   : _yerelBildirimler.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                MdiIcons.bellOff,
-                                size: 64,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Henüz yerel bildirim yok',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: DelilSoftEmpty(
+                            title: 'Henüz cihaz bildirimi yok',
+                            message: 'Telefonuna gelen bildirimler burada görünecek',
+                            icon: MdiIcons.bellOff,
                           ),
                         )
                       : RefreshIndicator(
@@ -252,8 +359,7 @@ class _UyarilarPageState extends State<UyarilarPage> {
                             padding: const EdgeInsets.all(8),
                             itemCount: _yerelBildirimler.length,
                             itemBuilder: (context, index) {
-                              final bildirim = _yerelBildirimler[index];
-                              return _buildYerelBildirimCard(bildirim);
+                              return _buildYerelBildirimCard(_yerelBildirimler[index]);
                             },
                           ),
                         ),
@@ -264,121 +370,125 @@ class _UyarilarPageState extends State<UyarilarPage> {
     );
   }
 
+  Widget _buildTab({
+    required String label,
+    required bool selected,
+    required Color accent,
+    required VoidCallback onTap,
+  }) {
+    final palette = SeyirPalette.of(context);
+    return Expanded(
+      child: Material(
+        color: selected ? accent : palette.surfaceMuted,
+        borderRadius: SeyirTokens.radiusSmAll,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: SeyirTokens.radiusSmAll,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: SeyirTokens.typeBody,
+                    fontWeight: FontWeight.bold,
+                    color: selected ? palette.onSolid(accent) : palette.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBildirimCard(Map<String, dynamic> bildirim) {
+    final palette = SeyirPalette.of(context);
+    final orange = _orange(palette);
     final uyariMesaji = bildirim['uyariMesaji'] as String? ?? '';
     final olusturmaTarihiStr = bildirim['olusturmaTarihi'] as String?;
-    
-    // Timeago ile tarih formatlama
-    String tarihText = '';
-    if (olusturmaTarihiStr != null) {
-      tarihText = TimeAgoHelper.formatFromString(olusturmaTarihiStr);
-    }
+    final tarihText = olusturmaTarihiStr == null
+        ? ''
+        : TimeAgoHelper.formatFromString(olusturmaTarihiStr);
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      elevation: 4,
+      elevation: 0,
+      color: palette.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: Colors.orange.shade200,
-          width: 1.5,
-        ),
+        borderRadius: SeyirTokens.radiusLgAll,
+        side: BorderSide(color: palette.tintBorder(orange)),
       ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.orange.shade50,
-              Colors.white,
-            ],
-          ),
-        ),
+      child: InkWell(
+        borderRadius: SeyirTokens.radiusLgAll,
+        onTap: () => _openRelated(bildirim),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tarih ve Sil butonu
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: Colors.grey.shade600,
-                      ),
+                      Icon(Icons.access_time, size: 16, color: palette.textSecondary),
                       const SizedBox(width: 4),
-                      Text(
-                        tarihText,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
+                      Text(tarihText, style: palette.caption()),
                     ],
                   ),
                   IconButton(
-                    icon: Icon(
-                      Icons.close,
-                      size: 20,
-                      color: Colors.grey.shade600,
+                    tooltip: 'Sil',
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(
+                        SeyirTokens.tapTarget,
+                        SeyirTokens.tapTarget,
+                      ),
+                      tapTargetSize: MaterialTapTargetSize.padded,
                     ),
+                    icon: Icon(Icons.close, size: 20, color: palette.textSecondary),
                     onPressed: () async {
                       final bildirimId = bildirim['id'] as String?;
-                      if (bildirimId != null && widget.userEmail != null) {
-                        await HiveDatabaseService.deleteBildirim(
-                          widget.userEmail!,
-                          bildirimId,
-                        );
-                        _loadBildirimler();
-                      }
+                      if (bildirimId == null || widget.userEmail == null) return;
+                      if (!await _confirmDelete()) return;
+                      await HiveDatabaseService.deleteBildirim(
+                        widget.userEmail!,
+                        bildirimId,
+                      );
+                      _loadBildirimler();
                     },
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              // Uyarı mesajı
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.orange.shade200,
-                    width: 1,
-                  ),
+                  color: palette.surfaceMuted,
+                  borderRadius: SeyirTokens.radiusMdAll,
+                  border: Border.all(color: palette.tintBorder(orange)),
                 ),
                 child: Text(
                   uyariMesaji,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: Colors.black87,
-                  ),
+                  style: palette.body(weight: FontWeight.w400),
                 ),
               ),
               const SizedBox(height: 12),
-              // Dava bilgileri
               Row(
                 children: [
-                  Icon(
-                    Icons.gavel,
-                    size: 16,
-                    color: Colors.blue.shade700,
-                  ),
+                  Icon(Icons.gavel, size: 16, color: _deviceAccent(palette)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       bildirim['davaAdi'] as String? ?? 'Bilinmeyen Dava',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.blue.shade700,
+                      style: palette.caption(
+                        color: _deviceAccent(palette),
+                        weight: FontWeight.w600,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -393,89 +503,62 @@ class _UyarilarPageState extends State<UyarilarPage> {
     );
   }
 
-  /// Yerel bildirim kartı widget'ı
   Widget _buildYerelBildirimCard(Map<String, dynamic> bildirim) {
+    final palette = SeyirPalette.of(context);
     final title = bildirim['title'] as String? ?? '';
     final body = bildirim['body'] as String? ?? '';
     final timestampStr = bildirim['timestamp'] as String?;
     final isRead = bildirim['isRead'] as bool? ?? false;
     final notificationId = bildirim['id'] as int? ?? 0;
     final channelId = bildirim['channelId'] as String? ?? '';
-    
-    // Timeago ile tarih formatlama
-    String tarihText = '';
-    if (timestampStr != null) {
-      tarihText = TimeAgoHelper.formatFromString(timestampStr);
-    }
+    final tarihText = timestampStr == null
+        ? ''
+        : TimeAgoHelper.formatFromString(timestampStr);
 
-    // Kanal rengi belirleme
-    Color kanalRengi = Colors.blue.shade700;
+    Color kanalRengi = _deviceAccent(palette);
     IconData kanalIcon = MdiIcons.bell;
-    
     if (channelId == 'mesaj_bildirimleri') {
-      kanalRengi = Colors.green.shade700;
+      kanalRengi = palette.isDark ? SeyirTokens.brand : const Color(0xFF047857);
       kanalIcon = MdiIcons.message;
     } else if (channelId == 'dava_bildirimleri') {
-      kanalRengi = Colors.orange.shade700;
+      kanalRengi = _orange(palette);
       kanalIcon = MdiIcons.gavel;
     } else if (channelId == 'uyari_bildirimleri') {
-      kanalRengi = Colors.blue.shade700;
+      kanalRengi = _deviceAccent(palette);
       kanalIcon = MdiIcons.alert;
     }
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      elevation: 4,
+      elevation: 0,
+      color: palette.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: kanalRengi.withOpacity(0.3),
-          width: 1.5,
-        ),
+        borderRadius: SeyirTokens.radiusLgAll,
+        side: BorderSide(color: palette.tintBorder(kanalRengi)),
       ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              kanalRengi.withOpacity(0.1),
-              Colors.white,
-            ],
-          ),
-        ),
+      child: InkWell(
+        borderRadius: SeyirTokens.radiusLgAll,
+        onTap: () => _openRelated(bildirim),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tarih, Okundu durumu ve Sil butonu
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: Colors.grey.shade600,
-                      ),
+                      Icon(Icons.access_time, size: 16, color: palette.textSecondary),
                       const SizedBox(width: 4),
-                      Text(
-                        tarihText,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
+                      Text(tarihText, style: palette.caption()),
                       if (!isRead) ...[
                         const SizedBox(width: 8),
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.blue,
+                          decoration: BoxDecoration(
+                            color: kanalRengi,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -486,24 +569,36 @@ class _UyarilarPageState extends State<UyarilarPage> {
                     children: [
                       if (!isRead)
                         IconButton(
+                          tooltip: 'Okundu olarak işaretle',
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(
+                              SeyirTokens.tapTarget,
+                              SeyirTokens.tapTarget,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.padded,
+                          ),
                           icon: Icon(
                             Icons.mark_email_read,
                             size: 20,
-                            color: Colors.grey.shade600,
+                            color: palette.textSecondary,
                           ),
-                          tooltip: 'Okundu olarak işaretle',
                           onPressed: () async {
                             await LocalNotificationService.markAsRead(notificationId);
                             _loadBildirimler();
                           },
                         ),
                       IconButton(
-                        icon: Icon(
-                          Icons.close,
-                          size: 20,
-                          color: Colors.grey.shade600,
+                        tooltip: 'Sil',
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(
+                            SeyirTokens.tapTarget,
+                            SeyirTokens.tapTarget,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.padded,
                         ),
+                        icon: Icon(Icons.close, size: 20, color: palette.textSecondary),
                         onPressed: () async {
+                          if (!await _confirmDelete()) return;
                           await LocalNotificationService.deleteNotification(notificationId);
                           _loadBildirimler();
                         },
@@ -513,53 +608,37 @@ class _UyarilarPageState extends State<UyarilarPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              // Kanal bilgisi
               Row(
                 children: [
-                  Icon(
-                    kanalIcon,
-                    size: 16,
-                    color: kanalRengi,
-                  ),
+                  Icon(kanalIcon, size: 16, color: kanalRengi),
                   const SizedBox(width: 8),
                   Text(
-                    channelId.replaceAll('_', ' ').toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: kanalRengi,
-                    ),
+                    _kanalAdi(channelId),
+                    style: palette.caption(color: kanalRengi, weight: FontWeight.w600),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              // Başlık
               Text(
                 title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isRead ? Colors.grey.shade700 : Colors.black87,
+                style: palette.title(
+                  color: isRead ? palette.textSecondary : palette.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
-              // İçerik
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: kanalRengi.withOpacity(0.3),
-                    width: 1,
-                  ),
+                  color: palette.surfaceMuted,
+                  borderRadius: SeyirTokens.radiusMdAll,
+                  border: Border.all(color: palette.tintBorder(kanalRengi)),
                 ),
                 child: Text(
                   body,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: isRead ? Colors.grey.shade600 : Colors.black87,
+                  style: palette.body(
+                    weight: FontWeight.w400,
+                    color: isRead ? palette.textSecondary : palette.textPrimary,
                   ),
                 ),
               ),
@@ -570,4 +649,3 @@ class _UyarilarPageState extends State<UyarilarPage> {
     );
   }
 }
-

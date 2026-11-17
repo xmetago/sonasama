@@ -6,6 +6,8 @@ import '../providers/dava_provider.dart';
 import '../widgets/modern_invitation_card.dart';
 import '../utils/comment_utils.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/delil_surface.dart';
+import '../theme/seyir_tokens.dart';
 import './haykir_page.dart'; // ✅ HAYKIR sayfasına yönlendirme için
 import '../widgets/modern_dava_card.dart';
 import '../widgets/shared/app_snack.dart';
@@ -15,8 +17,11 @@ export '../widgets/modern_dava_card.dart';
 
 class DavetlerPage extends StatefulWidget {
   final String? userEmail;
+
+  /// Test: davet listesi yüklenemesin.
+  final bool forceLoadError;
   
-  const DavetlerPage({super.key, this.userEmail});
+  const DavetlerPage({super.key, this.userEmail, this.forceLoadError = false});
 
   @override
   State<DavetlerPage> createState() => _DavetlerPageState();
@@ -33,6 +38,8 @@ class DavetEtListesiSayfasi extends StatefulWidget {
 
 class _DavetlerPageState extends State<DavetlerPage> {
   List<Map<String, dynamic>> davetler = [];
+  bool _needsLogin = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -127,9 +134,21 @@ class _DavetlerPageState extends State<DavetlerPage> {
   }
 
   void _loadAktifDavetler() {
-    if (widget.userEmail != null) {
-      print('DEBUG: DavetlerPage - Loading ACTIVE invitations for ${widget.userEmail}');
-      final invitations = HiveDatabaseService.getActiveInvitations(widget.userEmail!);
+    final email = widget.userEmail?.trim();
+    if (email == null || email.isEmpty) {
+      setState(() {
+        davetler = [];
+        _needsLogin = true;
+        _loadError = null;
+      });
+      return;
+    }
+    try {
+      if (widget.forceLoadError) {
+        throw Exception('Davetler yüklenemedi');
+      }
+      print('DEBUG: DavetlerPage - Loading ACTIVE invitations for $email');
+      final invitations = HiveDatabaseService.getActiveInvitations(email);
       print('DEBUG: DavetlerPage - Loaded ${invitations.length} ACTIVE invitations');
 
       final processedInvitations = invitations.map((invitation) {
@@ -153,6 +172,15 @@ class _DavetlerPageState extends State<DavetlerPage> {
 
       setState(() {
         davetler = processedInvitations;
+        _needsLogin = false;
+        _loadError = null;
+      });
+    } catch (e) {
+      print('DEBUG: DavetlerPage - load failed: $e');
+      setState(() {
+        davetler = [];
+        _needsLogin = false;
+        _loadError = 'Davetler yüklenemedi';
       });
     }
   }
@@ -717,9 +745,16 @@ class _DavetlerPageState extends State<DavetlerPage> {
     showAppSnack(context, '👎 Davet beğenilmedi: ${davet['davaAdi']}', backgroundColor: Colors.red, duration: const Duration(seconds: 2));
   }
 
+  Color _inviteGreen(SeyirPalette palette) {
+    return palette.isDark ? SeyirTokens.brand : const Color(0xFF10B981);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final green = _inviteGreen(palette);
     return Scaffold(
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -743,24 +778,27 @@ class _DavetlerPageState extends State<DavetlerPage> {
                       Icon(
                         MdiIcons.phoneClassic,
                         size: 28,
-                        color: const Color(0xFF10B981),
+                        color: green,
                       ),
                       const SizedBox(width: 12),
-                      const Text(
+                      Text(
                         'GELEN DAVETLER',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF10B981),
-                        ),
+                        style: palette.headline(color: green),
                       ),
                       const Spacer(),
                       // Yenile butonu
                       IconButton(
                         icon: Icon(
                           Icons.refresh_rounded,
-                          color: const Color(0xFF10B981),
+                          color: green,
                           size: 24,
+                        ),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(
+                            SeyirTokens.tapTarget,
+                            SeyirTokens.tapTarget,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.padded,
                         ),
                         onPressed: _refreshInvitations,
                         tooltip: 'Davetleri Yenile',
@@ -770,15 +808,16 @@ class _DavetlerPageState extends State<DavetlerPage> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
+                          color: palette.tint(green),
+                          borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
+                          border: Border.all(color: palette.tintBorder(green)),
                         ),
                         child: Text(
                           '${davetler.length}',
-                          style: const TextStyle(
-                            fontSize: 14,
+                          style: TextStyle(
+                            fontSize: SeyirTokens.typeBody,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF10B981),
+                            color: green,
                           ),
                         ),
                       ),
@@ -789,45 +828,30 @@ class _DavetlerPageState extends State<DavetlerPage> {
             ),
             // İçerik
             Expanded(
-              child: davetler.isEmpty 
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5), // Çok açık yeşil
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF10B981).withOpacity(0.2),
-                              width: 2,
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.inbox_outlined,
-                            size: 80,
-                            color: const Color(0xFF10B981).withOpacity(0.6),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Henüz davet almadınız',
-                          style: TextStyle(
-                            fontSize: 20,
-                            color: const Color(0xFF059669),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Dava davetleri burada görünecek',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: const Color(0xFF6B7280),
-                          ),
-                        ),
-                      ],
+              child: _needsLogin
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: DelilSoftEmpty(
+                      title: 'Giriş gerekli',
+                      message: 'Davetleri görmek için oturum aç.',
+                      icon: Icons.lock_outline,
+                    ),
+                  )
+                : _loadError != null
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: DelilLoadError(
+                      message: _loadError!,
+                      onRetry: _refreshInvitations,
+                    ),
+                  )
+                : davetler.isEmpty 
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: DelilSoftEmpty(
+                      title: 'Henüz davet almadınız',
+                      message: 'Dava davetleri burada görünecek',
+                      icon: Icons.inbox_outlined,
                     ),
                   )
                 : RefreshIndicator(

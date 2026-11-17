@@ -352,20 +352,32 @@ class LocalNotificationService {
     }
   }
 
+  /// Açık kutu varsa onu kullan. Test ve yeniden açılışta kutu zaten duruyor olabilir.
+  static Box? _notificationStore() {
+    final current = _notificationBox;
+    if (current != null && current.isOpen) return current;
+    if (Hive.isBoxOpen('notifications')) {
+      _notificationBox = Hive.box('notifications');
+      return _notificationBox;
+    }
+    return null;
+  }
+
   /// Tüm bildirimleri getir
   /// ✅ Veritabanından kalıcı bildirimleri okur
   static List<Map<String, dynamic>> getAllNotifications() {
     try {
-      if (_notificationBox == null) {
+      final box = _notificationStore();
+      if (box == null) {
         return [];
       }
 
       final notifications = <Map<String, dynamic>>[];
-      final keys = _notificationBox!.keys;
+      final keys = box.keys;
 
       for (final key in keys) {
         if (key.toString().startsWith('notification_')) {
-          final notification = _notificationBox!.get(key);
+          final notification = box.get(key);
           if (notification is Map) {
             notifications.add(Map<String, dynamic>.from(notification));
           }
@@ -389,12 +401,12 @@ class LocalNotificationService {
   /// Bildirimi okundu olarak işaretle
   static Future<void> markAsRead(int notificationId) async {
     try {
-      if (_notificationBox == null) {
+      if (_notificationStore() == null) {
         await _initializeNotificationDatabase();
       }
 
       final key = 'notification_$notificationId';
-      final notification = _notificationBox?.get(key);
+      final notification = _notificationStore()?.get(key);
 
       if (notification is Map) {
         final updatedNotification = Map<String, dynamic>.from(notification);
@@ -410,11 +422,11 @@ class LocalNotificationService {
   /// Bildirimi sil
   static Future<void> deleteNotification(int notificationId) async {
     try {
-      if (_notificationBox == null) {
+      if (_notificationStore() == null) {
         await _initializeNotificationDatabase();
       }
 
-      await _notificationBox?.delete('notification_$notificationId');
+      await _notificationStore()?.delete('notification_$notificationId');
       await _notifications.cancel(notificationId);
       debugPrint('✅ Bildirim silindi: $notificationId');
     } catch (e) {

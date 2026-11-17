@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../screens/delil_listesi_ekrani.dart';
+import '../theme/seyir_tokens.dart';
 import 'comment_section.dart';
 import '../utils/comment_utils.dart';
 
@@ -128,23 +129,19 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return ScaleTransition(
       scale: _scaleAnimation,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          borderRadius: SeyirTokens.radiusLgAll,
+          color: palette.card,
+          border: Border.all(color: palette.border),
+          boxShadow: palette.cardShadow,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: SeyirTokens.radiusLgAll,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -233,7 +230,7 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
                       ? widget.davaci!
                       : widget.displayName,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: SeyirTokens.typeTitle,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
@@ -263,7 +260,7 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
                   widget.davaKategori,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: SeyirTokens.typeCaption,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -277,8 +274,10 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
             child: InkWell(
               onTap: () => setState(() => isExpanded = !isExpanded),
               borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.all(6),
+              child: SizedBox(
+                width: SeyirTokens.tapTarget,
+                height: SeyirTokens.tapTarget,
+                child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
@@ -287,6 +286,7 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
                   isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                   color: Colors.white,
                   size: 20,
+                ),
                 ),
               ),
             ),
@@ -298,13 +298,14 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
 
   /// 👥 Davacı ve Davalı Bilgileri
   Widget _buildParticipantsInfo() {
+    final palette = SeyirPalette.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
+        color: palette.surfaceMuted,
+        borderRadius: SeyirTokens.radiusMdAll,
         border: Border.all(
-          color: Colors.grey[200]!,
+          color: palette.border,
           width: 1,
         ),
       ),
@@ -327,13 +328,14 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
             margin: const EdgeInsets.symmetric(horizontal: 8),
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.grey[200],
+              color: palette.surfaceMuted,
               shape: BoxShape.circle,
+              border: Border.all(color: palette.border),
             ),
             child: Icon(
               MdiIcons.swordCross,
               size: 18,
-              color: Colors.grey[700],
+              color: palette.textSecondary,
             ),
           ),
           
@@ -358,6 +360,8 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
     required IconData icon,
     required Color color,
   }) {
+    final palette = SeyirPalette.of(context);
+    final ink = palette.isDark ? palette.foreground(color) : color;
     return Column(
       children: [
         Container(
@@ -371,19 +375,15 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
         const SizedBox(height: 6),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w600,
-          ),
+          style: palette.caption(color: palette.textSecondary, weight: FontWeight.w600),
         ),
         const SizedBox(height: 2),
         Text(
           name,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: SeyirTokens.typeCaption,
             fontWeight: FontWeight.bold,
-            color: color,
+            color: ink,
           ),
           textAlign: TextAlign.center,
           maxLines: 2,
@@ -395,28 +395,26 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
 
   /// 📌 Başlık Bölümü
   Widget _buildTitleSection() {
+    final palette = SeyirPalette.of(context);
     return Text(
       widget.davaAdi,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Colors.black87,
-        height: 1.4,
-      ),
+      style: palette.headline(),
     );
   }
 
   /// 📝 Expanded Content (HAYKIR veya Dava için)
   Widget _buildExpandedContent() {
+    final palette = SeyirPalette.of(context);
     final isHaykir = widget.type == 'haykir';
+    final accent = isHaykir ? SeyirTokens.warning : SeyirTokens.sectionPeople;
     
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isHaykir ? Colors.orange[50] : Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
+        color: palette.tint(accent),
+        borderRadius: SeyirTokens.radiusMdAll,
         border: Border.all(
-          color: isHaykir ? Colors.orange[200]! : Colors.grey[200]!,
+          color: palette.tintBorder(accent),
         ),
       ),
       child: Column(
@@ -483,28 +481,22 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
     required Color color,
     bool isHighlighted = false,
   }) {
-    Color getColorShade(int shade) {
-      if (color == Colors.orange) {
-        return Colors.orange[shade]!;
-      } else if (color == Colors.blue) {
-        return Colors.blue[shade]!;
-      }
-      return color;
-    }
-    
+    final palette = SeyirPalette.of(context);
+    final ink = palette.isDark ? palette.foreground(color) : color;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, size: 16, color: getColorShade(700)),
+            Icon(icon, size: 16, color: ink),
             const SizedBox(width: 6),
             Text(
               title,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: SeyirTokens.typeBody,
                 fontWeight: FontWeight.bold,
-                color: getColorShade(700),
+                color: ink,
               ),
             ),
           ],
@@ -514,16 +506,16 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: getColorShade(300)),
+              color: palette.card,
+              borderRadius: SeyirTokens.radiusSmAll,
+              border: Border.all(color: palette.tintBorder(color)),
             ),
             child: Text(
               content,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: SeyirTokens.typeBody,
                 fontWeight: FontWeight.w600,
-                color: getColorShade(900),
+                color: palette.textPrimary,
                 fontStyle: FontStyle.italic,
                 height: 1.4,
               ),
@@ -532,11 +524,7 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
         else
           Text(
             content,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-              height: 1.4,
-            ),
+            style: palette.body(weight: FontWeight.w400),
           ),
       ],
     );
@@ -544,14 +532,15 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
 
   /// 💬 Engagement Bar
   Widget _buildEngagementBar() {
+    final palette = SeyirPalette.of(context);
     final totalComments = widget.yorumlar.isNotEmpty
         ? CommentUtils.countAllComments(widget.yorumlar)
         : widget.yorumSayisi;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
+        color: palette.surfaceMuted,
+        borderRadius: SeyirTokens.radiusMdAll,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -615,11 +604,17 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
-        child: Container(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: SeyirTokens.tapTarget,
+            minHeight: SeyirTokens.tapTarget,
+          ),
+          child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: isActive ? color.withValues(alpha: 0.15) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: SeyirTokens.radiusSmAll,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -633,13 +628,14 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
               Text(
                 count.toString(),
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: SeyirTokens.typeBody,
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
                   color: isActive ? color : color.withValues(alpha: 0.8),
                 ),
               ),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -714,10 +710,12 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
+          constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+          alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: SeyirTokens.radiusMdAll,
             boxShadow: [
               BoxShadow(
                 color: color.withValues(alpha: 0.3),
@@ -735,7 +733,7 @@ class _ModernInvitationCardState extends State<ModernInvitationCard>
                 label,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 14,
+                  fontSize: SeyirTokens.typeBody,
                   fontWeight: FontWeight.bold,
                 ),
               ),

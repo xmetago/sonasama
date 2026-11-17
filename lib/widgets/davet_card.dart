@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+
 class DavetCard extends StatelessWidget {
   final Map<String, dynamic> davet;
   final VoidCallback onMarkAsRead;
@@ -12,17 +14,25 @@ class DavetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     final isRead = davet['isRead'] ?? false;
+    const accent = SeyirTokens.sectionPeople;
     
     return Card(
-      elevation: 4,
+      elevation: 0,
+      color: palette.card,
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: SeyirTokens.radiusLgAll,
+        side: BorderSide(
+          color: isRead ? palette.border : palette.tintBorder(accent),
+          width: isRead ? 1 : 1.5,
+        ),
+      ),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: isRead ? Colors.grey[50] : Colors.blue[50],
-          border: isRead ? null : Border.all(color: Colors.blue[200]!, width: 2),
+          borderRadius: SeyirTokens.radiusLgAll,
+          color: isRead ? palette.card : palette.tint(accent),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -42,7 +52,7 @@ class DavetCard extends StatelessWidget {
                       davet['groupName'] ?? 'Davet',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 12,
+                        fontSize: SeyirTokens.typeCaption,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -64,25 +74,18 @@ class DavetCard extends StatelessWidget {
               // Dava Bilgileri
               Text(
                 davet['davaAdi'] ?? 'Dava Adı Belirtilmemiş',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
+                style: palette.headline(),
               ),
               const SizedBox(height: 8),
               
               if (davet['kategori'] != null && davet['kategori'].toString().isNotEmpty) ...[
                 Row(
                   children: [
-                    const Icon(Icons.category, size: 16, color: Colors.grey),
+                    Icon(Icons.category, size: 16, color: palette.textSecondary),
                     const SizedBox(width: 4),
                     Text(
                       'Kategori: ${davet['kategori']}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
+                      style: palette.body(color: palette.textSecondary, weight: FontWeight.w400),
                     ),
                   ],
                 ),
@@ -90,21 +93,14 @@ class DavetCard extends StatelessWidget {
               ],
               
               if (davet['davaKonusu'] != null && davet['davaKonusu'].toString().isNotEmpty) ...[
-                const Text(
+                Text(
                   'Dava Konusu:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                  ),
+                  style: palette.body(color: palette.textSecondary),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   davet['davaKonusu'],
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                  ),
+                  style: palette.body(weight: FontWeight.w400),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -119,10 +115,7 @@ class DavetCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       'Davacı: ${davet['davaci']}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.black87,
-                      ),
+                      style: palette.body(weight: FontWeight.w400),
                     ),
                   ],
                 ),
@@ -132,14 +125,11 @@ class DavetCard extends StatelessWidget {
               if (davet['davali'] != null && davet['davali'].toString().isNotEmpty) ...[
                 Row(
                   children: [
-                    const Icon(Icons.person_outline, size: 16, color: Colors.red),
+                    const Icon(Icons.person_outline, size: 16, color: SeyirTokens.reject),
                     const SizedBox(width: 4),
                     Text(
                       'Davalı: ${davet['davali']}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.black87,
-                      ),
+                      style: palette.body(weight: FontWeight.w400),
                     ),
                   ],
                 ),
@@ -149,19 +139,22 @@ class DavetCard extends StatelessWidget {
               // Tarih
               Row(
                 children: [
-                  const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                  Icon(Icons.access_time, size: 16, color: palette.textSecondary),
                   const SizedBox(width: 4),
                   Text(
                     _formatDate(davet['invitedAt']),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
+                    style: palette.caption(),
                   ),
                   const Spacer(),
                   if (!isRead)
                     TextButton(
                       onPressed: onMarkAsRead,
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(
+                          SeyirTokens.tapTarget,
+                          SeyirTokens.tapTarget,
+                        ),
+                      ),
                       child: const Text('Okundu İşaretle'),
                     ),
                 ],

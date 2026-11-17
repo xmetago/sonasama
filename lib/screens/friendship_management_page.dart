@@ -11,18 +11,24 @@ import '../models/friendship_model.dart';
 import 'user_gamified_score_page.dart';
 import 'chat_detail_page.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/friendship_category_dialog.dart';
 import '../widgets/friendship_incoming_requests_dialog.dart';
 import '../widgets/friendship_user_card.dart';
+import '../theme/seyir_tokens.dart';
 import '../utils/app_theme.dart';
 import '../widgets/shared/app_snack.dart';
 
 class FriendshipManagementPage extends StatefulWidget {
   final String userEmail;
+
+  /// Test: kişi listesi yüklenemesin.
+  final bool forceLoadError;
   
   const FriendshipManagementPage({
     super.key,
     required this.userEmail,
+    this.forceLoadError = false,
   });
 
   @override
@@ -66,6 +72,8 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
   String _searchQuery = '';
   String _selectedCategory = 'Tümü';
   bool _isLoading = true;
+  bool _needsLogin = false;
+  String? _loadError;
 
   final List<String> _categories = ['Tümü', 'Grup-19', 'Arkadaş', 'Takipçi', 'Herkes', 'Engellenenler'];
 
@@ -84,28 +92,72 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     super.dispose();
   }
 
+  /// Oturum yoksa sayfaya verilen e-postadan kullanıcıyı aç.
+  RegistrationModel? _resolveCurrentUser() {
+    final session = UserSessionService.getCurrentUser();
+    if (session != null) return session;
+    final email = widget.userEmail.trim();
+    if (email.isEmpty) return null;
+    try {
+      final user = HiveDatabaseService.getRegistrationByEmail(email);
+      if (user != null) {
+        UserSessionService.setCurrentUser(user);
+      }
+      return user;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Color _greenAccent(SeyirPalette palette) {
+    return palette.isDark ? SeyirTokens.brand : const Color(0xFF10B981);
+  }
+
+  Color _readable(SeyirPalette palette, Color accent) {
+    return palette.isDark ? palette.foreground(accent) : accent;
+  }
+
   // Veritabanından verileri yükle
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
+      _loadError = null;
+      _needsLogin = false;
     });
 
     try {
-      // Tüm kullanıcıları yükle
-      _allUsers = HiveDatabaseService.getAllRegistrations();
-      
-      // Mevcut kullanıcının arkadaşlıklarını yükle
-      await _loadUserFriendships();
+      if (widget.forceLoadError) {
+        throw Exception('Kişiler yüklenemedi');
+      }
+      final currentUser = _resolveCurrentUser();
+      if (currentUser == null) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _needsLogin = true;
+          _allUsers = [];
+          _pendingRequests.clear();
+        });
+        return;
+      }
 
+      _allUsers = HiveDatabaseService.getAllRegistrations();
+      await _loadUserFriendships();
       await _loadBlockedUsers();
-      
       await _loadPendingRequests();
-      
-    } catch (e) {
-      print('Veri yükleme hatası: $e');
-    } finally {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
+        _loadError = null;
+        _needsLogin = false;
+      });
+    } catch (e) {
+      print('Veri yükleme hatası: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Kişiler yüklenemedi';
+        _needsLogin = false;
       });
     }
   }
@@ -447,14 +499,14 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
             Text(
               title,
               style: const TextStyle(
-                fontSize: 16,
+                fontSize: SeyirTokens.typeTitle,
                 fontWeight: FontWeight.w600,
               ),
             ),
             Text(
               limitText,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: SeyirTokens.typeBody,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -523,13 +575,13 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
               Text(
                 '${request['requesterName']} size arkadaşlık isteği gönderdi.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: SeyirTokens.typeTitle),
               ),
               const SizedBox(height: 20),
               const Text(
                 'Bu kişiyi hangi kategoride kabul etmek istiyorsunuz?',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16),
+                style: TextStyle(fontSize: SeyirTokens.typeTitle),
               ),
               const SizedBox(height: 20),
               _buildCategoryButtonWithLimit('Grup-19', AppTheme.warningColor, () => _acceptFriendship(request, 'Grup-19')),
@@ -547,14 +599,14 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text(
                 'Reddet',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: SeyirTokens.typeTitle, fontWeight: FontWeight.w600),
               ),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text(
                 'İptal',
-                style: TextStyle(fontSize: 16),
+                style: TextStyle(fontSize: SeyirTokens.typeTitle),
               ),
             ),
           ],
@@ -763,17 +815,20 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     String? tooltip,
     Color? backgroundColor,
   }) {
+    final palette = SeyirPalette.of(context);
+    final accent = _readable(palette, color);
     return Tooltip(
       message: tooltip ?? '',
       child: Material(
-        color: backgroundColor ?? color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        color: backgroundColor ?? palette.tint(color),
+        borderRadius: SeyirTokens.radiusSmAll,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Icon(icon, size: _actionIconSize, color: color),
+          borderRadius: SeyirTokens.radiusSmAll,
+          child: SizedBox(
+            width: SeyirTokens.tapTarget,
+            height: SeyirTokens.tapTarget,
+            child: Icon(icon, size: _actionIconSize, color: accent),
           ),
         ),
       ),
@@ -826,24 +881,26 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         ? Icons.block_outlined
         : (category != null ? _categoryIcon(category) : Icons.person_add_outlined);
 
+    final palette = SeyirPalette.of(context);
+    final accent = _readable(palette, color);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.55), width: 1),
+        borderRadius: SeyirTokens.radiusMdAll,
+        border: Border.all(color: palette.tintBorder(color), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
+          Icon(icon, size: 12, color: accent),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
-              color: color,
+              color: accent,
               fontWeight: FontWeight.w600,
-              fontSize: 11,
+              fontSize: SeyirTokens.typeCaption,
             ),
           ),
         ],
@@ -862,24 +919,27 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     final limit = _getCategoryLimit(category);
     final countLabel = category == 'Tümü' || limit == -1 ? '$count' : '$count/$limit';
 
+    final palette = SeyirPalette.of(context);
+    final accentInk = _readable(palette, accent);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => setState(() => _selectedCategory = category),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
+            constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: isSelected ? accent.withOpacity(0.12) : AppTheme.cardBackgroundColor,
-              borderRadius: BorderRadius.circular(20),
+              color: isSelected ? palette.tint(accent) : palette.card,
+              borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
               border: Border.all(
-                color: isSelected ? accent : AppTheme.dividerColor,
+                color: isSelected ? palette.tintBorder(accent) : palette.border,
                 width: isSelected ? 1.5 : 1,
               ),
-              boxShadow: isSelected ? AppTheme.cardShadow : null,
+              boxShadow: isSelected ? palette.cardShadow : null,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -887,21 +947,24 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                 Icon(
                   _categoryIcon(category),
                   size: 14,
-                  color: isSelected ? accent : AppTheme.textSecondary,
+                  color: isSelected ? accentInk : palette.textSecondary,
                 ),
                 const SizedBox(width: 6),
                 Text(
                   _categoryTabLabel(category),
-                  style: AppTheme.bodySmall.copyWith(
+                  style: TextStyle(
+                    fontSize: SeyirTokens.typeBody,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? accent : AppTheme.textPrimary,
+                    color: isSelected ? accentInk : palette.textPrimary,
+                    height: 1.35,
                   ),
                 ),
                 const SizedBox(width: 4),
                 Text(
                   countLabel,
-                  style: AppTheme.caption.copyWith(
-                    color: isSelected ? accent : AppTheme.textTertiary,
+                  style: TextStyle(
+                    fontSize: SeyirTokens.typeCaption,
+                    color: isSelected ? accentInk : palette.textMuted,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1000,14 +1063,16 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
   @override
   Widget build(BuildContext context) {
     final filteredUsers = _getFilteredUsers();
+    final palette = SeyirPalette.of(context);
+    final green = _greenAccent(palette);
     
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackgroundColor,
+      backgroundColor: palette.surface,
       body: SafeArea(
         child: _isLoading
             ? Center(
                 child: CircularProgressIndicator(
-                  color: AppTheme.successColor,
+                  color: green,
                 ),
               )
             : Column(
@@ -1019,11 +1084,16 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                     child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
                   ),
                   
-                  // Başlık ve Action Butonları - AppTheme ile modern tasarım
+                  // Başlık ve Action Butonları
                   Container(
                     margin: const EdgeInsets.all(12.0),
                     padding: const EdgeInsets.all(4.0),
-                    decoration: AppTheme.cardDecoration(),
+                    decoration: BoxDecoration(
+                      color: palette.card,
+                      borderRadius: SeyirTokens.radiusLgAll,
+                      border: Border.all(color: palette.border),
+                      boxShadow: palette.cardShadow,
+                    ),
 
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1034,16 +1104,18 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                           children: [
                             Container(
                               decoration: BoxDecoration(
-                                color: AppTheme.successColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
+                                color: palette.tint(green),
+                                borderRadius: SeyirTokens.radiusMdAll,
                               ),
                               child: IconButton(
-                                icon: Icon(MdiIcons.accountHeart, color: AppTheme.successColor, size: _headerIconSize),
-                                padding: const EdgeInsets.all(4),
-                                visualDensity: VisualDensity.compact,
-                                constraints: const BoxConstraints(
-                                  minWidth: 32,
-                                  minHeight: 32,
+                                tooltip: 'Gelen istekler',
+                                icon: Icon(MdiIcons.accountHeart, color: green, size: _headerIconSize),
+                                style: IconButton.styleFrom(
+                                  minimumSize: const Size(
+                                    SeyirTokens.tapTarget,
+                                    SeyirTokens.tapTarget,
+                                  ),
+                                  tapTargetSize: MaterialTapTargetSize.padded,
                                 ),
                                 onPressed: () {
                                   if (_pendingRequests.isNotEmpty) {
@@ -1063,7 +1135,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.accentColor,
+                                    color: green,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   constraints: const BoxConstraints(
@@ -1072,9 +1144,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                                   ),
                                   child: Text(
                                     '${_pendingRequests.length}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
+                                    style: TextStyle(
+                                      color: palette.onSolid(green),
+                                      fontSize: SeyirTokens.typeCaption,
                                       fontWeight: FontWeight.bold,
                                     ),
                                     textAlign: TextAlign.center,
@@ -1087,8 +1159,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                         // Orta: başlık
                         Text(
                           '|| KİŞİLER ||',
-                          style: AppTheme.headline4.copyWith(
-                            color: AppTheme.successColor,
+                          style: palette.headline(
+                            color: green,
+                            weight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -1096,19 +1169,19 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: AppTheme.successColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(16),
+                            color: palette.tint(green),
+                            borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
                             border: Border.all(
-                              color: AppTheme.successColor.withOpacity(0.25),
+                              color: palette.tintBorder(green),
                               width: 1,
                             ),
                           ),
                           child: Text(
                             '${filteredUsers.length}',
-                            style: const TextStyle(
-                              fontSize: 12,
+                            style: TextStyle(
+                              fontSize: SeyirTokens.typeCaption,
                               fontWeight: FontWeight.bold,
-                              color: AppTheme.successColor,
+                              color: green,
                             ),
                           ),
                         ),
@@ -1118,40 +1191,45 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                   // Arama alanı - AppTheme ile modern tasarım
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: AppTheme.cardDecoration(),
+                    decoration: BoxDecoration(
+                      color: palette.card,
+                      borderRadius: SeyirTokens.radiusLgAll,
+                      border: Border.all(color: palette.border),
+                      boxShadow: palette.cardShadow,
+                    ),
                     child: TextField(
                       controller: _searchController,
-                      style: AppTheme.bodyMedium,
+                      style: palette.body(),
                       decoration: InputDecoration(
                         hintText: _selectedCategory == 'Tümü' 
                             ? 'Kategorisiz kişilerde ara (min 4 karakter)...'
                             : 'Yargıç adı ile ara...',
-                        hintStyle: AppTheme.bodySmall.copyWith(color: AppTheme.textTertiary),
-                        prefixIcon: Icon(MdiIcons.magnify, color: AppTheme.successColor, size: 20),
+                        hintStyle: palette.body(color: palette.textMuted, weight: FontWeight.w400),
+                        prefixIcon: Icon(MdiIcons.magnify, color: green, size: 20),
                         prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: SeyirTokens.radiusLgAll,
                           borderSide: BorderSide(
-                            color: AppTheme.dividerColor,
+                            color: palette.border,
                             width: 1,
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: SeyirTokens.radiusLgAll,
                           borderSide: BorderSide(
-                            color: AppTheme.dividerColor,
+                            color: palette.border,
                             width: 1,
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: SeyirTokens.radiusLgAll,
                           borderSide: BorderSide(
-                            color: AppTheme.successColor,
+                            color: green,
                             width: 2,
                           ),
                         ),
                         filled: true,
-                        fillColor: AppTheme.calmGreenUltraLight,
+                        fillColor: palette.surfaceMuted,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       ),
                       onChanged: (value) {
@@ -1170,10 +1248,10 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _performanceMessageColor,
-                      borderRadius: BorderRadius.circular(12),
+                      color: palette.isDark ? palette.brandSoft : _performanceMessageColor,
+                      borderRadius: SeyirTokens.radiusMdAll,
                       border: Border.all(
-                        color: AppTheme.successColor.withOpacity(0.3),
+                        color: palette.tintBorder(green),
                         width: 1,
                       ),
                     ),
@@ -1181,17 +1259,14 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                       children: [
                         Icon(
                           _performanceMessageIcon,
-                          color: AppTheme.successColor,
+                          color: green,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _performanceMessage,
-                            style: AppTheme.bodyMedium.copyWith(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.w500,
-                            ),
+                            style: palette.body(weight: FontWeight.w500),
                           ),
                         ),
                       ],
@@ -1200,30 +1275,38 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                 
                 // Kullanıcı listesi - AppTheme ile modern tasarım
                 Expanded(
-                  child: filteredUsers.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                MdiIcons.accountOff,
-                                size: 48,
-                                color: AppTheme.textMuted,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _selectedCategory == 'Tümü' && _searchQuery.isEmpty
-                                    ? 'Kategorisiz kişi kalmadı'
-                                    : _searchQuery.isEmpty 
-                                        ? 'Henüz kullanıcı bulunamadı'
-                                        : _searchQuery.length < 4
-                                            ? 'En az 4 karakter girin'
-                                            : '"$_searchQuery" için sonuç bulunamadı',
-                                style: AppTheme.bodyLarge.copyWith(
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ],
+                  child: _needsLogin
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: DelilSoftEmpty(
+                            title: 'Giriş gerekli',
+                            message: 'Kişileri görmek için oturum aç.',
+                            icon: Icons.lock_outline,
+                          ),
+                        )
+                      : _loadError != null
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: DelilLoadError(
+                            message: _loadError!,
+                            onRetry: _loadData,
+                          ),
+                        )
+                      : filteredUsers.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: DelilSoftEmpty(
+                            title: _selectedCategory == 'Tümü' && _searchQuery.isEmpty
+                                ? 'Kategorisiz kişi kalmadı'
+                                : _searchQuery.isEmpty
+                                    ? 'Henüz kullanıcı bulunamadı'
+                                    : _searchQuery.length < 4
+                                        ? 'En az 4 karakter girin'
+                                        : '"$_searchQuery" için sonuç bulunamadı',
+                            message: _searchQuery.isEmpty
+                                ? 'Bu listede gösterilecek kişi yok'
+                                : 'Aramayı değiştirip yeniden dene',
+                            icon: MdiIcons.accountOff,
                           ),
                         )
                       : ListView.builder(
@@ -1256,37 +1339,37 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     final isCurrentCategory = currentCategory == category;
     final canAdd = _canAddToCategory(category);
     
+    final palette = SeyirPalette.of(context);
     return GestureDetector(
       onTap: () {
         if (isCurrentCategory) {
-          // Mevcut kategoriden kaldır
           _removeUserFromCategory(user, category);
         } else if (canAdd) {
-          // Yeni kategoriye ekle
           _addUserToCategory(user, category);
         } else {
-          // Limit dolu uyarısı
           showAppSnack(context, '$category kategorisi dolu! Limit: ${_getCategoryLimit(category)}', backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ));
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+        constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         decoration: BoxDecoration(
-          color: isCurrentCategory ? color : AppTheme.calmGreenUltraLight,
+          color: isCurrentCategory ? color : palette.surfaceMuted,
           border: Border.all(
-            color: isCurrentCategory ? color : AppTheme.dividerColor,
+            color: isCurrentCategory ? color : palette.border,
             width: 1,
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: SeyirTokens.radiusMdAll,
         ),
         child: Text(
           title,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: isCurrentCategory ? Colors.white : AppTheme.textSecondary,
-            fontSize: 11,
+            color: isCurrentCategory ? palette.onSolid(color) : palette.textSecondary,
+            fontSize: SeyirTokens.typeCaption,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -1473,11 +1556,13 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
           itemBuilder: (context, index) {
                 final request = _pendingRequests[index];
                 
+                final rowPalette = SeyirPalette.of(context);
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
+                    color: rowPalette.surfaceMuted,
+                    borderRadius: SeyirTokens.radiusMdAll,
+                    border: Border.all(color: rowPalette.border),
                   ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1485,7 +1570,11 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                     leading: _buildProfileImage(request['requesterProfileImage'], request['requesterName'], size: 36),
                     title: Text(
                       request['requesterName'],
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: SeyirTokens.typeBody,
+                        color: rowPalette.textPrimary,
+                      ),
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1554,14 +1643,14 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
             ),
             content: Text(
               '${user.judgeName} kullanıcısını tüm kategorilerden silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!',
-              style: const TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: SeyirTokens.typeTitle),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text(
                   'İptal',
-                  style: TextStyle(fontSize: 16),
+                  style: TextStyle(fontSize: SeyirTokens.typeTitle),
                 ),
               ),
               TextButton(
@@ -1569,7 +1658,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
                 child: const Text(
                   'Sil',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: SeyirTokens.typeTitle, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -1647,38 +1736,43 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
               children: [
                 Text(
                   '${user.judgeName} kullanıcısını engellemek istediğinizden emin misiniz?',
-                  style: const TextStyle(fontSize: 16),
+                  style: const TextStyle(fontSize: SeyirTokens.typeTitle),
                 ),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF3E0),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFFF9800)),
+                    color: SeyirPalette.of(context).tint(const Color(0xFFFF9800)),
+                    borderRadius: SeyirTokens.radiusSmAll,
+                    border: Border.all(
+                      color: SeyirPalette.of(context).tintBorder(const Color(0xFFFF9800)),
+                    ),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Engelleme sonrası:',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFFFF9800),
+                          color: _readable(
+                            SeyirPalette.of(context),
+                            const Color(0xFFFF9800),
+                          ),
                         ),
                       ),
-                      SizedBox(height: 4),
-                      Text(
+                      const SizedBox(height: 4),
+                      const Text(
                         '• Tüm kategorilerden çıkarılır',
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: SeyirTokens.typeBody),
                       ),
-                      Text(
+                      const Text(
                         '• Artık arkadaşlık isteği gönderemez',
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: SeyirTokens.typeBody),
                       ),
-                      Text(
+                      const Text(
                         '• İstediğiniz zaman engeli kaldırabilirsiniz',
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: SeyirTokens.typeBody),
                       ),
                     ],
                   ),
@@ -1690,7 +1784,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text(
                   'İptal',
-                  style: TextStyle(fontSize: 16),
+                  style: TextStyle(fontSize: SeyirTokens.typeTitle),
                 ),
               ),
               TextButton(
@@ -1698,7 +1792,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                 style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF9800)),
                 child: const Text(
                   'Engelle',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: SeyirTokens.typeTitle, fontWeight: FontWeight.w600),
                 ),
               ),
             ],

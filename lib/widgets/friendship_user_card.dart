@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../utils/app_theme.dart';
+import '../theme/seyir_tokens.dart';
 
 /// Arkadaş listesindeki kullanıcı satırı. Aksiyonlar dışarıdan gelir.
 class FriendshipUserCard extends StatelessWidget {
@@ -27,9 +27,15 @@ class FriendshipUserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: AppTheme.cardDecoration(borderRadius: 14, bordered: true),
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: SeyirTokens.radiusLgAll,
+        border: Border.all(color: palette.border),
+        boxShadow: palette.cardShadow,
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
         child: Column(
@@ -51,10 +57,7 @@ class FriendshipUserCard extends StatelessWidget {
                           judgeName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTheme.bodyMedium.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
+                          style: palette.title(weight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
                         categoryBadge,
