@@ -13,9 +13,8 @@ import '../services/durtme_service.dart';
 import '../services/hive_database_service.dart';
 import '../services/local_notification_service.dart';
 import '../theme/seyir_tokens.dart';
-import '../widgets/delil_surface.dart';
+import '../widgets/durt_wheel_sheet.dart';
 import '../widgets/timed_action_buttons.dart';
-import '../widgets/profile_icons_row.dart';
 import '../widgets/verified_users_management_dialog.dart';
 
 // WhoBoom, Arama Iconu, Chat Iconu
@@ -342,99 +341,6 @@ class _OneFriendPhoneBellMenuState extends State<OneFriendPhoneBellMenu> {
   }
 }
 
-const List<Map<String, dynamic>> _durtmeKelimeData = [
-  {
-    'kelime': 'İyi',
-    'icon': Icons.thumb_up,
-    'color': Colors.green,
-    'fontWeight': FontWeight.w600,
-  },
-  {
-    'kelime': 'Kötü',
-    'icon': Icons.thumb_down,
-    'color': Colors.red,
-    'fontWeight': FontWeight.w700,
-  },
-  {
-    'kelime': 'Çirkin',
-    'icon': Icons.sentiment_very_dissatisfied,
-    'color': Colors.brown,
-    'fontWeight': FontWeight.w500,
-  },
-  {
-    'kelime': 'Özel',
-    'icon': Icons.star,
-    'color': Colors.amber,
-    'fontWeight': FontWeight.w600,
-  },
-  {
-    'kelime': 'Güzel',
-    'icon': Icons.favorite,
-    'color': Colors.pink,
-    'fontWeight': FontWeight.w600,
-  },
-  {
-    'kelime': 'Fena',
-    'icon': Icons.warning,
-    'color': Colors.orange,
-    'fontWeight': FontWeight.w700,
-  },
-  {
-    'kelime': 'Hoş',
-    'icon': Icons.mood,
-    'color': Colors.lightBlue,
-    'fontWeight': FontWeight.w500,
-  },
-  {
-    'kelime': 'Yakışıklı',
-    'icon': Icons.face,
-    'color': Colors.blue,
-    'fontWeight': FontWeight.w600,
-  },
-  {
-    'kelime': 'Boş ver',
-    'icon': Icons.block,
-    'color': Colors.grey,
-    'fontWeight': FontWeight.w500,
-  },
-  {
-    'kelime': 'İmkansız',
-    'icon': Icons.cancel,
-    'color': Colors.redAccent,
-    'fontWeight': FontWeight.w700,
-  },
-  {
-    'kelime': 'Aptal',
-    'icon': Icons.sentiment_dissatisfied,
-    'color': Colors.deepOrange,
-    'fontWeight': FontWeight.w600,
-  },
-  {
-    'kelime': 'Çılgın',
-    'icon': Icons.bolt,
-    'color': Colors.purple,
-    'fontWeight': FontWeight.w700,
-  },
-  {
-    'kelime': 'Deli',
-    'icon': Icons.psychology,
-    'color': Colors.indigo,
-    'fontWeight': FontWeight.w600,
-  },
-  {
-    'kelime': 'Olmaz',
-    'icon': Icons.close,
-    'color': Colors.red,
-    'fontWeight': FontWeight.w700,
-  },
-  {
-    'kelime': 'Belki',
-    'icon': Icons.help_outline,
-    'color': Colors.teal,
-    'fontWeight': FontWeight.w500,
-  },
-];
-
 // Profil Bölümü
 class SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant extends StatefulWidget {
   final VoidCallback? onDavalaPressed;
@@ -759,104 +665,23 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.62,
-          minChildSize: 0.45,
-          maxChildSize: 0.85,
-          builder: (context, scrollController) {
-            final SeyirPalette sheetPalette = SeyirPalette.of(context);
-            return Container(
-              decoration: BoxDecoration(
-                color: sheetPalette.card,
-                borderRadius: SeyirTokens.sheetTop,
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 10),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: sheetPalette.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.touch_app, color: Colors.amber[800], size: 22),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Dürt',
-                                style: sheetPalette.headline(),
-                              ),
-                              Text(
-                                isSelfDurtme
-                                    ? '...'
-                                    : '$targetJudgeName\'e hızlı tepki gönder',
-                                style: sheetPalette.body(
-                                  weight: FontWeight.w400,
-                                  color: sheetPalette.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(sheetContext),
-                          tooltip: 'Kapat',
-                          style: delilIconButtonStyle(
-                            foreground: sheetPalette.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: GridView.builder(
-                      controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 14,
-                        childAspectRatio: 0.82,
-                      ),
-                      itemCount: _durtmeKelimeData.length,
-                      itemBuilder: (context, index) {
-                        final data = _durtmeKelimeData[index];
-                        return _ModernKelimeKart(
-                          kelime: data['kelime'] as String,
-                          icon: data['icon'] as IconData,
-                          color: data['color'] as Color,
-                          fontWeight: data['fontWeight'] as FontWeight,
-                          onTap: () => _onDurtmeKelimeSelected(
-                            sheetContext,
-                            kelime: data['kelime'] as String,
-                            targetJudgeName: targetJudgeName,
-                            targetUserId: targetUserId,
-                            targetUserEmail: targetUserEmail,
-                            senderEmail: senderEmail,
-                            isSelfDurtme: isSelfDurtme,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+        return DurtWheelSheet(
+          subtitle: isSelfDurtme
+              ? '...'
+              : '$targetJudgeName\'e hızlı tepki gönder',
+          onClose: () => Navigator.pop(sheetContext),
+          onSend: (kelime) => _onDurtmeKelimeSelected(
+            sheetContext,
+            kelime: kelime,
+            targetJudgeName: targetJudgeName,
+            targetUserId: targetUserId,
+            targetUserEmail: targetUserEmail,
+            senderEmail: senderEmail,
+            isSelfDurtme: isSelfDurtme,
+          ),
         );
       },
     );
@@ -1022,8 +847,6 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const ProfileIconsRow(),
                 if (targetUserId != null &&
                     targetUserEmail != null &&
                     widget.userEmail != null) ...[
@@ -1088,78 +911,6 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
             ),
         ],
       ),
-    );
-  }
-}
-
-// Kelime düğmesi — dürtme bottom sheet içinde yuvarlak ikon + alt etiket
-class _ModernKelimeKart extends StatelessWidget {
-  final String kelime;
-  final IconData icon;
-  final Color color;
-  final FontWeight fontWeight;
-  final VoidCallback onTap;
-
-  const _ModernKelimeKart({
-    required this.kelime,
-    required this.icon,
-    required this.color,
-    required this.fontWeight,
-    required this.onTap,
-  });
-
-  static const double _circleSize = 62;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Material(
-          color: Colors.transparent,
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            customBorder: const CircleBorder(),
-            splashColor: color.withOpacity(0.2),
-            highlightColor: color.withOpacity(0.1),
-            child: Ink(
-              width: _circleSize,
-              height: _circleSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withOpacity(0.12),
-                border: Border.all(color: color.withOpacity(0.4), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.15),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(icon, color: color, size: 26),
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Text(
-            kelime,
-            style: TextStyle(
-              color: color.withOpacity(0.95),
-              fontSize: 11,
-              fontWeight: fontWeight,
-              height: 1.15,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
     );
   }
 }
