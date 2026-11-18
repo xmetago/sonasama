@@ -263,7 +263,8 @@ class UserGamifiedScoreService {
     return progress.clamp(0.0, 1.0);
   }
 
-  /// Kategorileri normalize eder. Kaldırılan Herkes, Takipçi sayılır.
+  /// Kategoriyi Grup-19, Arkadaş veya Takipçi'ye indirger.
+  /// Eski Herkes ve Tanımadıklarım kayıtları Takipçi sayılır; Takipçi'de kota yok.
   static String _normalizeCategoryName(String category) {
     return ProximityCategoryRules.normalize(category) ??
         ProximityCategoryRules.takipci;

@@ -1,6 +1,7 @@
 import '../services/hive_database_service.dart';
 import '../models/registration_model.dart';
 import '../utils/debug_davet_utils.dart';
+import '../utils/proximity_category_rules.dart';
 
 /// Test senaryosu: whoboom@whoboom.com ve fatih@whoboom.com arasındaki davet sistemi
 class TestDavetSystem {
@@ -153,7 +154,7 @@ class TestDavetSystem {
       
       // Takipçi kategorisindeki kişileri kontrol et
       final takipciEmails = categories.entries
-          .where((entry) => entry.value.toLowerCase() == 'takipçi')
+          .where((entry) => ProximityCategoryRules.countsAsTakipci(entry.value))
           .map((entry) => entry.key)
           .toList();
       print('Takipçi kategorisindeki kişiler: $takipciEmails');

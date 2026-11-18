@@ -5,7 +5,7 @@ class FriendCategoryModel extends HiveObject {
   final String id;
   final String ownerUserId; // Kategoriyi belirleyen kullanıcı
   final String targetUserId; // Kategoriye eklenen kullanıcı
-  final String category; // Örn: Arkadaş, Takipçi, Grup-19, Herkes/Tanımadıklarım
+  final String category; // Grup-19, Arkadaş veya Takipçi
   final DateTime createdAt;
   final DateTime? updatedAt;
 

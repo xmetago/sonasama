@@ -185,13 +185,6 @@ class FriendshipCategoryDialog extends StatelessWidget {
         'description': 'Değer verdiğim',
         'category': 'Takipçi',
       },
-      {
-        'title': 'Herkes',
-        'color': AppTheme.primaryColor,
-        'icon': Icons.public,
-        'description': 'Samimiyete Değer',
-        'category': 'Herkes',
-      },
     ];
 
     return GridView.builder(
@@ -212,7 +205,7 @@ class FriendshipCategoryDialog extends StatelessWidget {
         final canSelect = canMoveTo(categoryName);
         final currentCount = categoryCount(categoryName);
         final limit = categoryLimit(categoryName);
-        final limitText = limit == -1 ? '∞' : '$currentCount/$limit';
+        final limitText = limit < 0 ? '$currentCount' : '$currentCount/$limit';
         
         return GestureDetector(
           onTap: () {
