@@ -13,6 +13,7 @@ import '../models/album_model.dart';
 import '../models/album_image_model.dart';
 import '../data/direm_data.dart';
 import '../utils/constants.dart';
+import '../utils/proximity_category_rules.dart';
 import 'verified_users_service.dart';
 import '../utils/comment_utils.dart';
 
@@ -161,6 +162,41 @@ class HiveDatabaseService {
     
     // Verified users servisini başlat
     await VerifiedUsersService.initialize();
+
+    await migrateRetiredHerkesCategories();
+  }
+
+  /// Eski Herkes / Tanımadıklarım arkadaş kategorisini Takipçi olarak saklar.
+  static String _canonicalFriendCategory(String category) {
+    if (ProximityCategoryRules.isRetiredHerkesAlias(category)) {
+      return ProximityCategoryRules.takipci;
+    }
+    return category;
+  }
+
+  /// friend_group_box içindeki kaldırılan Herkes kayıtlarını Takipçi yapar.
+  static Future<int> migrateRetiredHerkesCategories() async {
+    final box = _friendGroupBox;
+    if (box == null) return 0;
+    var changed = 0;
+    for (final key in box.keys.toList()) {
+      final current = box.get(key);
+      if (current is! Map) continue;
+      final map = Map<String, String>.from(
+        current.map((k, v) => MapEntry(k.toString(), v.toString())),
+      );
+      var dirty = false;
+      for (final entry in map.entries.toList()) {
+        if (!ProximityCategoryRules.isRetiredHerkesAlias(entry.value)) continue;
+        map[entry.key] = ProximityCategoryRules.takipci;
+        dirty = true;
+        changed++;
+      }
+      if (dirty) {
+        await box.put(key, map);
+      }
+    }
+    return changed;
   }
 
   // ========== HOME FEED (SEYIR DEFTERI) ==========
@@ -307,7 +343,7 @@ class HiveDatabaseService {
     final Map<String, String> map = current != null
         ? Map<String, String>.from((current as Map).map((k, v) => MapEntry(k.toString(), v.toString())))
         : <String, String>{};
-    map[friendEmail] = category;
+    map[friendEmail] = _canonicalFriendCategory(category);
     await _friendGroupBox?.put(ownerEmail, map);
   }
 
@@ -320,14 +356,19 @@ class HiveDatabaseService {
     if (current == null) return null;
     final Map<String, dynamic> map = Map<String, dynamic>.from(current as Map);
     final val = map[friendEmail];
-    return val?.toString();
+    if (val == null) return null;
+    return _canonicalFriendCategory(val.toString());
   }
 
   /// Bir kullanıcının tüm arkadaş-kategori eşleşmelerini getir
   static Map<String, String> getFriendCategories(String ownerEmail) {
     final current = _friendGroupBox?.get(ownerEmail);
     if (current == null) return <String, String>{};
-    return Map<String, String>.from((current as Map).map((k, v) => MapEntry(k.toString(), v.toString())));
+    return Map<String, String>.from(
+      (current as Map).map(
+        (k, v) => MapEntry(k.toString(), _canonicalFriendCategory(v.toString())),
+      ),
+    );
   }
 
   /// Bir arkadaşın kategorisini sil
@@ -924,6 +965,7 @@ class HiveDatabaseService {
     final existing = getFriendshipByUsers(ownerId, targetId);
     if (existing?.status == FriendshipStatus.blocked) return;
 
+    final storedCategory = _canonicalFriendCategory(category);
     await sendFriendshipRequest(FriendshipModel(
       id: existing?.id ?? id,
       requesterId: ownerId,
@@ -931,7 +973,7 @@ class HiveDatabaseService {
       status: FriendshipStatus.following,
       createdAt: existing?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
-      message: 'Kategori: $category',
+      message: 'Kategori: $storedCategory',
     ));
   }
 
@@ -1744,15 +1786,7 @@ class HiveDatabaseService {
       print('DEBUG: All friend categories for $openerEmail: $friendCategories');
       
       final followerEmails = friendCategories.entries
-          .where((entry) {
-            final categoryLower = entry.value.toLowerCase();
-            return categoryLower.contains('takipçi') || 
-                   categoryLower.contains('takipci') ||
-                   categoryLower.contains('takip') ||
-                   categoryLower.contains('follower') ||
-                   categoryLower == 'takipçi' ||
-                   categoryLower == 'takipçiler';
-          })
+          .where((entry) => ProximityCategoryRules.countsAsTakipci(entry.value))
           .map((entry) => entry.key)
           .toSet();
       
@@ -2093,8 +2127,8 @@ class HiveDatabaseService {
       return;
     }
     
-    // Kategorilere dağıt
-    final categories = ['arkadaş', 'takipçi', 'herkes'];
+    // Kategorilere dağıt. Herkes arkadaş kategorisi Takipçi ile birleşti.
+    final categories = ['arkadaş', 'takipçi'];
     final Map<String, String> friendCategories = {};
     
     for (int i = 0; i < otherUsers.length && i < 15; i++) {

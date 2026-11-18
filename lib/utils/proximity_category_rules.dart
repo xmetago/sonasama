@@ -13,7 +13,26 @@ class ProximityCategoryRules {
 
   static const int grup19Limit = 19;
   static const int arkadasLimit = 114; // 19 × 6
-  static const int takipciLimit = -1; // sınırsız
+  static const int takipciLimit = -1; // sınırsız, Herkes ile birleşti
+
+  /// Kaldırılan arkadaş kategorisi: Herkes ve eski Tanımadıklarım takma adı.
+  static bool isRetiredHerkesAlias(String? raw) {
+    if (raw == null) return false;
+    final lower = raw.trim().toLowerCase();
+    if (lower.isEmpty) return false;
+    return lower.contains('herkes') ||
+        lower.contains('tanımadık') ||
+        lower.contains('tanimadik');
+  }
+
+  /// Takipçi davet/liste kaydı. Grup-19 ve Arkadaş bu kümeye girmez.
+  static bool countsAsTakipci(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return false;
+    final lower = raw.toLowerCase();
+    if (lower.contains('grup') || lower.contains('ark')) return false;
+    if (lower.contains('takip') || lower.contains('follower')) return true;
+    return isRetiredHerkesAlias(raw);
+  }
 
   static String? normalize(String? raw) {
     if (raw == null || raw.trim().isEmpty) return null;
@@ -21,7 +40,7 @@ class ProximityCategoryRules {
     if (lower.contains('grup')) return grup19;
     if (lower.contains('ark')) return arkadas;
     if (lower.contains('takip')) return takipci;
-    if (lower.contains('herkes')) return takipci;
+    if (isRetiredHerkesAlias(raw)) return takipci;
     return takipci;
   }
 

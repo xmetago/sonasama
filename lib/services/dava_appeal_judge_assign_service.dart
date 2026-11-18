@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import '../utils/proximity_category_rules.dart';
 import 'dava_timer_service.dart';
 import 'hive_database_service.dart';
 
@@ -29,14 +30,7 @@ class DavaAppealJudgeAssignService {
   }) {
     final categories = HiveDatabaseService.getFriendCategories(ownerEmail);
     final followerEmails = categories.entries
-        .where((entry) {
-          final categoryLower = entry.value.toLowerCase();
-          return categoryLower.contains('takipçi') ||
-              categoryLower.contains('takipci') ||
-              categoryLower.contains('follower') ||
-              categoryLower == 'takipçi' ||
-              categoryLower == 'takipçiler';
-        })
+        .where((entry) => ProximityCategoryRules.countsAsTakipci(entry.value))
         .map((e) => e.key.trim().toLowerCase())
         .where((email) => email.isNotEmpty && !excludedEmails.contains(email))
         .toList();

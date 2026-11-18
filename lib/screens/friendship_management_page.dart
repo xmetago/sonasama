@@ -17,6 +17,7 @@ import '../widgets/friendship_incoming_requests_dialog.dart';
 import '../widgets/friendship_user_card.dart';
 import '../theme/seyir_tokens.dart';
 import '../utils/app_theme.dart';
+import '../utils/proximity_category_rules.dart';
 import '../widgets/shared/app_snack.dart';
 
 class FriendshipManagementPage extends StatefulWidget {
@@ -40,11 +41,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
   static const double _actionIconSize = 16;
   static const double _headerIconSize = 18;
 
-  // Kategori limitleri
+  // Kategori limitleri. Takipçi sınırsızdır (eski Herkes kotası da kalktı).
   static const int GRUP_19_LIMIT = 19;
   static const int ARKADAS_LIMIT = 38;
-  static const int TAKIPCI_LIMIT = 114;
-  static const int HERKES_LIMIT = 6346; // Herkes kategorisi limiti
 
   // Veritabanından gelen veriler
   List<RegistrationModel> _allUsers = [];
@@ -53,7 +52,6 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     'Grup-19': [],
     'Arkadaş': [],
     'Takipçi': [],
-    'Herkes': [],
   };
   
   // Silinen ve engellenen kullanıcıları takip etmek için
@@ -75,7 +73,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
   bool _needsLogin = false;
   String? _loadError;
 
-  final List<String> _categories = ['Tümü', 'Grup-19', 'Arkadaş', 'Takipçi', 'Herkes', 'Engellenenler'];
+  final List<String> _categories = ['Tümü', 'Grup-19', 'Arkadaş', 'Takipçi', 'Engellenenler'];
 
   @override
   void initState() {
@@ -204,17 +202,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
           ),
         );
 
-        // Kategoriyi normalize et
-        String normalizedCategory = category.toLowerCase();
-        if (normalizedCategory.contains('grup') || normalizedCategory.contains('grup-19')) {
-          normalizedCategory = 'Grup-19';
-        } else if (normalizedCategory.contains('arkadaş') || normalizedCategory.contains('arkadas')) {
-          normalizedCategory = 'Arkadaş';
-        } else if (normalizedCategory.contains('takipçi') || normalizedCategory.contains('takipci')) {
-          normalizedCategory = 'Takipçi';
-        } else {
-          normalizedCategory = 'Herkes';
-        }
+        // Eski Herkes ve Tanımadıklarım kayıtları Takipçi sekmesinde gösterilir.
+        final normalizedCategory =
+            ProximityCategoryRules.normalize(category) ?? 'Takipçi';
 
         if (_categorizedUsers.containsKey(normalizedCategory)) {
           _categorizedUsers[normalizedCategory]!.add(otherUser);
@@ -307,9 +297,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
       case 'Arkadaş':
         return currentCount < ARKADAS_LIMIT;
       case 'Takipçi':
-        return currentCount < TAKIPCI_LIMIT;
-      case 'Herkes':
-        return currentCount < HERKES_LIMIT;
+        return true;
       default:
         return false;
     }
@@ -346,9 +334,6 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
       case 'Arkadaş':
         return ARKADAS_LIMIT;
       case 'Takipçi':
-        return TAKIPCI_LIMIT;
-      case 'Herkes':
-        return HERKES_LIMIT;
       case 'Engellenenler':
         return -1; // Sınırsız
       default:
@@ -474,7 +459,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     bool canAdd = _canAddToCategory(title);
     int currentCount = _getCategoryCount(title);
     int limit = _getCategoryLimit(title);
-    String limitText = limit == -1 ? 'Sınırsız' : '$currentCount/$limit';
+    String limitText = limit < 0 ? '$currentCount' : '$currentCount/$limit';
     
     return Container(
       width: double.infinity,
@@ -587,7 +572,6 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
               _buildCategoryButtonWithLimit('Grup-19', AppTheme.warningColor, () => _acceptFriendship(request, 'Grup-19')),
               _buildCategoryButtonWithLimit('Arkadaş', AppTheme.successColor, () => _acceptFriendship(request, 'Arkadaş')),
               _buildCategoryButtonWithLimit('Takipçi', AppTheme.infoColor, () => _acceptFriendship(request, 'Takipçi')),
-              _buildCategoryButtonWithLimit('Herkes', AppTheme.primaryColor, () => _acceptFriendship(request, 'Herkes')),
             ],
           ),
           actions: [
@@ -843,8 +827,6 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         return AppTheme.successColor;
       case 'Takipçi':
         return AppTheme.infoColor;
-      case 'Herkes':
-        return AppTheme.primaryColor;
       default:
         return AppTheme.textTertiary;
     }
@@ -858,8 +840,6 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         return Icons.favorite_border;
       case 'Takipçi':
         return Icons.visibility_outlined;
-      case 'Herkes':
-        return Icons.public;
       case 'Engellenenler':
         return Icons.block_outlined;
       default:
@@ -1050,8 +1030,6 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
                         _buildQuickCategoryButton('Grup-19', const Color(0xFFD97706), user, 'Grup-19'),
                         const SizedBox(width: 6),
                         _buildQuickCategoryButton('Takipçi', AppTheme.infoColor, user, 'Takipçi'),
-                        const SizedBox(width: 6),
-                        _buildQuickCategoryButton('Herkes', AppTheme.primaryColor, user, 'Herkes'),
                       ],
                     ),
                   ),
