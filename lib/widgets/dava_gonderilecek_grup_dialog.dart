@@ -1,269 +1,248 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../models/friendship_model.dart';
+import '../models/registration_model.dart';
+import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
+
+/// Dava açılırken yargıç grubunu seçtiren bilet diyalogu.
+///
+/// Atama dizeleri değişmez: `Grup19`, `Arkadaşlar`, `Takipçiler`,
+/// `Tanımadıklarım`. Dördüncü kartın havuzu arkadaş kategorisi değildir.
+/// Kaldırılan Herkes / Tanımadıklarım kategorileri Takipçi sayılır; bu kart
+/// ise [HiveDatabaseService.pickGroupRecipients] ile aynı kümedir: kabul
+/// edilmiş arkadaşı, takipçisi ve takip ettiği olmayan kayıtlı kişiler.
 class DavaGonderilecekGrupDialog extends StatefulWidget {
   const DavaGonderilecekGrupDialog({
     super.key,
     required this.onConfirm,
+    this.openerEmail,
+    this.defendant,
   });
 
   final ValueChanged<String> onConfirm;
 
+  /// Dava açan. Havuz sayıları bu kişiye göre okunur.
+  final String? openerEmail;
+
+  /// Davalı metni. Boşsa özette davalı yer almaz.
+  final String? defendant;
+
   static Future<void> show(
     BuildContext context, {
     required ValueChanged<String> onConfirm,
+    String? openerEmail,
+    String? defendant,
   }) {
     return showDialog<void>(
       context: context,
-      barrierDismissible: true, // artık dışarı tıklayınca kapanabilir
-      builder: (context) => DavaGonderilecekGrupDialog(onConfirm: onConfirm),
-    );
-  }
-
-  @override
-  State<DavaGonderilecekGrupDialog> createState() => _DavaGonderilecekGrupDialogState();
-}
-
-class _DavaGonderilecekGrupDialogState extends State<DavaGonderilecekGrupDialog> with SingleTickerProviderStateMixin {
-  String? _selectedGroup;
-  AnimationController? _animController;
-  Animation<double>? _scaleAnimation;
-
-  /// Hot reload `initState` çalıştırmadığı için `late` yerine ilk kullanımda oluşturulur.
-  void _ensureAnimController() {
-    if (_animController != null) return;
-    final c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 180),
-    );
-    _animController = c;
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.06).animate(
-      CurvedAnimation(parent: c, curve: Curves.easeOutCubic),
-    );
-  }
-
-  AnimationController get _ac {
-    _ensureAnimController();
-    return _animController!;
-  }
-
-  Animation<double> get _scaleAnim {
-    _ensureAnimController();
-    return _scaleAnimation!;
-  }
-
-  @override
-  void dispose() {
-    _animController?.dispose();
-    super.dispose();
-  }
-
-  void _playAnimation() {
-    final c = _ac;
-    c.forward().then((_) {
-      if (mounted) c.reverse();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    _ensureAnimController();
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      elevation: 12,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 28,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DavaHukmeJaggedHeader(
-              title: 'Davayı Hükme Gönder',
-              textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: Colors.blue.shade800,
-                  ),
-            ),
-            const SizedBox(height: 28),
-
-            // Seçenekler
-            _buildOptionCard(
-              value: 'Grup19',
-              title: 'Grup19',
-              subtitle: '7 Bilgeden Seç',
-              color: Colors.deepPurple,
-              icon: Icons.group_rounded,
-            ),
-            const SizedBox(height: 12),
-            _buildOptionCard(
-              value: 'Arkadaşlar',
-              title: 'Arkadaşlar',
-              subtitle: 'Arkadaşlardan 7  üye seç',
-              color: Colors.green.shade700,
-              icon: Icons.people_alt_rounded,
-            ),
-            const SizedBox(height: 12),
-            _buildOptionCard(
-              value: 'Takipçiler',
-              title: 'Takipçiler',
-              subtitle: 'Takipçilerden  7  üye seç',
-              color: Colors.orange.shade700,
-              icon: Icons.notifications_active_rounded,
-            ),
-            const SizedBox(height: 12),
-            _buildOptionCard(
-              value: 'Tanımadıklarım',
-              title: 'Tanınmayan',
-              subtitle: 'Tanımadığım 7  üye seç',
-              color: Colors.red.shade700,
-              icon: Icons.public_rounded,
-            ),
-
-            const SizedBox(height: 32),
-
-            // Butonlar
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      side: BorderSide(color: Colors.grey.shade400),
-                    ),
-                    child: Text(
-                      'İPTAL',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _selectedGroup != null
-                        ? () {
-                            Navigator.pop(context);
-                            widget.onConfirm(_selectedGroup!);
-                          }
-                        : null,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _selectedGroup != null ? Colors.blue.shade700 : Colors.grey.shade400,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: _selectedGroup != null ? 2 : 0,
-                    ),
-                    child: const Text(
-                      'DAVA ATA',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+      barrierDismissible: true,
+      builder: (context) => DavaGonderilecekGrupDialog(
+        onConfirm: onConfirm,
+        openerEmail: openerEmail,
+        defendant: defendant,
       ),
     );
   }
 
-  Widget _buildOptionCard({
-    required String value,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required IconData icon,
-  }) {
-    final isSelected = _selectedGroup == value;
+  @override
+  State<DavaGonderilecekGrupDialog> createState() =>
+      _DavaGonderilecekGrupDialogState();
+}
 
-    return GestureDetector(
-      onTap: () {
-        setState(() => _selectedGroup = value);
-        _playAnimation();
-      },
-      child: AnimatedBuilder(
-        animation: _ac,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: isSelected ? _scaleAnim.value : 1.0,
-            child: child,
-          );
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: isSelected ? color.withOpacity(0.12) : Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected ? color : Colors.grey.shade300,
-              width: isSelected ? 2.2 : 1.4,
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: color.withOpacity(0.28),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
+class _DavaGonderilecekGrupDialogState extends State<DavaGonderilecekGrupDialog>
+    with SingleTickerProviderStateMixin {
+  static const Duration _stampDuration = Duration(milliseconds: 420);
+
+  String? _selectedGroup;
+  AnimationController? _stampController;
+  late final _DavaGrupSecimi _secim;
+
+  void _ensureStamp() {
+    if (_stampController != null) return;
+    _stampController = AnimationController(vsync: this, duration: _stampDuration);
+  }
+
+  AnimationController get _stamp {
+    _ensureStamp();
+    return _stampController!;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureStamp();
+    _secim = _DavaGrupSecimi.resolve(
+      openerEmail: widget.openerEmail,
+      defendant: widget.defendant,
+    );
+  }
+
+  @override
+  void dispose() {
+    _stampController?.dispose();
+    super.dispose();
+  }
+
+  void _select(String value) {
+    if (_selectedGroup == value) return;
+    setState(() => _selectedGroup = value);
+    HapticFeedback.selectionClick();
+    HapticFeedback.mediumImpact();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _stamp.value = 0;
+      return;
+    }
+    _stamp.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _ensureStamp();
+    final palette = SeyirPalette.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final motion = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : SeyirTokens.motion;
+    final selected = _secim.card(_selectedGroup);
+    final headerInk = selected == null
+        ? palette.foreground(SeyirTokens.brandDeep)
+        : palette.foreground(selected.color);
+    final headerFill = selected == null
+        ? palette.brandSoft
+        : palette.tint(selected.color);
+    final headerBorder = selected == null
+        ? palette.tintBorder(SeyirTokens.brandDeep)
+        : palette.tintBorder(selected.color);
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.92;
+
+    return Dialog(
+      backgroundColor: palette.surface,
+      surfaceTintColor: palette.surface,
+      elevation: 8,
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space4,
+        vertical: SeyirTokens.space6,
+      ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(SeyirTokens.radiusXl)),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight, maxWidth: 440),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            SeyirTokens.space4,
+            SeyirTokens.space6,
+            SeyirTokens.space4,
+            SeyirTokens.space6,
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(
-                icon,
-                size: 28,
-                color: isSelected ? color : Colors.grey.shade600,
+              TweenAnimationBuilder<Color?>(
+                tween: ColorTween(end: headerFill),
+                duration: motion,
+                builder: (context, fill, child) {
+                  return DavaHukmeJaggedHeader(
+                    title: 'Davayı Hükme Gönder',
+                    fillColor: fill ?? headerFill,
+                    borderColor: headerBorder,
+                    inkColor: headerInk,
+                    stamp: _stamp,
+                    textStyle: palette.display(
+                      color: headerInk,
+                      weight: FontWeight.w800,
+                    ),
+                  );
+                },
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                        color: isSelected ? color : Colors.black87,
+              const SizedBox(height: SeyirTokens.space6),
+              for (var i = 0; i < _secim.cards.length; i++) ...[
+                if (i > 0) const SizedBox(height: SeyirTokens.space3),
+                _GrupOptionCard(
+                  data: _secim.cards[i],
+                  selected: _selectedGroup == _secim.cards[i].value,
+                  motion: motion,
+                  onTap: () => _select(_secim.cards[i].value),
+                ),
+              ],
+              const SizedBox(height: SeyirTokens.space6),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: palette.textPrimary,
+                        minimumSize: const Size(0, SeyirTokens.tapTarget),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: SeyirTokens.space3,
+                          horizontal: SeyirTokens.space3,
+                        ),
+                        side: BorderSide(color: palette.border),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: SeyirTokens.radiusLgAll,
+                        ),
+                      ),
+                      child: Text(
+                        'İPTAL',
+                        style: palette.title(weight: FontWeight.w600),
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade700,
+                  ),
+                  const SizedBox(width: SeyirTokens.space4),
+                  Expanded(
+                    child: FilledButton(
+                      key: const Key('dava-grup-ata'),
+                      onPressed: selected == null
+                          ? null
+                          : () {
+                              Navigator.pop(context);
+                              widget.onConfirm(selected.value);
+                            },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: selected == null
+                            ? scheme.primary.withValues(alpha: 0.38)
+                            : scheme.primary,
+                        foregroundColor: selected == null
+                            ? palette.textMuted
+                            : scheme.onPrimary,
+                        disabledBackgroundColor:
+                            scheme.primary.withValues(alpha: 0.38),
+                        disabledForegroundColor: palette.textMuted,
+                        minimumSize: const Size(0, SeyirTokens.tapTarget),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: SeyirTokens.space3,
+                          horizontal: SeyirTokens.space3,
+                        ),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: SeyirTokens.radiusLgAll,
+                        ),
+                        elevation: selected == null ? 0 : 2,
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          selected?.ataLabel ?? 'DAVA ATA',
+                          maxLines: 1,
+                          style: palette.title(
+                            weight: FontWeight.w700,
+                            color: selected == null
+                                ? palette.textMuted
+                                : scheme.onPrimary,
+                          ),
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              if (isSelected)
-                Icon(
-                  Icons.check_circle_rounded,
-                  color: color,
-                  size: 28,
-                ),
             ],
           ),
         ),
@@ -272,43 +251,395 @@ class _DavaGonderilecekGrupDialogState extends State<DavaGonderilecekGrupDialog>
   }
 }
 
+class _GrupOptionCard extends StatelessWidget {
+  const _GrupOptionCard({
+    required this.data,
+    required this.selected,
+    required this.motion,
+    required this.onTap,
+  });
+
+  final _GrupCardData data;
+  final bool selected;
+  final Duration motion;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final notice = data.notice;
+    return AnimatedContainer(
+      duration: motion,
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        borderRadius: SeyirTokens.radiusLgAll,
+        border: Border.all(
+          color: selected ? SeyirTokens.brand : palette.surface,
+          width: 2,
+        ),
+      ),
+      child: Material(
+        color: palette.surface,
+        borderRadius: SeyirTokens.radiusLgAll,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: Key('dava-grup-${data.value}'),
+          onTap: onTap,
+          borderRadius: SeyirTokens.radiusLgAll,
+          splashColor: data.color.withValues(alpha: 0.16),
+          highlightColor: data.color.withValues(alpha: 0.08),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+            child: AnimatedContainer(
+              duration: motion,
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(
+                horizontal: SeyirTokens.space4,
+                vertical: SeyirTokens.space3,
+              ),
+              decoration: BoxDecoration(
+                color: selected ? palette.tint(data.color) : palette.surfaceMuted,
+                borderRadius: SeyirTokens.radiusLgAll,
+                border: Border.all(
+                  color: selected ? data.color : palette.border,
+                  width: selected ? 2 : 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        data.icon,
+                        size: SeyirTokens.space6,
+                        color: selected
+                            ? palette.foreground(data.color)
+                            : palette.textSecondary,
+                      ),
+                      const SizedBox(width: SeyirTokens.space3),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              data.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: palette.headline(
+                                weight: selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                                color: selected
+                                    ? palette.foreground(data.color)
+                                    : palette.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: SeyirTokens.space1),
+                            Text(
+                              data.subtitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: palette.body(color: palette.textSecondary),
+                            ),
+                            const SizedBox(height: SeyirTokens.space1),
+                            Text(
+                              '${data.poolSize} kişi',
+                              key: Key('dava-grup-count-${data.value}'),
+                              style: palette.caption(
+                                weight: FontWeight.w700,
+                                color: palette.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      AnimatedOpacity(
+                        duration: motion,
+                        opacity: selected ? 1 : 0,
+                        child: Icon(
+                          Icons.check_circle_rounded,
+                          color: selected
+                              ? palette.foreground(data.color)
+                              : palette.surface,
+                          size: SeyirTokens.space6,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (notice != null) ...[
+                    const SizedBox(height: SeyirTokens.space2),
+                    Text(
+                      notice,
+                      style: palette.caption(
+                        color: palette.foreground(SeyirTokens.warning),
+                      ),
+                    ),
+                  ],
+                  ClipRect(
+                    child: AnimatedAlign(
+                      duration: motion,
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topCenter,
+                      heightFactor: selected ? 1 : 0,
+                      child: selected
+                          ? Padding(
+                              padding: const EdgeInsets.only(
+                                top: SeyirTokens.space3,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (data.members.isNotEmpty) ...[
+                                    _AvatarStack(
+                                      people: data.members,
+                                      poolSize: data.poolSize,
+                                      accent: data.color,
+                                    ),
+                                    const SizedBox(height: SeyirTokens.space2),
+                                  ],
+                                  Text(
+                                    data.summary,
+                                    key: const Key('dava-grup-summary'),
+                                    style: palette.body(
+                                      weight: FontWeight.w700,
+                                      color: palette.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : const SizedBox(width: double.infinity),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AvatarStack extends StatelessWidget {
+  const _AvatarStack({
+    required this.people,
+    required this.poolSize,
+    required this.accent,
+  });
+
+  final List<RegistrationModel> people;
+  final int poolSize;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = people.take(5).toList();
+    final extra = poolSize - shown.length;
+    const double size = 32;
+    const double step = 20;
+    final count = shown.length + (extra > 0 ? 1 : 0);
+    final width = size + (count - 1) * step;
+
+    return SizedBox(
+      height: size,
+      width: width,
+      child: Stack(
+        children: [
+          for (var i = 0; i < shown.length; i++)
+            Positioned(
+              left: i * step,
+              child: _PoolAvatar(person: shown[i], accent: accent, size: size),
+            ),
+          if (extra > 0)
+            Positioned(
+              left: shown.length * step,
+              child: _PlusBadge(extra: extra, accent: accent, size: size),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PoolAvatar extends StatelessWidget {
+  const _PoolAvatar({
+    required this.person,
+    required this.accent,
+    required this.size,
+  });
+
+  final RegistrationModel person;
+  final Color accent;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final initials = _initials(person.judgeName);
+    final fallback = ColoredBox(
+      color: palette.tint(accent),
+      child: Center(
+        child: Text(
+          initials,
+          style: palette.caption(
+            weight: FontWeight.w800,
+            color: palette.foreground(accent),
+          ),
+        ),
+      ),
+    );
+    final image = _avatarImage(person.profileImage, fallback);
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: palette.surface, width: 2),
+        color: palette.tint(accent),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: image,
+    );
+  }
+}
+
+class _PlusBadge extends StatelessWidget {
+  const _PlusBadge({
+    required this.extra,
+    required this.accent,
+    required this.size,
+  });
+
+  final int extra;
+  final Color accent;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: palette.tint(accent),
+        border: Border.all(color: palette.surface, width: 2),
+      ),
+      child: Text(
+        '+$extra',
+        style: palette.caption(
+          weight: FontWeight.w800,
+          color: palette.foreground(accent),
+        ),
+      ),
+    );
+  }
+}
+
+Widget _avatarImage(String? raw, Widget fallback) {
+  final provider = _imageProvider(raw);
+  if (provider == null) return fallback;
+  return Image(
+    image: provider,
+    fit: BoxFit.cover,
+    gaplessPlayback: true,
+    errorBuilder: (_, __, ___) => fallback,
+  );
+}
+
+ImageProvider? _imageProvider(String? raw) {
+  if (raw == null) return null;
+  final value = raw.trim();
+  if (value.isEmpty) return null;
+  if (value.startsWith('data:image')) {
+    final comma = value.indexOf(',');
+    if (comma < 0) return null;
+    try {
+      return MemoryImage(base64Decode(value.substring(comma + 1)));
+    } catch (_) {
+      return null;
+    }
+  }
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return NetworkImage(value);
+  }
+  final path = value.startsWith('file://') ? value.substring(7) : value;
+  if (path.startsWith('/')) return FileImage(File(path));
+  return null;
+}
+
+String _initials(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return '?';
+  if (parts.length == 1) {
+    final word = parts.first;
+    return word.length >= 2
+        ? word.substring(0, 2).toUpperCase()
+        : word.toUpperCase();
+  }
+  return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+}
+
 /// Bilet / makbuz tarzı tırtıklı üst–alt kenar; dolgu ve çerçeve tek path ile çizilir.
 class DavaHukmeJaggedHeader extends StatelessWidget {
   const DavaHukmeJaggedHeader({
     super.key,
     required this.title,
     this.textStyle,
+    this.fillColor,
+    this.borderColor,
+    this.inkColor,
+    this.stamp,
   });
 
   final String title;
   final TextStyle? textStyle;
+  final Color? fillColor;
+  final Color? borderColor;
+  final Color? inkColor;
+  final Animation<double>? stamp;
 
   @override
   Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final ink = inkColor ?? palette.foreground(SeyirTokens.brandDeep);
     final style = textStyle ??
-        Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: Colors.blue.shade800,
-            );
+        palette.display(
+          color: ink,
+          weight: FontWeight.w800,
+        );
 
     return CustomPaint(
       painter: _JaggedTicketHeaderPainter(
-        fillColor: Colors.blue.shade50,
-        borderColor: Colors.blue.shade300,
+        fillColor: fillColor ?? palette.brandSoft,
+        borderColor: borderColor ?? palette.tintBorder(SeyirTokens.brandDeep),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        padding: const EdgeInsets.fromLTRB(
+          SeyirTokens.space4,
+          SeyirTokens.space4,
+          SeyirTokens.space4,
+          SeyirTokens.space4,
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.gavel_rounded, size: 20, color: Colors.blue.shade700),
-            const SizedBox(width: 12),
+            _StampGavel(color: ink, stamp: stamp),
+            const SizedBox(width: SeyirTokens.space3),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  // Dar alanlarda fontu kontrollü küçültüp tek satırı korur.
-                  final resolvedStyle = style ?? const TextStyle();
-                  final baseFontSize = resolvedStyle.fontSize ?? 22;
+                  final resolvedStyle = style;
+                  final baseFontSize =
+                      resolvedStyle.fontSize ?? SeyirTokens.typeDisplay;
                   const minScale = 0.84;
 
                   final textPainter = TextPainter(
@@ -328,13 +659,70 @@ class DavaHukmeJaggedHeader extends StatelessWidget {
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: resolvedStyle.copyWith(fontSize: baseFontSize * widthScale),
+                    style: resolvedStyle.copyWith(
+                      fontSize: baseFontSize * widthScale,
+                    ),
                   );
                 },
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StampGavel extends StatelessWidget {
+  const _StampGavel({required this.color, this.stamp});
+
+  final Color color;
+  final Animation<double>? stamp;
+
+  @override
+  Widget build(BuildContext context) {
+    final animation = stamp;
+    if (animation == null) {
+      return Icon(Icons.gavel_rounded, size: 20, color: color);
+    }
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: animation,
+        builder: (context, child) {
+          final t = animation.value;
+          final pulse = math.sin(t * math.pi);
+          return SizedBox(
+            width: 28,
+            height: 28,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Opacity(
+                  opacity: (pulse * 0.7).clamp(0.0, 1.0),
+                  child: Transform.scale(
+                    scale: 1.55 - (0.55 * t),
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: color, width: 2),
+                      ),
+                    ),
+                  ),
+                ),
+                Transform.rotate(
+                  angle: -0.4 * pulse,
+                  child: Transform.scale(
+                    scale: 1 + (0.22 * pulse),
+                    child: child,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+        child: Icon(Icons.gavel_rounded, size: 20, color: color),
       ),
     );
   }
@@ -349,7 +737,7 @@ class _JaggedTicketHeaderPainter extends CustomPainter {
   final Color fillColor;
   final Color borderColor;
 
-  static const double _r = 12;
+  static const double _r = SeyirTokens.radiusMd;
   static const double _toothW = 9;
   static const double _toothD = 3.5;
 
@@ -410,7 +798,7 @@ class _JaggedTicketHeaderPainter extends CustomPainter {
     }
 
     path.arcToPoint(
-      Offset(0, _r),
+      const Offset(0, _r),
       radius: const Radius.circular(_r),
       clockwise: false,
     );
@@ -425,4 +813,331 @@ class _JaggedTicketHeaderPainter extends CustomPainter {
     return oldDelegate.fillColor != fillColor ||
         oldDelegate.borderColor != borderColor;
   }
+}
+
+class _GrupCardData {
+  const _GrupCardData({
+    required this.value,
+    required this.title,
+    required this.subtitle,
+    required this.ataLabel,
+    required this.poolSize,
+    required this.yargic,
+    required this.rastgeleDoldurulur,
+    required this.davaliVar,
+    required this.members,
+    required this.color,
+    required this.icon,
+  });
+
+  final String value;
+  final String title;
+  final String subtitle;
+  final String ataLabel;
+  final int poolSize;
+  final int yargic;
+  final bool rastgeleDoldurulur;
+  final bool davaliVar;
+  final List<RegistrationModel> members;
+  final Color color;
+  final IconData icon;
+
+  String? get notice {
+    if (poolSize >= 7) return null;
+    if (rastgeleDoldurulur) {
+      return 'Bu grupta yeterli kişi yok. Eksik yerler rastgele doldurulur.';
+    }
+    return 'Bu grupta yeterli kişi yok. Eksik yerler bu havuzda tamamlanmaz.';
+  }
+
+  String get summary => _atamaOzeti(yargic: yargic, davaliVar: davaliVar);
+}
+
+class _DavaGrupSecimi {
+  const _DavaGrupSecimi(this.cards);
+
+  final List<_GrupCardData> cards;
+
+  _GrupCardData? card(String? value) {
+    if (value == null) return null;
+    for (final item in cards) {
+      if (item.value == value) return item;
+    }
+    return null;
+  }
+
+  static _DavaGrupSecimi resolve({
+    String? openerEmail,
+    String? defendant,
+  }) {
+    final opener = openerEmail == null || openerEmail.trim().isEmpty
+        ? null
+        : HiveDatabaseService.getRegistrationByEmail(openerEmail.trim());
+    final openerId = opener?.id;
+    final openerMail = opener?.email ?? openerEmail?.trim();
+    final country = opener?.country.trim().toLowerCase() ?? '';
+    final defendantText = _meaningfulDefendant(defendant);
+    final all = HiveDatabaseService.getAllRegistrations();
+
+    final grupEmails = HiveDatabaseService.getRegisteredGrup19MemberEmails();
+    final friendships = openerId == null
+        ? const <FriendshipModel>[]
+        : HiveDatabaseService.getAcceptedFriendships(openerId);
+    final followers = openerId == null
+        ? const <FriendshipModel>[]
+        : HiveDatabaseService.getFollowers(openerId);
+    final following = openerId == null
+        ? const <FriendshipModel>[]
+        : HiveDatabaseService.getFollowingUsers(openerId);
+
+    final friendIds = friendships
+        .map((f) => f.requesterId == openerId ? f.recipientId : f.requesterId)
+        .toSet();
+    final followerIds = followers.map((f) => f.requesterId).toSet();
+    final followingIds = following.map((f) => f.recipientId).toSet();
+    final strangerExclude = <String>{
+      ...friendships.expand((f) => [f.requesterId, f.recipientId]),
+      ...followerIds,
+      ...followingIds,
+      if (openerId != null) openerId,
+    };
+
+    final grupMembers = _peopleByEmail(all, grupEmails);
+    final friendMembers = _uniqueById(
+      friendIds.map((id) => _byId(all, id)).whereType<RegistrationModel>(),
+    );
+    final followerMembers = _uniqueById(
+      followerIds.map((id) => _byId(all, id)).whereType<RegistrationModel>(),
+    );
+    final strangerMembers = all
+        .where((r) => !strangerExclude.contains(r.id))
+        .toList();
+
+    final davaliVar = defendantText != null;
+    final defendantEmail = _emailOrNull(defendantText);
+
+    _GrupCardData build({
+      required String value,
+      required String title,
+      required String subtitle,
+      required int poolSize,
+      required List<RegistrationModel> members,
+      required Color color,
+      required IconData icon,
+      required bool grup19,
+    }) {
+      final plan = _planJudges(
+        grup19: grup19,
+        primary: members,
+        everyone: all,
+        openerEmail: openerMail,
+        openerCountry: country,
+        defendantEmail: defendantEmail,
+      );
+      return _GrupCardData(
+        value: value,
+        title: title,
+        subtitle: subtitle,
+        ataLabel: _ataLabel(title),
+        poolSize: poolSize,
+        yargic: plan.yargic,
+        rastgeleDoldurulur: plan.rastgele,
+        davaliVar: davaliVar,
+        members: _sorted(members),
+        color: color,
+        icon: icon,
+      );
+    }
+
+    return _DavaGrupSecimi([
+      build(
+        value: 'Grup19',
+        title: 'Grup-19',
+        subtitle: 'Grup-19’dan 7 üye seç',
+        poolSize: grupEmails.length,
+        members: grupMembers,
+        color: SeyirTokens.sectionEvidence,
+        icon: Icons.group_rounded,
+        grup19: true,
+      ),
+      build(
+        value: 'Arkadaşlar',
+        title: 'Arkadaşlar',
+        subtitle: 'Arkadaşlardan 7 üye seç',
+        poolSize: friendships.length,
+        members: friendMembers,
+        color: SeyirTokens.sectionPeople,
+        icon: Icons.people_alt_rounded,
+        grup19: false,
+      ),
+      build(
+        value: 'Takipçiler',
+        title: 'Takipçiler',
+        subtitle: 'Takipçilerden 7 üye seç',
+        poolSize: followers.length,
+        members: followerMembers,
+        color: SeyirTokens.sectionGift,
+        icon: Icons.notifications_active_rounded,
+        grup19: false,
+      ),
+      build(
+        value: 'Tanımadıklarım',
+        title: 'Tanımadıklarım',
+        subtitle: 'Tanımadıklarından 7 üye seç',
+        poolSize: strangerMembers.length,
+        members: strangerMembers,
+        color: SeyirTokens.sectionAppeal,
+        icon: Icons.public_rounded,
+        grup19: false,
+      ),
+    ]);
+  }
+}
+
+class _JudgePlan {
+  const _JudgePlan({required this.yargic, required this.rastgele});
+
+  final int yargic;
+  final bool rastgele;
+}
+
+_JudgePlan _planJudges({
+  required bool grup19,
+  required List<RegistrationModel> primary,
+  required List<RegistrationModel> everyone,
+  required String? openerEmail,
+  required String openerCountry,
+  required String? defendantEmail,
+}) {
+  bool blocked(RegistrationModel person, {required bool seven}) {
+    final settings = HiveDatabaseService.getSettings(person.email);
+    if (settings == null) return false;
+    final allowsDava = settings.privacySettings['genel_davaacilsin'] ?? true;
+    if (!allowsDava) return true;
+    if (seven && !(settings.privacySettings['davet_7yargic'] ?? true)) {
+      return true;
+    }
+    return false;
+  }
+
+  bool isOpener(RegistrationModel person) =>
+      openerEmail != null && person.email == openerEmail;
+
+  bool isDefendant(RegistrationModel person) =>
+      defendantEmail != null && person.email == defendantEmail;
+
+  if (grup19) {
+    final own = primary
+        .where((person) =>
+            !isOpener(person) &&
+            !isDefendant(person) &&
+            !blocked(person, seven: true))
+        .length;
+    final eligible = <String>{};
+    for (final person in everyone) {
+      if (isOpener(person) || isDefendant(person)) continue;
+      if (blocked(person, seven: true)) continue;
+      eligible.add(person.email);
+    }
+    final yargic = math.min(7, eligible.length);
+    return _JudgePlan(yargic: yargic, rastgele: own < 7 && yargic > own);
+  }
+
+  var allowed = primary
+      .where((person) => !isOpener(person) && !blocked(person, seven: false))
+      .toList();
+  var filledFromEveryone = false;
+  if (allowed.isEmpty) {
+    filledFromEveryone = true;
+    allowed = everyone
+        .where((person) =>
+            !isOpener(person) &&
+            !isDefendant(person) &&
+            !blocked(person, seven: false))
+        .toList();
+  }
+  if (openerCountry.isNotEmpty) {
+    allowed = allowed
+        .where((person) => person.country.trim().toLowerCase() == openerCountry)
+        .toList();
+  }
+  final yargic = math.min(7, allowed.length);
+  return _JudgePlan(
+    yargic: yargic,
+    rastgele: filledFromEveryone && yargic > 0,
+  );
+}
+
+String _atamaOzeti({required int yargic, required bool davaliVar}) {
+  final roller = <String>['$yargic yargıç', 'sen'];
+  var toplam = yargic + 1;
+  if (davaliVar) {
+    roller.add('davalı');
+    toplam += 1;
+  }
+  return '${roller.join(' + ')}, toplam $toplam kişi alacak';
+}
+
+String _ataLabel(String title) => '$title${_dativeSuffix(title)} ata';
+
+String _dativeSuffix(String phrase) {
+  const back = {'a', 'A', 'ı', 'I', 'o', 'O', 'u', 'U'};
+  const front = {'e', 'E', 'i', 'İ', 'ö', 'Ö', 'ü', 'Ü'};
+  for (var i = phrase.length - 1; i >= 0; i--) {
+    final char = phrase[i];
+    if (back.contains(char)) return '’a';
+    if (front.contains(char)) return '’e';
+  }
+  return '’a';
+}
+
+String? _meaningfulDefendant(String? raw) {
+  final text = raw?.trim() ?? '';
+  if (text.isEmpty ||
+      text == 'Davalı  adını gir ' ||
+      text == 'Beklemede') {
+    return null;
+  }
+  return text;
+}
+
+String? _emailOrNull(String? text) {
+  if (text == null || !text.contains('@')) return null;
+  return text;
+}
+
+RegistrationModel? _byId(List<RegistrationModel> all, String id) {
+  for (final person in all) {
+    if (person.id == id) return person;
+  }
+  return null;
+}
+
+List<RegistrationModel> _peopleByEmail(
+  List<RegistrationModel> all,
+  Set<String> emails,
+) {
+  final wanted = emails.map((email) => email.trim().toLowerCase()).toSet();
+  return all
+      .where((person) => wanted.contains(person.email.trim().toLowerCase()))
+      .toList();
+}
+
+List<RegistrationModel> _uniqueById(Iterable<RegistrationModel> people) {
+  final seen = <String>{};
+  final result = <RegistrationModel>[];
+  for (final person in people) {
+    if (seen.add(person.id)) result.add(person);
+  }
+  return result;
+}
+
+List<RegistrationModel> _sorted(List<RegistrationModel> people) {
+  final copy = List<RegistrationModel>.from(people);
+  copy.sort((a, b) {
+    final byName = a.judgeName.compareTo(b.judgeName);
+    if (byName != 0) return byName;
+    return a.email.compareTo(b.email);
+  });
+  return copy;
 }
