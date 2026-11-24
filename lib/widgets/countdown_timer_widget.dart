@@ -1,12 +1,31 @@
 import 'package:flutter/material.dart';
 
+import '../theme/seyir_tokens.dart';
+
+/// Süre doldu, kısa süre ve varsayılan sayaç renkleri Seyir paletinden gelir.
+Color _countdownColor(
+  BuildContext context, {
+  required bool timeUp,
+  required Duration remaining,
+  Color? accent,
+}) {
+  final palette = SeyirPalette.of(context);
+  if (timeUp) return palette.foreground(SeyirTokens.reject);
+  if (accent != null) return accent;
+  final hoursLeft = remaining.inHours;
+  if (hoursLeft <= 2) return palette.foreground(SeyirTokens.reject);
+  if (hoursLeft <= 24) return palette.foreground(SeyirTokens.warning);
+  return palette.foreground(SeyirTokens.brand);
+}
+
 /// Geriye doğru sayan sayaç widget'ı
 class CountdownTimerWidget extends StatefulWidget {
   final DateTime startTime;
   final Duration totalDuration;
   final VoidCallback? onTimeUp;
   final bool showHourglass;
-  /// Faz rengi (yeşil/turuncu/kırmızı) — verilmezse süreye göre varsayılan renk kullanılır.
+
+  /// Faz rengi. Verilmezse süreye göre Seyir paleti kullanılır.
   final Color? accentColor;
 
   const CountdownTimerWidget({
@@ -28,14 +47,14 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
   late Animation<double> _hourglassAnimation;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  
+
   Duration _remainingTime = Duration.zero;
   bool _isTimeUp = false;
 
   @override
   void initState() {
     super.initState();
-    
+
     // Kum saati animasyonu
     _hourglassController = AnimationController(
       duration: const Duration(seconds: 2),
@@ -48,7 +67,7 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
       parent: _hourglassController,
       curve: Curves.easeInOut,
     ));
-    
+
     // Nabız animasyonu (süre azaldığında)
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -61,7 +80,7 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
       parent: _pulseController,
       curve: Curves.easeInOut,
     ));
-    
+
     _calculateRemainingTime();
     _startTimer();
   }
@@ -70,7 +89,7 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
     final now = DateTime.now();
     final elapsed = now.difference(widget.startTime);
     final remaining = widget.totalDuration - elapsed;
-    
+
     if (remaining.isNegative) {
       _remainingTime = Duration.zero;
       _isTimeUp = true;
@@ -88,7 +107,7 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
           _calculateRemainingTime();
         });
         _startTimer();
-        
+
         // Animasyon kontrolü
         _updateAnimations();
       }
@@ -100,7 +119,7 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
     if (!_hourglassController.isAnimating) {
       _hourglassController.repeat();
     }
-    
+
     // Nabız animasyonu - son 10 saatte başlar
     final hoursLeft = _remainingTime.inHours;
     if (hoursLeft <= 10 && hoursLeft > 0) {
@@ -123,7 +142,7 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
     final seconds = duration.inSeconds % 60;
-    
+
     if (hours > 0) {
       return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     } else {
@@ -132,16 +151,12 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
   }
 
   Color _getTimerColor() {
-    if (widget.accentColor != null) {
-      if (_isTimeUp) return Colors.red;
-      return widget.accentColor!;
-    }
-    final hoursLeft = _remainingTime.inHours;
-    if (_isTimeUp) return Colors.red;
-    if (hoursLeft <= 2) return Colors.red.shade600;
-    if (hoursLeft <= 10) return Colors.orange;
-    if (hoursLeft <= 24) return Colors.amber;
-    return Colors.green;
+    return _countdownColor(
+      context,
+      timeUp: _isTimeUp,
+      remaining: _remainingTime,
+      accent: widget.accentColor,
+    );
   }
 
   @override
@@ -152,7 +167,10 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
         return Transform.scale(
           scale: _pulseAnimation.value,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: SeyirTokens.space3,
+              vertical: SeyirTokens.space2,
+            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -170,23 +188,16 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget>
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: SeyirTokens.space2),
                 ],
-                
-                // Süre metni
                 Text(
                   _isTimeUp ? 'SÜRE DOLDU!' : _formatDuration(_remainingTime),
                   style: TextStyle(
                     color: _getTimerColor(),
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: SeyirTokens.typeTitle,
                   ),
                 ),
-                
-                // Durum ikonu
-                const SizedBox(width: 6),
-
-
               ],
             ),
           ),
@@ -228,7 +239,7 @@ class _SimpleCountdownWidgetState extends State<SimpleCountdownWidget> {
     final now = DateTime.now();
     final elapsed = now.difference(widget.startTime);
     final remaining = widget.totalDuration - elapsed;
-    
+
     if (remaining.isNegative) {
       _remainingTime = Duration.zero;
       _isTimeUp = true;
@@ -254,7 +265,7 @@ class _SimpleCountdownWidgetState extends State<SimpleCountdownWidget> {
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
     final seconds = duration.inSeconds % 60;
-    
+
     if (hours > 0) {
       return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     } else {
@@ -263,41 +274,41 @@ class _SimpleCountdownWidgetState extends State<SimpleCountdownWidget> {
   }
 
   Color _getTimerColor() {
-    final hoursLeft = _remainingTime.inHours;
-    if (_isTimeUp) return Colors.red;
-    if (hoursLeft <= 2) return Colors.red.shade600;
-    if (hoursLeft <= 10) return Colors.orange;
-    if (hoursLeft <= 24) return Colors.amber;
-    return Colors.green;
+    return _countdownColor(
+      context,
+      timeUp: _isTimeUp,
+      remaining: _remainingTime,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final color = _getTimerColor();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space2,
+        vertical: SeyirTokens.space1,
+      ),
       decoration: BoxDecoration(
-        color: _getTimerColor().withOpacity(0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: _getTimerColor(),
-          width: 1,
-        ),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: SeyirTokens.radiusSmAll,
+        border: Border.all(color: color),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             _isTimeUp ? Icons.warning : Icons.timer,
-            color: _getTimerColor(),
+            color: color,
             size: 14,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: SeyirTokens.space1),
           Text(
             _isTimeUp ? 'SÜRE DOLDU!' : _formatDuration(_remainingTime),
             style: TextStyle(
-              color: _getTimerColor(),
+              color: color,
               fontWeight: FontWeight.bold,
-              fontSize: 12,
+              fontSize: SeyirTokens.typeCaption,
             ),
           ),
         ],

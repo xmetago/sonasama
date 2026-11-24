@@ -614,7 +614,10 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
           icon: MdiIcons.timerSand,
           startTime: appealRequestedAt,
           totalDuration: DavaTimerService.appealJudgeDecisionWindow,
-          accentColor: Colors.deepPurple.shade700,
+          accentColor: seyirIncomingPhaseColor(
+            context,
+            DavaLifecycleStatuses.appealProcess,
+          ),
         );
       }
     }
@@ -629,7 +632,7 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
         icon: MdiIcons.timerSand,
         startTime: segment.segmentStart,
         totalDuration: segment.totalDuration,
-        accentColor: segment.accentColor,
+        accentColor: seyirIncomingPhaseColor(context, segment.storageStatus),
       );
     }
 

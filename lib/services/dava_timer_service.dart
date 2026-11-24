@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+import '../theme/seyir_tokens.dart';
 import 'evidence_service.dart';
 import 'hive_database_service.dart';
 
@@ -60,7 +62,8 @@ class DavaTimerService {
     return DateTime.tryParse(v.toString());
   }
 
-  /// Gelen dava kartı: mevcut segment için geri sayım ve renk.
+  /// Gelen dava kartı: mevcut segment için geri sayım.
+  /// Renk [seyirIncomingPhaseToken] ile temadan okunur.
   static DavaIncomingCountdownSegment? buildIncomingListCountdown({
     required DateTime openedAt,
     DateTime? now,
@@ -71,7 +74,6 @@ class DavaTimerService {
       return DavaIncomingCountdownSegment(
         segmentStart: openedAt,
         segmentEnd: openedAt.add(voluntaryRoleWindow),
-        accentColor: Colors.green.shade700,
         storageStatus: DavaLifecycleStatuses.awaitingRole,
         phaseLabel: 'Mevki seçimi',
       );
@@ -86,7 +88,6 @@ class DavaTimerService {
       return DavaIncomingCountdownSegment(
         segmentStart: openedAt,
         segmentEnd: openedAt.add(t120),
-        accentColor: Colors.green.shade700,
         storageStatus: DavaLifecycleStatuses.awaitingRole,
         phaseLabel: 'Mevki seçimi',
       );
@@ -95,7 +96,6 @@ class DavaTimerService {
       return DavaIncomingCountdownSegment(
         segmentStart: openedAt.add(t120),
         segmentEnd: openedAt.add(t144),
-        accentColor: Colors.orange.shade800,
         storageStatus: DavaLifecycleStatuses.roleAssigned,
         phaseLabel: 'Otomatik atama / rol tamamlama',
       );
@@ -104,7 +104,6 @@ class DavaTimerService {
       return DavaIncomingCountdownSegment(
         segmentStart: openedAt.add(t144),
         segmentEnd: openedAt.add(t168),
-        accentColor: Colors.red.shade700,
         storageStatus: DavaLifecycleStatuses.finalJudgement,
         phaseLabel: 'Yargıç karar dönemi',
       );
@@ -113,7 +112,6 @@ class DavaTimerService {
       return DavaIncomingCountdownSegment(
         segmentStart: openedAt.add(t168),
         segmentEnd: openedAt.add(t240),
-        accentColor: Colors.deepPurple.shade700,
         storageStatus: DavaLifecycleStatuses.appealProcess,
         phaseLabel: 'Temyiz süreci (isteğe bağlı)',
       );
@@ -316,17 +314,39 @@ class DavaIncomingCountdownSegment {
   const DavaIncomingCountdownSegment({
     required this.segmentStart,
     required this.segmentEnd,
-    required this.accentColor,
     required this.storageStatus,
     required this.phaseLabel,
   });
 
   final DateTime segmentStart;
   final DateTime segmentEnd;
-  final Color accentColor;
   final String storageStatus;
   final String phaseLabel;
 
   Duration get totalDuration => segmentEnd.difference(segmentStart);
 }
 
+/// Fazın Seyir rengi: marka, uyarı, red, temyiz moru.
+///
+/// Servis Material renk tutmaz; açık ve koyu tema [context] üzerinden okunur.
+Color seyirIncomingPhaseToken(BuildContext context, String storageStatus) {
+  final tokens = AppTokens.of(context);
+  switch (storageStatus) {
+    case DavaLifecycleStatuses.roleAssigned:
+      return tokens.warning;
+    case DavaLifecycleStatuses.finalJudgement:
+      return tokens.reject;
+    case DavaLifecycleStatuses.appealProcess:
+      return SeyirTokens.sectionAppeal;
+    case DavaLifecycleStatuses.awaitingRole:
+    default:
+      return tokens.brand;
+  }
+}
+
+/// Faz etiketi ve sayaç metni için temaya göre okunaklı renk.
+Color seyirIncomingPhaseColor(BuildContext context, String storageStatus) {
+  return SeyirPalette.of(context).foreground(
+    seyirIncomingPhaseToken(context, storageStatus),
+  );
+}

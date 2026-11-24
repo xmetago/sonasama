@@ -286,7 +286,9 @@ class CommonDavaCardWidget extends StatelessWidget {
 
     final timerStart = phaseSeg?.segmentStart ?? startTime;
     final timerDuration = phaseSeg?.totalDuration ?? totalDuration;
-    final accent = phaseSeg?.accentColor;
+    final accent = phaseSeg == null
+        ? null
+        : seyirIncomingPhaseColor(context, phaseSeg.storageStatus);
 
     return Container(
       padding: const EdgeInsets.all(12),
