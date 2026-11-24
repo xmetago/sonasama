@@ -18,21 +18,31 @@ class FriendCategoryService {
     await migrateHerkesToTakipci();
   }
 
-  /// Kaldırılan "Herkes" kayıtlarını Takipçi'ye taşır.
+  /// Kaldırılan Herkes ve Tanımadıklarım kayıtlarını Takipçi'ye taşır.
   static Future<void> migrateHerkesToTakipci() async {
     final box = _box;
-    if (box == null) return;
-    for (final record in box.values.toList()) {
-      final lower = record.category.toLowerCase();
-      if (!lower.contains('herkes')) continue;
-      await box.put(
-        record.id,
-        record.copyWith(
-          category: ProximityCategoryRules.takipci,
-          updatedAt: record.updatedAt ?? record.createdAt,
-        ),
-      );
+    if (box != null) {
+      for (final record in box.values.toList()) {
+        if (!ProximityCategoryRules.isRetiredHerkesAlias(record.category)) {
+          continue;
+        }
+        await box.put(
+          record.id,
+          record.copyWith(
+            category: ProximityCategoryRules.takipci,
+            updatedAt: record.updatedAt ?? record.createdAt,
+          ),
+        );
+      }
     }
+    await HiveDatabaseService.migrateRetiredHerkesCategories();
+  }
+
+  static FriendCategoryModel _canonicalize(FriendCategoryModel record) {
+    if (!ProximityCategoryRules.isRetiredHerkesAlias(record.category)) {
+      return record;
+    }
+    return record.copyWith(category: ProximityCategoryRules.takipci);
   }
 
   static int countInCategory(String ownerUserId, String category) {
@@ -128,9 +138,10 @@ class FriendCategoryService {
     );
   }
 
-  /// Kayıt ekle veya güncelle
+  /// Kayıt ekle veya güncelle. Eski Herkes adları Takipçi olarak yazılır.
   static Future<void> upsert(FriendCategoryModel record) async {
-    await _box?.put(record.id, record);
+    final stored = _canonicalize(record);
+    await _box?.put(stored.id, stored);
   }
 
   /// Sil
@@ -154,11 +165,16 @@ class FriendCategoryService {
     return _box?.values.where((r) => r.ownerUserId == ownerUserId).toList() ?? [];
   }
 
-  /// Sahibin belirli kategori adındaki kayıtlarını getir
+  /// Sahibin belirli kategori adındaki kayıtlarını getir.
+  /// Herkes ve Tanımadıklarım, Takipçi ile aynı kümede okunur.
   static List<FriendCategoryModel> listByOwnerAndCategory(String ownerUserId, String category) {
+    final canonical = ProximityCategoryRules.normalize(category);
     return _box?.values
-            .where((r) => r.ownerUserId == ownerUserId && r.category == category)
-            .toList() ?? [];
+            .where((r) =>
+                r.ownerUserId == ownerUserId &&
+                ProximityCategoryRules.normalize(r.category) == canonical)
+            .toList() ??
+        [];
   }
 
   /// Eski email tabanlı friend_group_box verisini yeni sisteme taşır (bir kez).
