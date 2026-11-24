@@ -24,8 +24,10 @@ class Dava {
   final DateTime? acceptedAt; // Dava kabul edilme tarihi
   /// AwaitingRole | RoleAssigned | FinalJudgement | …
   final String lifecycleStatus;
+
   /// Davalı e-posta (üyelik / misafir rozeti için)
   final String? davaliEmail;
+
   /// Temyiz hakimi görevi mi (tarafın takipçisine atanan)
   final bool isAppealJudgeAssignment;
 
@@ -158,7 +160,8 @@ Future<void> commitGelenDavaRejection({
         'displayName': dava.davaci,
         'userEmail': email,
         'mevkii': 'Katılımcı',
-        'kalanSure': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
+        'kalanSure':
+            DateTime.now().add(const Duration(days: 3)).toIso8601String(),
         'profilResmi': dava.profilResmi,
         'openedAt': DateTime.now().toIso8601String(),
         'acceptedAt': DateTime.now().toIso8601String(),
@@ -188,8 +191,6 @@ Future<void> commitGelenDavaRejection({
 
 class FiveCardCaseInformation extends StatefulWidget {
   final Dava dava;
-  final VoidCallback? onTap;
-  final bool isExpanded;
   final String? userEmail;
   final VoidCallback? onDavaRejected; // Kabul sonrası listeyi tazelemek için
   /// Red onayı: sayfa kartı gizler ve geri alma süresini başlatır.
@@ -198,15 +199,14 @@ class FiveCardCaseInformation extends StatefulWidget {
   const FiveCardCaseInformation({
     super.key,
     required this.dava,
-    this.onTap,
-    this.isExpanded = false,
     this.userEmail,
     this.onDavaRejected,
     this.onRejectQueued,
   });
 
   @override
-  State<FiveCardCaseInformation> createState() => _FiveCardCaseInformationState();
+  State<FiveCardCaseInformation> createState() =>
+      _FiveCardCaseInformationState();
 }
 
 class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
@@ -248,16 +248,11 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     super.dispose();
   }
 
-  Color _cardPhaseColor() {
-    final opened = widget.dava.createdAt ?? DateTime.now();
-    final seg = DavaTimerService.buildIncomingListCountdown(openedAt: opened);
-    return seg?.accentColor ?? SeyirTokens.brandDeep;
-  }
-
   Duration? _phaseRemaining() {
     final opened = widget.dava.createdAt;
     if (opened == null) return null;
-    final segment = DavaTimerService.buildIncomingListCountdown(openedAt: opened);
+    final segment =
+        DavaTimerService.buildIncomingListCountdown(openedAt: opened);
     if (segment == null) return null;
     final left = segment.segmentEnd.difference(DateTime.now());
     if (left.isNegative) return Duration.zero;
@@ -266,7 +261,9 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
 
   String? _urgentLabel() {
     final left = _phaseRemaining();
-    if (left == null || left <= Duration.zero || left >= const Duration(hours: 24)) {
+    if (left == null ||
+        left <= Duration.zero ||
+        left >= const Duration(hours: 24)) {
       return null;
     }
     final hours = left.inHours >= 1 ? left.inHours : 1;
@@ -293,7 +290,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
       widget.dava.isAppealJudgeAssignment ||
       DavaAppealJudgeAssignService.isAppealJudgeRole(widget.dava.mevkii);
 
-  Future<bool> _askConfirm(String message, String confirmLabel, Key confirmKey) async {
+  Future<bool> _askConfirm(
+    String message,
+    String confirmLabel,
+    Key confirmKey, {
+    Color? confirmColor,
+  }) async {
     final palette = SeyirPalette.of(context);
     final result = await showDialog<bool>(
       context: context,
@@ -313,13 +315,18 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
             TextButton(
               style: buttonStyle,
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Vazgeç', style: palette.title(color: palette.textSecondary)),
+              child: Text('Vazgeç',
+                  style: palette.title(color: palette.textSecondary)),
             ),
             TextButton(
               key: confirmKey,
               style: buttonStyle,
               onPressed: () => Navigator.pop(ctx, true),
-              child: Text(confirmLabel, style: palette.title(color: SeyirTokens.brandDeep)),
+              child: Text(
+                confirmLabel,
+                style:
+                    palette.title(color: confirmColor ?? SeyirTokens.brandDeep),
+              ),
             ),
           ],
         );
@@ -367,6 +374,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
       'Bu davayı reddetmek istediğine emin misin?',
       'Reddet',
       const Key('gelen-reddet-onay'),
+      confirmColor: SeyirTokens.reject,
     );
     if (!ok || !mounted) return;
     HapticFeedback.lightImpact();
@@ -391,6 +399,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
         'Bu davayı reddetmek istediğine emin misin?',
         'Reddet',
         const Key('gelen-reddet-onay'),
+        confirmColor: SeyirTokens.reject,
       );
       if (!ok || !mounted || widget.onRejectQueued == null) return false;
       HapticFeedback.lightImpact();
@@ -406,7 +415,9 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     final urgentLabel = _urgentLabel();
     final urgent = urgentLabel != null;
     _schedulePulse(urgent && !disableAnimations);
-    final phaseColor = _cardPhaseColor();
+    final openedAt = widget.dava.createdAt ?? DateTime.now();
+    final segment =
+        DavaTimerService.buildIncomingListCountdown(openedAt: openedAt);
 
     return Dismissible(
       key: ValueKey('gelen-dismiss-${widget.dava.id}'),
@@ -415,135 +426,119 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
       onDismissed: (_) => widget.onRejectQueued?.call(),
       background: _swipeBackground(accept: true),
       secondaryBackground: _swipeBackground(accept: false),
-      child: AnimatedBuilder(
-        animation: _pulseController,
-        builder: (context, _) {
-          final t = urgent && !disableAnimations ? _pulseController.value : 0.0;
-          return Stack(
-            children: [
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                decoration: BoxDecoration(
-                  color: palette.card,
-                  borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
-                  border: Border.all(
-                    color: phaseColor.withValues(
-                      alpha: urgent && !disableAnimations ? 0.55 + (0.45 * t) : 1,
-                    ),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: phaseColor.withValues(
-                        alpha: urgent ? 0.12 + (0.22 * t) : 0.12,
-                      ),
-                      blurRadius: urgent ? 12 + (6 * t) : 15,
-                      offset: const Offset(0, 8),
-                    ),
+      child: Stack(
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(
+              vertical: SeyirTokens.space3,
+              horizontal: SeyirTokens.space2,
+            ),
+            decoration: BoxDecoration(
+              color: palette.card,
+              borderRadius: SeyirTokens.radiusLgAll,
+              border: Border.all(color: palette.border),
+              boxShadow: palette.cardShadow,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(SeyirTokens.space1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (segment != null) ...[
+                    _buildPhaseChip(segment),
+                    const SizedBox(height: SeyirTokens.space2),
                   ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
-                    onTap: widget.onTap,
-                    child: Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildCaseInfo(urgentLabel, disableAnimations),
-                          const SizedBox(height: SeyirTokens.space6),
-                          _buildActionButtons(),
-                          const SizedBox(height: SeyirTokens.space6),
-                          if (showRoleSelection && isAccepted) ...[
-                            _buildDashedLine(),
-                            Center(
-                              child: Text(
-                                _isAppealJudgeAssignmentCard()
-                                    ? 'TEMYİZ HAKİMLİĞİ GÖREVİ'
-                                    : 'MEVKİNİZİ SEÇİNİZ',
-                                style: const TextStyle(
-                                  fontSize: SeyirTokens.typeHeadline,
-                                  fontWeight: FontWeight.bold,
-                                  color: SeyirTokens.brand,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                            ),
-                            if (_isAppealJudgeAssignmentCard()) ...[
-                              const SizedBox(height: SeyirTokens.space2),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: SeyirTokens.space3,
-                                ),
-                                child: Text(
-                                  'Görevi seçip "Görevi onayla" ile kabul edin; ardından 8-Hüküm sayfasında karar verin. '
-                                  'Kabul etmezseniz görev başkasına verilmez, dava mevcut haliyle sonuçlanır.',
-                                  textAlign: TextAlign.center,
-                                  style: palette.body(
-                                    weight: FontWeight.w400,
-                                    color: palette.textSecondary,
-                                  ).copyWith(height: 1.4),
-                                ),
-                              ),
-                            ],
-                            _buildCaseInfoSeparator(),
-                            const SizedBox(height: SeyirTokens.space2),
-                            _buildRoleSelection(),
-                          ],
-                          if (isRoleConfirmed && selectedRole != null) ...[
-                            _buildDashedLine(),
-                            Center(
-                              child: Text(
-                                'SEÇİLEN MEVKİ',
-                                style: TextStyle(
-                                  fontSize: SeyirTokens.typeHeadline,
-                                  fontWeight: FontWeight.bold,
-                                  color: palette.textPrimary,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                            ),
-                            _buildCaseInfoSeparator(),
-                            const SizedBox(height: SeyirTokens.space4),
-                            _buildSelectedRoleDisplay(),
-                            _buildCaseInfoSeparator(),
-                            const SizedBox(height: SeyirTokens.space4),
-                            if (_acceptedAt != null)
-                              CountdownTimerWidget(
-                                startTime: _acceptedAt!,
-                                totalDuration: _isAppealJudgeAssignmentCard()
-                                    ? DavaTimerService.appealJudgeDecisionWindow
-                                    : DavaTimerService.acceptedHukumWindow,
-                                showHourglass: true,
-                                onTimeUp: () {
-                                  final scheme = Theme.of(context).colorScheme;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    seyirNoticeSnackBar(
-                                      scheme: scheme,
-                                      message: 'Dava süresi doldu',
-                                      duration: const Duration(seconds: 3),
-                                    ),
-                                  );
-                                },
-                              ),
-                          ],
-                        ],
+                  _buildCaseInfo(urgentLabel, disableAnimations, segment),
+                  const SizedBox(height: SeyirTokens.space6),
+                  _buildActionButtons(),
+                  if (showRoleSelection && isAccepted) ...[
+                    const SizedBox(height: SeyirTokens.space6),
+                    _buildDashedLine(),
+                    Center(
+                      child: Text(
+                        _isAppealJudgeAssignmentCard()
+                            ? 'TEMYİZ HAKİMLİĞİ GÖREVİ'
+                            : 'MEVKİNİZİ SEÇİNİZ',
+                        style: const TextStyle(
+                          fontSize: SeyirTokens.typeHeadline,
+                          fontWeight: FontWeight.bold,
+                          color: SeyirTokens.brand,
+                          letterSpacing: 1,
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                    if (_isAppealJudgeAssignmentCard()) ...[
+                      const SizedBox(height: SeyirTokens.space2),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SeyirTokens.space3,
+                        ),
+                        child: Text(
+                          'Görevi seçip "Görevi onayla" ile kabul edin; ardından 8-Hüküm sayfasında karar verin. '
+                          'Kabul etmezseniz görev başkasına verilmez, dava mevcut haliyle sonuçlanır.',
+                          textAlign: TextAlign.center,
+                          style: palette
+                              .body(
+                                weight: FontWeight.w400,
+                                color: palette.textSecondary,
+                              )
+                              .copyWith(height: 1.4),
+                        ),
+                      ),
+                    ],
+                    _buildCaseInfoSeparator(),
+                    const SizedBox(height: SeyirTokens.space2),
+                    _buildRoleSelection(),
+                  ],
+                  if (isRoleConfirmed && selectedRole != null) ...[
+                    const SizedBox(height: SeyirTokens.space6),
+                    _buildDashedLine(),
+                    Center(
+                      child: Text(
+                        'SEÇİLEN MEVKİ',
+                        style: TextStyle(
+                          fontSize: SeyirTokens.typeHeadline,
+                          fontWeight: FontWeight.bold,
+                          color: palette.textPrimary,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                    _buildCaseInfoSeparator(),
+                    const SizedBox(height: SeyirTokens.space4),
+                    _buildSelectedRoleDisplay(),
+                    _buildCaseInfoSeparator(),
+                    const SizedBox(height: SeyirTokens.space4),
+                    if (_acceptedAt != null)
+                      CountdownTimerWidget(
+                        startTime: _acceptedAt!,
+                        totalDuration: _isAppealJudgeAssignmentCard()
+                            ? DavaTimerService.appealJudgeDecisionWindow
+                            : DavaTimerService.acceptedHukumWindow,
+                        showHourglass: true,
+                        onTimeUp: () {
+                          final scheme = Theme.of(context).colorScheme;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            seyirNoticeSnackBar(
+                              scheme: scheme,
+                              message: 'Dava süresi doldu',
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ],
               ),
-              if (_showStamp)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: Center(child: _buildStamp(palette)),
-                  ),
-                ),
-            ],
-          );
-        },
+            ),
+          ),
+          if (_showStamp)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(child: _buildStamp(palette)),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -590,7 +585,10 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     final palette = SeyirPalette.of(context);
     final color = accept ? SeyirTokens.accept : SeyirTokens.reject;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      margin: const EdgeInsets.symmetric(
+        vertical: SeyirTokens.space3,
+        horizontal: SeyirTokens.space2,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: SeyirTokens.space4),
       alignment: accept ? Alignment.centerLeft : Alignment.centerRight,
       decoration: BoxDecoration(
@@ -613,7 +611,8 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
       child: CustomPaint(
-        painter: DashedLinePainter(color: palette.tintBorder(SeyirTokens.brand)),
+        painter:
+            DashedLinePainter(color: palette.tintBorder(SeyirTokens.brand)),
         child: const SizedBox(height: 1, width: double.infinity),
       ),
     );
@@ -640,16 +639,51 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     return HiveDatabaseService.getRegistrationByEmail(key) == null;
   }
 
-  Widget _buildCaseInfo(String? urgentLabel, bool disableAnimations) {
+  Widget _buildPhaseChip(DavaIncomingCountdownSegment segment) {
+    final palette = SeyirPalette.of(context);
+    final token = seyirIncomingPhaseToken(context, segment.storageStatus);
+    final ink = seyirIncomingPhaseColor(context, segment.storageStatus);
+    return Row(
+      children: [
+        Flexible(
+          child: Container(
+            key: Key('gelen-faz-${widget.dava.id}'),
+            padding: const EdgeInsets.symmetric(
+              horizontal: SeyirTokens.space2,
+              vertical: SeyirTokens.space1,
+            ),
+            decoration: BoxDecoration(
+              color: palette.tint(token),
+              borderRadius: SeyirTokens.radiusSmAll,
+              border: Border.all(color: palette.tintBorder(token)),
+            ),
+            child: Text(
+              segment.phaseLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: palette.caption(weight: FontWeight.w700, color: ink),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCaseInfo(
+    String? urgentLabel,
+    bool disableAnimations,
+    DavaIncomingCountdownSegment? segment,
+  ) {
     final palette = SeyirPalette.of(context);
     final guest = _davaliIsGuest();
-    final konu = widget.dava.davaKonusu.trim();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space4,
+        vertical: SeyirTokens.space3,
+      ),
       decoration: BoxDecoration(
-        color: palette.card,
-        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
-        border: Border.all(color: palette.border),
+        color: palette.surfaceMuted,
+        borderRadius: SeyirTokens.radiusMdAll,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -659,35 +693,22 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
             widget.dava.adi.isNotEmpty ? widget.dava.adi : 'Belirtilmedi',
             Icons.description,
           ),
-          if (konu.isNotEmpty) ...[
-            const SizedBox(height: SeyirTokens.space2),
-            Text(
-              konu,
-              key: Key('gelen-dava-konu-${widget.dava.id}'),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: palette.body(
-                weight: FontWeight.w500,
-                color: palette.textSecondary,
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
+          const SizedBox(height: SeyirTokens.space2),
           _buildYargilaStyleSeparator(),
-          const SizedBox(height: 10),
+          const SizedBox(height: SeyirTokens.space2),
           _buildCaseInfoRow(
             'Davacı',
             widget.dava.davaci.isNotEmpty ? widget.dava.davaci : 'Davacı Adı',
             Icons.person,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: SeyirTokens.space2),
           _buildYargilaStyleSeparator(),
-          const SizedBox(height: 10),
+          const SizedBox(height: SeyirTokens.space2),
           _buildModernDavaliRow(guest),
-          const SizedBox(height: 10),
+          const SizedBox(height: SeyirTokens.space2),
           _buildYargilaStyleSeparator(),
-          const SizedBox(height: 10),
-          _buildStyledCountdownRow(urgentLabel, disableAnimations),
+          const SizedBox(height: SeyirTokens.space2),
+          _buildStyledCountdownRow(urgentLabel, disableAnimations, segment),
         ],
       ),
     );
@@ -696,9 +717,9 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
   Widget _buildYargilaStyleSeparator() {
     final palette = SeyirPalette.of(context);
     return SizedBox(
-      height: 10,
+      height: SeyirTokens.space2,
       child: CustomPaint(
-        size: const Size(double.infinity, 10),
+        size: const Size(double.infinity, SeyirTokens.space2),
         painter: DashedLinePainter(
           color: palette.border,
           strokeWidth: 1.6,
@@ -717,7 +738,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
           size: 20,
           color: SeyirTokens.brand,
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: SeyirTokens.space3),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -748,7 +769,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
           size: 20,
           color: SeyirTokens.brand,
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: SeyirTokens.space3),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -762,17 +783,19 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
                 children: [
                   Expanded(
                     child: Text(
-                      widget.dava.davali.isNotEmpty ? widget.dava.davali : 'Davalı Adı',
+                      widget.dava.davali.isNotEmpty
+                          ? widget.dava.davali
+                          : 'Davalı Adı',
                       style: palette.title(weight: FontWeight.w700),
                     ),
                   ),
                   if (guest) ...[
-                    const SizedBox(width: 6),
-                    const Tooltip(
+                    const SizedBox(width: SeyirTokens.space2),
+                    Tooltip(
                       message: 'Bu davalı WhoBoom üyesi değil (misafir)',
                       child: Icon(
                         Icons.person_off_outlined,
-                        color: SeyirTokens.reject,
+                        color: palette.textMuted,
                         size: 20,
                       ),
                     ),
@@ -786,7 +809,11 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     );
   }
 
-  Widget _buildStyledCountdownRow(String? urgentLabel, bool disableAnimations) {
+  Widget _buildStyledCountdownRow(
+    String? urgentLabel,
+    bool disableAnimations,
+    DavaIncomingCountdownSegment? segment,
+  ) {
     final palette = SeyirPalette.of(context);
     final timer = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -796,7 +823,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
           style: palette.caption(weight: FontWeight.w600),
         ),
         const SizedBox(height: 4),
-        _buildCountdownRow(),
+        _buildCountdownRow(segment),
         if (urgentLabel != null) ...[
           const SizedBox(height: SeyirTokens.space1),
           Text(
@@ -838,15 +865,13 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
           size: 20,
           color: SeyirTokens.brand,
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: SeyirTokens.space3),
         Expanded(child: pulsed),
       ],
     );
   }
 
-  Widget _buildCountdownRow() {
-    final openedAt = widget.dava.createdAt ?? DateTime.now();
-    final segment = DavaTimerService.buildIncomingListCountdown(openedAt: openedAt);
+  Widget _buildCountdownRow(DavaIncomingCountdownSegment? segment) {
     final palette = SeyirPalette.of(context);
     if (segment == null) {
       return Row(
@@ -872,48 +897,34 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
       );
     }
 
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 6),
+        SizedBox(
+          width: 70,
           child: Text(
-            segment.phaseLabel,
-            style: palette.caption(
-              weight: FontWeight.w600,
-              color: SeyirTokens.warning,
-            ),
+            'Süre :',
+            style: palette.body(weight: FontWeight.w700),
           ),
         ),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 70,
-              child: Text(
-                'Süre :',
-                style: palette.body(weight: FontWeight.w700),
-              ),
-            ),
-            Expanded(
-              child: CountdownTimerWidget(
-                startTime: segment.segmentStart,
-                totalDuration: segment.totalDuration,
-                accentColor: segment.accentColor,
-                showHourglass: true,
-                onTimeUp: () {
-                  final scheme = Theme.of(context).colorScheme;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    seyirNoticeSnackBar(
-                      scheme: scheme,
-                      message: 'Bu fazın süresi doldu',
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+        Expanded(
+          child: CountdownTimerWidget(
+            startTime: segment.segmentStart,
+            totalDuration: segment.totalDuration,
+            accentColor:
+                seyirIncomingPhaseColor(context, segment.storageStatus),
+            showHourglass: true,
+            onTimeUp: () {
+              final scheme = Theme.of(context).colorScheme;
+              ScaffoldMessenger.of(context).showSnackBar(
+                seyirNoticeSnackBar(
+                  scheme: scheme,
+                  message: 'Bu fazın süresi doldu',
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            },
+          ),
         ),
       ],
     );
@@ -960,41 +971,14 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     required bool isReject,
     required VoidCallback onPressed,
   }) {
-    final palette = SeyirPalette.of(context);
     final isSelected = isReject ? isRejected : isAccepted;
     final Color tone = isReject ? SeyirTokens.reject : SeyirTokens.accept;
-    final Color fill = isSelected ? tone : palette.card;
-    final Color ink = isSelected ? palette.onSolid(tone) : palette.textPrimary;
-
-    return Container(
+    return _GelenDecisionButton(
       key: key,
-      height: 50,
-      constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
-        border: Border.all(
-          color: isSelected ? tone : palette.border,
-          width: 2,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
-          onTap: onPressed,
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: SeyirTokens.typeTitle,
-                fontWeight: FontWeight.bold,
-                color: ink,
-              ),
-            ),
-          ),
-        ),
-      ),
+      label: label,
+      tone: tone,
+      selected: isSelected,
+      onPressed: onPressed,
     );
   }
 
@@ -1004,9 +988,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     }
 
     try {
-      final participants = await HiveDatabaseService.getDavaParticipants(widget.dava.id);
+      final participants =
+          await HiveDatabaseService.getDavaParticipants(widget.dava.id);
       final existingParticipant = participants.firstWhere(
-        (p) => (p['userEmail']?.toString() ?? '').toLowerCase() == widget.userEmail!.toLowerCase(),
+        (p) =>
+            (p['userEmail']?.toString() ?? '').toLowerCase() ==
+            widget.userEmail!.toLowerCase(),
         orElse: () => <String, dynamic>{},
       );
 
@@ -1144,7 +1131,8 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
 
   Widget _buildConfirmTaskButton() {
     final palette = SeyirPalette.of(context);
-    final enabled = selectedRole != null && !_hasExistingRole && !_confirmingRole;
+    final enabled =
+        selectedRole != null && !_hasExistingRole && !_confirmingRole;
     return Padding(
       padding: const EdgeInsets.only(top: SeyirTokens.space2),
       child: SizedBox(
@@ -1167,7 +1155,9 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
             style: TextStyle(
               fontSize: SeyirTokens.typeTitle,
               fontWeight: FontWeight.bold,
-              color: enabled ? palette.onSolid(SeyirTokens.brand) : palette.textMuted,
+              color: enabled
+                  ? palette.onSolid(SeyirTokens.brand)
+                  : palette.textMuted,
             ),
           ),
         ),
@@ -1186,9 +1176,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
 
     if (email != null && email.isNotEmpty) {
       try {
-        final participants = await HiveDatabaseService.getDavaParticipants(widget.dava.id);
+        final participants =
+            await HiveDatabaseService.getDavaParticipants(widget.dava.id);
         final existingParticipant = participants.firstWhere(
-          (p) => (p['userEmail']?.toString() ?? '').toLowerCase() == email.toLowerCase(),
+          (p) =>
+              (p['userEmail']?.toString() ?? '').toLowerCase() ==
+              email.toLowerCase(),
           orElse: () => <String, dynamic>{},
         );
         if (existingParticipant.isNotEmpty) {
@@ -1243,7 +1236,8 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
       'userRole': role,
       'status': 'accepted',
       'acceptedAt': acceptedTime.toIso8601String(),
-      'createdAt': widget.dava.createdAt?.toIso8601String() ?? acceptedTime.toIso8601String(),
+      'createdAt': widget.dava.createdAt?.toIso8601String() ??
+          acceptedTime.toIso8601String(),
       'remainingHours': 76,
       if (_isAppealJudgeAssignmentCard()) 'isAppealJudgeAssignment': true,
     };
@@ -1365,7 +1359,8 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
       decoration: BoxDecoration(
         color: palette.brandSoft,
         borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
-        border: Border.all(color: palette.tintBorder(SeyirTokens.brand), width: 2),
+        border:
+            Border.all(color: palette.tintBorder(SeyirTokens.brand), width: 2),
       ),
       child: Column(
         children: [
@@ -1404,6 +1399,105 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Kabul / red: boşta ince renkli kenar ve açık dolgu, seçilince dolu.
+class _GelenDecisionButton extends StatefulWidget {
+  const _GelenDecisionButton({
+    super.key,
+    required this.label,
+    required this.tone,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final String label;
+  final Color tone;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  State<_GelenDecisionButton> createState() => _GelenDecisionButtonState();
+}
+
+class _GelenDecisionButtonState extends State<_GelenDecisionButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _emphasis;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _emphasis = AnimationController(vsync: this, duration: SeyirTokens.motion);
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1, end: 1.045), weight: 45),
+      TweenSequenceItem(tween: Tween(begin: 1.045, end: 1), weight: 55),
+    ]).animate(CurvedAnimation(parent: _emphasis, curve: Curves.easeOut));
+  }
+
+  @override
+  void didUpdateWidget(covariant _GelenDecisionButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected && !oldWidget.selected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !widget.selected) return;
+        if (MediaQuery.disableAnimationsOf(context)) {
+          _emphasis.value = 0;
+          return;
+        }
+        _emphasis.forward(from: 0);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _emphasis.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = SeyirPalette.of(context);
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final motion = disableAnimations ? Duration.zero : SeyirTokens.motion;
+    final tone = widget.tone;
+    final selected = widget.selected;
+    final fill = selected ? tone : palette.tint(tone);
+    final ink = selected ? palette.onSolid(tone) : palette.foreground(tone);
+
+    return ScaleTransition(
+      scale: disableAnimations ? kAlwaysCompleteAnimation : _scale,
+      child: AnimatedContainer(
+        duration: motion,
+        curve: Curves.easeOut,
+        height: 50,
+        constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: SeyirTokens.radiusMdAll,
+          border: Border.all(color: tone),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: SeyirTokens.radiusMdAll,
+            onTap: widget.onPressed,
+            child: Center(
+              child: Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: SeyirTokens.typeTitle,
+                  fontWeight: FontWeight.bold,
+                  color: ink,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

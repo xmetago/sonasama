@@ -44,7 +44,6 @@ class _PendingGelenReject {
 }
 
 class _GelenDavalarPageState extends State<GelenDavalarPage> {
-  String? _expandedDavaId;
   DavaProvider? _davaProvider;
   bool _isLoading = true;
   String? _loadError;
@@ -205,7 +204,6 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
     setState(() {
       _pendingRejectIds.add(dava.id);
       _pendingRejects[dava.id] = pending;
-      if (_expandedDavaId == dava.id) _expandedDavaId = null;
     });
 
     final scheme = Theme.of(context).colorScheme;
@@ -343,20 +341,8 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
                       return FiveCardCaseInformation(
                         key: ValueKey(dava.id),
                         dava: dava,
-                        isExpanded: _expandedDavaId == dava.id,
                         userEmail: widget.userEmail,
-                        onTap: () {
-                          setState(() {
-                            _expandedDavaId = _expandedDavaId == dava.id ? null : dava.id;
-                          });
-                        },
                         onRejectQueued: () => _queueReject(dava),
-                        onDavaRejected: () {
-                          if (!mounted) return;
-                          setState(() {
-                            if (_expandedDavaId == dava.id) _expandedDavaId = null;
-                          });
-                        },
                       );
                     },
                   ),
@@ -398,7 +384,7 @@ class GelenDavalarHeadlineRow extends StatelessWidget {
                     'Gelen Davalar',
                     style: palette.headline(weight: FontWeight.w600),
                   ),
-                  const SizedBox(width: 7),
+                  const SizedBox(width: SeyirTokens.space2),
                   _IncomingDavaCountBadge(pendingRejectIds: pendingRejectIds),
                 ],
               ),
@@ -426,7 +412,7 @@ class _GelenEmptyState extends StatelessWidget {
             size: 64,
             color: palette.textMuted,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: SeyirTokens.space4),
           Text(
             'Gelen dava yok',
             style: palette.title(
@@ -434,7 +420,7 @@ class _GelenEmptyState extends StatelessWidget {
               color: palette.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: SeyirTokens.space2),
           Text(
             'Size atanan davalar burada görünür',
             textAlign: TextAlign.center,
@@ -497,10 +483,13 @@ class _IncomingDavaCountBadge extends StatelessWidget {
                         final count = davaProvider.incomingDavaCount - hidden;
                         if (count <= 0) return const SizedBox.shrink();
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: SeyirTokens.space2,
+                            vertical: SeyirTokens.space1,
+                          ),
                           decoration: BoxDecoration(
                             color: SeyirTokens.brand,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: SeyirTokens.radiusSmAll,
                             boxShadow: [
                               BoxShadow(
                                 color: palette.shadow,

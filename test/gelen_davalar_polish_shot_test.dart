@@ -53,6 +53,7 @@ void main() {
       'polish-urgent-1',
       'polish-live-1',
       'polish-live-2',
+      'polish-themes-1',
     ]) {
       await HiveDatabaseService.removeKatildigimDava(_email, id);
       await HiveDatabaseService.removeKatildigimDava(_other, id);
@@ -125,11 +126,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800));
     await tester.pump(const Duration(seconds: 5));
     await tester.pump(const Duration(milliseconds: 800));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 400)));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 400)));
     await tester.pump();
   }
 
-  testWidgets('kart konusu, tek dokunuş ve görev onayı', (tester) async {
+  testWidgets('faz şeridi, düğmeler ve görev onayı', (tester) async {
     const id = 'polish-konu-1';
     _seedPair(id);
     await pumpPage(
@@ -139,9 +141,10 @@ void main() {
     );
     await waitForText(tester, 'Bahçe duvarı');
 
-    final konu = tester.widget<Text>(find.text(_konu));
-    expect(konu.maxLines, 2);
-    expect(konu.overflow, TextOverflow.ellipsis);
+    expect(find.text(_konu), findsNothing);
+    expect(find.byKey(const Key('gelen-dava-konu-$id')), findsNothing);
+    expect(find.text('Mevki seçimi'), findsOneWidget);
+    expect(find.byKey(const Key('gelen-faz-$id')), findsOneWidget);
     expect(find.text('Çift tıkla'), findsNothing);
     expect(find.textContaining('çift tıkla'), findsNothing);
 
@@ -197,7 +200,8 @@ void main() {
         .whereType<BoxDecoration>()
         .first
         .color;
-    final palette = SeyirPalette(WhoBoomTheme.dark.colorScheme, Brightness.dark);
+    final palette =
+        SeyirPalette(WhoBoomTheme.dark.colorScheme, Brightness.dark);
     expect(roleFill, palette.brandSoft);
     expect(roleFill, isNot(Colors.white));
     expect(roleFill, isNot(const Color(0xFFE8F5E9)));
@@ -215,7 +219,8 @@ void main() {
     await release(tester);
   });
 
-  testWidgets('red onayı yalnızca bu kullanıcıyı siler, geri al yazmaz', (tester) async {
+  testWidgets('red onayı yalnızca bu kullanıcıyı siler, geri al yazmaz',
+      (tester) async {
     const id = 'polish-reject-1';
     _seedPair(id);
     await pumpPage(
@@ -232,6 +237,14 @@ void main() {
       find.text('Bu davayı reddetmek istediğine emin misin?'),
       findsOneWidget,
     );
+    final reddet = tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(const Key('gelen-reddet-onay')),
+        matching: find.byType(Text),
+      ),
+    );
+    expect(reddet.data, 'Reddet');
+    expect(reddet.style?.color, SeyirTokens.reject);
 
     await tester.tap(find.text('Vazgeç'));
     await tester.pump();
@@ -253,7 +266,8 @@ void main() {
     await tester.tap(find.byType(SnackBarAction));
     await tester.pump();
     await tester.pump(const Duration(seconds: 6));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 400)));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 400)));
     await tester.pump();
 
     expect(find.text('Bahçe duvarı'), findsOneWidget);
@@ -263,7 +277,8 @@ void main() {
     await release(tester);
   });
 
-  testWidgets('süre dolunca red yalnızca mevcut kullanıcının kutusundan düşer', (tester) async {
+  testWidgets('süre dolunca red yalnızca mevcut kullanıcının kutusundan düşer',
+      (tester) async {
     const id = 'polish-commit-1';
     _seedPair(id);
     await pumpPage(
@@ -303,7 +318,8 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 400)));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 400)));
     await tester.pump(const Duration(seconds: 6));
 
     expect(_hasIncoming(_email, id), isFalse);
@@ -322,7 +338,8 @@ void main() {
       disableAnimations: true,
     );
     await waitForText(tester, 'Bahçe duvarı');
-    expect(find.textContaining(RegExp(r'Karar için \d+ saat kaldı')), findsOneWidget);
+    expect(find.textContaining(RegExp(r'Karar için \d+ saat kaldı')),
+        findsOneWidget);
     await release(tester);
   });
 
@@ -348,7 +365,8 @@ void main() {
       size: const Size(480, 1600),
     );
     await waitForText(tester, 'Tekrar dene');
-    expect(find.text('Gelen davalar yüklenemedi', skipOffstage: false), findsOneWidget);
+    expect(find.text('Gelen davalar yüklenemedi', skipOffstage: false),
+        findsOneWidget);
     expect(find.text('Tekrar dene', skipOffstage: false), findsOneWidget);
 
     const id = 'polish-live-1';
@@ -374,9 +392,64 @@ void main() {
     });
     await waitForText(tester, 'Yeni gelen');
     expect(find.text('Yeni gelen'), findsOneWidget);
-    expect(find.text('Taze konu satırı'), findsOneWidget);
+    expect(find.text('Taze konu satırı'), findsNothing);
+    expect(find.text('Mevki seçimi'), findsWidgets);
     expect(find.text('2'), findsWidgets);
     await release(tester);
+  });
+
+  testWidgets('faz şeridi ve düğmeler açık ve koyu temada', (tester) async {
+    const id = 'polish-themes-1';
+    for (final brightness in const [Brightness.light, Brightness.dark]) {
+      HiveDatabaseService.clearIncomingDavalar(_email);
+      _seedPair(id);
+      await pumpPage(
+        tester,
+        const GelenDavalarPage(userEmail: _email),
+        brightness: brightness,
+        size: const Size(480, 1400),
+      );
+      await waitForText(tester, 'Bahçe duvarı');
+
+      expect(find.text(_konu), findsNothing);
+      expect(find.text('Mevki seçimi'), findsOneWidget);
+      expect(find.byKey(const Key('gelen-faz-$id')), findsOneWidget);
+      expect(find.text('RED ET'), findsOneWidget);
+      expect(find.text('KABUL ET'), findsOneWidget);
+
+      final theme = brightness == Brightness.dark
+          ? WhoBoomTheme.dark
+          : WhoBoomTheme.light;
+      final palette = SeyirPalette(theme.colorScheme, brightness);
+
+      BoxDecoration decorationOf(Key key) {
+        final animated = tester.widget<AnimatedContainer>(
+          find.descendant(
+            of: find.byKey(key),
+            matching: find.byType(AnimatedContainer),
+          ),
+        );
+        return animated.decoration! as BoxDecoration;
+      }
+
+      final red = decorationOf(const Key('gelen-reddet'));
+      final accept = decorationOf(const Key('gelen-kabul'));
+      expect((red.border! as Border).top.color, SeyirTokens.reject);
+      expect(red.color, palette.tint(SeyirTokens.reject));
+      expect(red.color, isNot(SeyirTokens.reject));
+      expect((accept.border! as Border).top.color, SeyirTokens.accept);
+      expect(accept.color, palette.tint(SeyirTokens.accept));
+
+      final chip = tester.widget<Text>(find.text('Mevki seçimi'));
+      expect(chip.style?.color, palette.foreground(SeyirTokens.brand));
+      expect(chip.style?.color, isNot(SeyirTokens.warning));
+
+      final guest = tester.widget<Icon>(find.byIcon(Icons.person_off_outlined));
+      expect(guest.color, palette.textMuted);
+      expect(guest.color, isNot(SeyirTokens.reject));
+
+      await release(tester);
+    }
   });
 }
 
@@ -397,7 +470,8 @@ Future<void> _register(String email, String name, String id) async {
 }
 
 void _seedPair(String id, {DateTime? createdAt}) {
-  final at = (createdAt ?? DateTime.now().subtract(const Duration(hours: 3))).toIso8601String();
+  final at = (createdAt ?? DateTime.now().subtract(const Duration(hours: 3)))
+      .toIso8601String();
   final row = <String, dynamic>{
     'id': id,
     'davaId': id,
