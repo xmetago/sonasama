@@ -949,8 +949,23 @@ class _DavaAcPageState extends State<DavaAcPage> {
   void _showGroupSelectionDialog() {
     DavaGonderilecekGrupDialog.show(
       context,
+      openerEmail: widget.userEmail,
+      defendant: _dialogDefendant(),
       onConfirm: _processDavaOpening,
     );
+  }
+
+  /// Yer tutucu davalı metni özet ve havuz sayısına kişi olarak girmez.
+  String? _dialogDefendant() {
+    final raw = _davaliController.text.trim();
+    final fallback = davaList.isEmpty ? '' : davaList[0].davali.trim();
+    final candidate = raw.isNotEmpty ? raw : fallback;
+    if (candidate.isEmpty ||
+        candidate == 'Davalı  adını gir ' ||
+        candidate == 'Beklemede') {
+      return null;
+    }
+    return candidate;
   }
 
   // Dava açıldı başarı dialog'u göster
