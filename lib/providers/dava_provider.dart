@@ -457,11 +457,19 @@ class DavaProvider extends BaseProvider {
         // Red edilen davalara ekle
         _rejectedDavalar.add(rejectedDava);
         
-        // Veritabanına kaydet
+        // Veritabanına kaydet. Yalnızca bu kullanıcının gelen kutusundan düşer.
         await HiveDatabaseService.saveRejectedDava(rejectedDava);
-        await HiveDatabaseService.removeIncomingDava(dava['id']);
         final String? davaId = rejectedDava['id']?.toString() ?? rejectedDava['davaId']?.toString();
         final String? participantEmail = rejectedDava['userEmail']?.toString();
+        final String? inboxEmail = (participantEmail != null && participantEmail.isNotEmpty)
+            ? participantEmail
+            : _currentUserEmail;
+        if (inboxEmail != null &&
+            inboxEmail.isNotEmpty &&
+            davaId != null &&
+            davaId.isNotEmpty) {
+          await HiveDatabaseService.removeIncomingDavaForUser(inboxEmail, davaId);
+        }
         if (davaId != null && participantEmail != null && participantEmail.isNotEmpty) {
           await HiveDatabaseService.markDavaParticipantStatus(
             davaId: davaId,

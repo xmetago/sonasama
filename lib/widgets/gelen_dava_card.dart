@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/dava_provider.dart';
-import '../screens/katildigim_davalar_page.dart';
 import '../screens/yargila_page.dart';
 import '../services/dava_appeal_judge_assign_service.dart';
 import '../services/dava_auto_assign_service.dart';
@@ -46,187 +46,585 @@ class Dava {
   });
 }
 
+/// Tema renkleriyle kısa bildirim. Sabit kırmızı/turuncu kullanılmaz.
+SnackBar seyirNoticeSnackBar({
+  required ColorScheme scheme,
+  required String message,
+  Duration duration = const Duration(seconds: 4),
+  String? actionLabel,
+  VoidCallback? onAction,
+}) {
+  return SnackBar(
+    backgroundColor: scheme.inverseSurface,
+    behavior: SnackBarBehavior.floating,
+    duration: duration,
+    // Aksiyon varken Flutter snackbar'ı kalıcı yapar; süre dolunca kapansın.
+    persist: false,
+    content: Text(
+      message,
+      style: TextStyle(
+        color: scheme.onInverseSurface,
+        fontSize: SeyirTokens.typeBody,
+      ),
+    ),
+    action: actionLabel == null
+        ? null
+        : SnackBarAction(
+            label: actionLabel,
+            textColor: SeyirTokens.brand,
+            onPressed: onAction ?? () {},
+          ),
+  );
+}
+
+/// Reddin kalıcı etkileri: yalnızca bu kullanıcının gelen kutusu,
+/// çekilme notu ve Katıldığım Davalar kaydı.
+Future<void> commitGelenDavaRejection({
+  required Dava dava,
+  required String? userEmail,
+  DavaProvider? provider,
+}) async {
+  final email = (userEmail ?? '').trim();
+  if (email.isEmpty) return;
+
+  final appeal = dava.isAppealJudgeAssignment ||
+      DavaAppealJudgeAssignService.isAppealJudgeRole(dava.mevkii);
+  try {
+    if (appeal) {
+      await HiveDatabaseService.markDavaParticipantStatus(
+        davaId: dava.id,
+        userEmail: email,
+        status: 'manual_rejected',
+        reason: 'appeal_judge_declined',
+        extra: {
+          'mevkii': dava.mevkii.isNotEmpty
+              ? dava.mevkii
+              : DavaAppealJudgeAssignService.appealJudgeRole,
+          'isAppealJudgeAssignment': true,
+        },
+      );
+      await HiveDatabaseService.updateOpenedDava(dava.id, {
+        'appealJudgeAssignmentPending': false,
+        'appealJudgeDeclined': true,
+        'appealJudgeDeclinedAt': DateTime.now().toIso8601String(),
+      });
+    } else {
+      await HiveDatabaseService.markDavaParticipantStatus(
+        davaId: dava.id,
+        userEmail: email,
+        status: 'manual_rejected',
+        reason: 'user_rejected',
+        extra: {
+          if (dava.mevkii.isNotEmpty) 'mevkii': dava.mevkii,
+        },
+      );
+
+      final reg = HiveDatabaseService.getRegistrationByEmail(email);
+      final mevkiiLabel = dava.mevkii.isNotEmpty ? dava.mevkii : 'Katılımcı';
+      final kisiAdi = reg?.judgeName ?? email.split('@').first;
+      final davaciAd = dava.davaci.isNotEmpty ? dava.davaci : 'Davacı';
+      final davaliAd = dava.davali.isNotEmpty ? dava.davali : 'Davalı';
+      final davaAdi = dava.adi.isNotEmpty ? dava.adi : 'Dava';
+      final narrative =
+          '"$mevkiiLabel" "$kisiAdi", vicdanıyla girdiği düelloyu kaybettiği için '
+          '"$davaciAd"\'in "$davaliAd"\'ya açtığı "$davaAdi" davasından çekilmek zorunda kalmıştır.';
+
+      await HiveDatabaseService.appendWithdrawalNarrative(dava.id, narrative);
+      await HiveDatabaseService.appendDavaHistoryEvent(dava.id, {
+        'type': 'withdraw_reject',
+        'userEmail': email,
+        'mevkii': mevkiiLabel,
+        'narrative': narrative,
+      });
+      await HiveDatabaseService.updateOpenedDava(dava.id, {
+        'davaOverallStatus': 'Reddedildi/Çekildi',
+      });
+      await HiveDatabaseService.saveHukum(
+        davaId: dava.id,
+        userRole: mevkiiLabel,
+        hukumText: narrative,
+        userEmail: email,
+        hukumSentiment: 'positive',
+        isFinalized: true,
+      );
+
+      final davaData = {
+        'id': dava.id,
+        'adi': dava.adi,
+        'davaAdi': dava.adi,
+        'davaKonusu': dava.davaKonusu,
+        'davaci': dava.davaci,
+        'davali': dava.davali,
+        'displayName': dava.davaci,
+        'userEmail': email,
+        'mevkii': 'Katılımcı',
+        'kalanSure': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
+        'profilResmi': dava.profilResmi,
+        'openedAt': DateTime.now().toIso8601String(),
+        'acceptedAt': DateTime.now().toIso8601String(),
+        'kategori': 'Genel',
+        'davaKategori': 'Genel',
+        'source': 'gelen_davalar_page',
+        'isAccepted': true,
+        'isRejected': false,
+        'status': 'Reddedildi/Çekildi',
+      };
+      await HiveDatabaseService.addKatildigimDava(email, davaData);
+    }
+
+    await HiveDatabaseService.removeIncomingDavaForUser(email, dava.id);
+    if (provider != null) {
+      try {
+        await provider.reloadKatildigimDavalar(email);
+        await provider.reloadIncomingDavalar(email);
+      } catch (e) {
+        debugPrint('Red sonrası liste yenilenemedi: $e');
+      }
+    }
+  } catch (e) {
+    debugPrint('Gelen dava reddi kaydedilemedi: $e');
+  }
+}
+
 class FiveCardCaseInformation extends StatefulWidget {
   final Dava dava;
   final VoidCallback? onTap;
   final bool isExpanded;
   final String? userEmail;
-  final VoidCallback? onDavaRejected; // Red edilince çağrılacak callback
+  final VoidCallback? onDavaRejected; // Kabul sonrası listeyi tazelemek için
+  /// Red onayı: sayfa kartı gizler ve geri alma süresini başlatır.
+  final VoidCallback? onRejectQueued;
 
   const FiveCardCaseInformation({
-    super.key, 
-    required this.dava, 
+    super.key,
+    required this.dava,
     this.onTap,
     this.isExpanded = false,
     this.userEmail,
     this.onDavaRejected,
+    this.onRejectQueued,
   });
 
   @override
   State<FiveCardCaseInformation> createState() => _FiveCardCaseInformationState();
 }
 
-class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
+class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
+    with TickerProviderStateMixin {
   String? selectedRole;
   bool isAccepted = false;
   bool isRejected = false;
   bool showRoleSelection = false;
   bool isRoleConfirmed = false;
-  DateTime? _acceptedAt; // Kabul edilme zamanı
-  bool _hasExistingRole = false; // Kullanıcının bu davada zaten bir görevi var mı?
-  String? _existingRole; // Mevcut görev adı
+  bool _confirmingRole = false;
+  bool _showStamp = false;
+  bool _pulseWanted = false;
+  DateTime? _acceptedAt;
+  bool _hasExistingRole = false;
+  String? _existingRole;
+
+  late final AnimationController _pulseController;
+  late final AnimationController _stampController;
+
+  static const String _yargilaGit = 'Yargıla’ya git';
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _stampController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _stampController.dispose();
+    super.dispose();
+  }
 
   Color _cardPhaseColor() {
     final opened = widget.dava.createdAt ?? DateTime.now();
     final seg = DavaTimerService.buildIncomingListCountdown(openedAt: opened);
-    return seg?.accentColor ?? Colors.green.shade300;
+    return seg?.accentColor ?? SeyirTokens.brandDeep;
+  }
+
+  Duration? _phaseRemaining() {
+    final opened = widget.dava.createdAt;
+    if (opened == null) return null;
+    final segment = DavaTimerService.buildIncomingListCountdown(openedAt: opened);
+    if (segment == null) return null;
+    final left = segment.segmentEnd.difference(DateTime.now());
+    if (left.isNegative) return Duration.zero;
+    return left;
+  }
+
+  String? _urgentLabel() {
+    final left = _phaseRemaining();
+    if (left == null || left <= Duration.zero || left >= const Duration(hours: 24)) {
+      return null;
+    }
+    final hours = left.inHours >= 1 ? left.inHours : 1;
+    return 'Karar için $hours saat kaldı';
+  }
+
+  void _schedulePulse(bool wanted) {
+    if (_pulseWanted == wanted) return;
+    _pulseWanted = wanted;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_pulseWanted) {
+        if (!_pulseController.isAnimating) {
+          _pulseController.repeat(reverse: true);
+        }
+      } else {
+        _pulseController.stop();
+        _pulseController.value = 0;
+      }
+    });
   }
 
   bool _isAppealJudgeAssignmentCard() =>
       widget.dava.isAppealJudgeAssignment ||
       DavaAppealJudgeAssignService.isAppealJudgeRole(widget.dava.mevkii);
 
+  Future<bool> _askConfirm(String message, String confirmLabel, Key confirmKey) async {
+    final palette = SeyirPalette.of(context);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final buttonStyle = TextButton.styleFrom(
+          minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+          textStyle: const TextStyle(
+            fontSize: SeyirTokens.typeTitle,
+            fontWeight: FontWeight.w700,
+          ),
+        );
+        return AlertDialog(
+          backgroundColor: palette.card,
+          title: Text('Emin misin?', style: palette.title()),
+          content: Text(message, style: palette.body()),
+          actions: [
+            TextButton(
+              style: buttonStyle,
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Vazgeç', style: palette.title(color: palette.textSecondary)),
+            ),
+            TextButton(
+              key: confirmKey,
+              style: buttonStyle,
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(confirmLabel, style: palette.title(color: SeyirTokens.brandDeep)),
+            ),
+          ],
+        );
+      },
+    );
+    return result == true;
+  }
+
+  Future<void> _startAcceptFlow({bool haptic = true}) async {
+    if (haptic) HapticFeedback.lightImpact();
+    if (isAccepted && showRoleSelection) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    setState(() {
+      isAccepted = true;
+      isRejected = false;
+    });
+    final hasRole = await _checkExistingRole();
+    if (!mounted) return;
+    if (hasRole && _hasExistingRole) {
+      setState(() {
+        isAccepted = false;
+        showRoleSelection = false;
+      });
+      messenger.showSnackBar(
+        seyirNoticeSnackBar(
+          scheme: scheme,
+          message:
+              'Bu davada zaten "$_existingRole" görevini seçtiniz. Aynı davada farklı bir görev seçemezsiniz.',
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      showRoleSelection = true;
+      if (_isAppealJudgeAssignmentCard()) {
+        selectedRole = DavaAppealJudgeAssignService.appealJudgeRole;
+      }
+    });
+  }
+
+  Future<void> _onRejectPressed() async {
+    final ok = await _askConfirm(
+      'Bu davayı reddetmek istediğine emin misin?',
+      'Reddet',
+      const Key('gelen-reddet-onay'),
+    );
+    if (!ok || !mounted) return;
+    HapticFeedback.lightImpact();
+    widget.onRejectQueued?.call();
+  }
+
+  Future<bool> _confirmSwipe(DismissDirection direction) async {
+    if (direction == DismissDirection.startToEnd) {
+      final ok = await _askConfirm(
+        'Bu davayı kabul etmek istediğine emin misin?',
+        'Kabul et',
+        const Key('gelen-kabul-onay'),
+      );
+      if (ok && mounted) {
+        HapticFeedback.lightImpact();
+        await _startAcceptFlow(haptic: false);
+      }
+      return false;
+    }
+    if (direction == DismissDirection.endToStart) {
+      final ok = await _askConfirm(
+        'Bu davayı reddetmek istediğine emin misin?',
+        'Reddet',
+        const Key('gelen-reddet-onay'),
+      );
+      if (!ok || !mounted || widget.onRejectQueued == null) return false;
+      HapticFeedback.lightImpact();
+      return true;
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = SeyirPalette.of(context);
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final urgentLabel = _urgentLabel();
+    final urgent = urgentLabel != null;
+    _schedulePulse(urgent && !disableAnimations);
     final phaseColor = _cardPhaseColor();
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(
-        color: palette.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: phaseColor,
-          width: 2,
-          style: BorderStyle.solid,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: phaseColor.withValues(alpha: 0.12),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-          onTap: widget.onTap,
-        child: Padding(
-            padding: const EdgeInsets.all(4.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+
+    return Dismissible(
+      key: ValueKey('gelen-dismiss-${widget.dava.id}'),
+      direction: DismissDirection.horizontal,
+      confirmDismiss: _confirmSwipe,
+      onDismissed: (_) => widget.onRejectQueued?.call(),
+      background: _swipeBackground(accept: true),
+      secondaryBackground: _swipeBackground(accept: false),
+      child: AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, _) {
+          final t = urgent && !disableAnimations ? _pulseController.value : 0.0;
+          return Stack(
             children: [
-                // Dava Bilgileri
-                _buildCaseInfo(),
-                
-                const SizedBox(height: 24),
-                
-                // Action Buttons
-                _buildActionButtons(),
-                
-                const SizedBox(height: 24),
-                
-                // Mevki Seçimi - Sadece Kabul Et'e basıldığında göster
-                if (showRoleSelection && isAccepted) ...[
-                  _buildDashedLine(),
-                  Center(
-                    child: Text(
-                      _isAppealJudgeAssignmentCard()
-                          ? 'TEMYİZ HAKİMLİĞİ GÖREVİ'
-                          : 'MEVKİNİZİ SEÇİNİZ',
-                      style: const TextStyle(
-                        fontSize: SeyirTokens.typeHeadline,
-                        fontWeight: FontWeight.bold,
-                        color: SeyirTokens.brand,
-                        letterSpacing: 1,
-                      ),
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: palette.card,
+                  borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
+                  border: Border.all(
+                    color: phaseColor.withValues(
+                      alpha: urgent && !disableAnimations ? 0.55 + (0.45 * t) : 1,
                     ),
+                    width: 2,
                   ),
-                  if (_isAppealJudgeAssignmentCard()) ...[
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'Görevi çift tıklayarak kabul edin; ardından 8-Hüküm sayfasında karar verin. '
-                        'Kabul etmezseniz görev başkasına verilmez, dava mevcut haliyle sonuçlanır.',
-                        textAlign: TextAlign.center,
-                        style: palette.body(
-                          weight: FontWeight.w400,
-                          color: palette.textSecondary,
-                        ).copyWith(height: 1.4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: phaseColor.withValues(
+                        alpha: urgent ? 0.12 + (0.22 * t) : 0.12,
                       ),
+                      blurRadius: urgent ? 12 + (6 * t) : 15,
+                      offset: const Offset(0, 8),
                     ),
                   ],
-                  _buildCaseInfoSeparator(),
-                  const SizedBox(height: 8),
-                  _buildRoleSelection(),
-                ],
-                
-                // Seçilen Mevki Gösterimi
-                if (isRoleConfirmed && selectedRole != null) ...[
-                  _buildDashedLine(),
-                  Center(
-                    child: Text(
-                      'SEÇİLEN MEVKİ',
-                      style: TextStyle(
-                        fontSize: SeyirTokens.typeHeadline,
-                        fontWeight: FontWeight.bold,
-                        color: palette.textPrimary,
-                        letterSpacing: 1,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
+                    onTap: widget.onTap,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildCaseInfo(urgentLabel, disableAnimations),
+                          const SizedBox(height: SeyirTokens.space6),
+                          _buildActionButtons(),
+                          const SizedBox(height: SeyirTokens.space6),
+                          if (showRoleSelection && isAccepted) ...[
+                            _buildDashedLine(),
+                            Center(
+                              child: Text(
+                                _isAppealJudgeAssignmentCard()
+                                    ? 'TEMYİZ HAKİMLİĞİ GÖREVİ'
+                                    : 'MEVKİNİZİ SEÇİNİZ',
+                                style: const TextStyle(
+                                  fontSize: SeyirTokens.typeHeadline,
+                                  fontWeight: FontWeight.bold,
+                                  color: SeyirTokens.brand,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ),
+                            if (_isAppealJudgeAssignmentCard()) ...[
+                              const SizedBox(height: SeyirTokens.space2),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: SeyirTokens.space3,
+                                ),
+                                child: Text(
+                                  'Görevi seçip "Görevi onayla" ile kabul edin; ardından 8-Hüküm sayfasında karar verin. '
+                                  'Kabul etmezseniz görev başkasına verilmez, dava mevcut haliyle sonuçlanır.',
+                                  textAlign: TextAlign.center,
+                                  style: palette.body(
+                                    weight: FontWeight.w400,
+                                    color: palette.textSecondary,
+                                  ).copyWith(height: 1.4),
+                                ),
+                              ),
+                            ],
+                            _buildCaseInfoSeparator(),
+                            const SizedBox(height: SeyirTokens.space2),
+                            _buildRoleSelection(),
+                          ],
+                          if (isRoleConfirmed && selectedRole != null) ...[
+                            _buildDashedLine(),
+                            Center(
+                              child: Text(
+                                'SEÇİLEN MEVKİ',
+                                style: TextStyle(
+                                  fontSize: SeyirTokens.typeHeadline,
+                                  fontWeight: FontWeight.bold,
+                                  color: palette.textPrimary,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ),
+                            _buildCaseInfoSeparator(),
+                            const SizedBox(height: SeyirTokens.space4),
+                            _buildSelectedRoleDisplay(),
+                            _buildCaseInfoSeparator(),
+                            const SizedBox(height: SeyirTokens.space4),
+                            if (_acceptedAt != null)
+                              CountdownTimerWidget(
+                                startTime: _acceptedAt!,
+                                totalDuration: _isAppealJudgeAssignmentCard()
+                                    ? DavaTimerService.appealJudgeDecisionWindow
+                                    : DavaTimerService.acceptedHukumWindow,
+                                showHourglass: true,
+                                onTimeUp: () {
+                                  final scheme = Theme.of(context).colorScheme;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    seyirNoticeSnackBar(
+                                      scheme: scheme,
+                                      message: 'Dava süresi doldu',
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
-                  _buildCaseInfoSeparator(),
-                  const SizedBox(height: 16),
-                  _buildSelectedRoleDisplay(),
-                  _buildCaseInfoSeparator(),
-                  const SizedBox(height: 16),
-                  // Zamanlayıcı Widget'ı
-                  if (_acceptedAt != null)
-                    CountdownTimerWidget(
-                      startTime: _acceptedAt!,
-                      totalDuration: _isAppealJudgeAssignmentCard()
-                          ? DavaTimerService.appealJudgeDecisionWindow
-                          : DavaTimerService.acceptedHukumWindow,
-                      showHourglass: true,
-                      onTimeUp: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('⏰ Dava süresi doldu!'),
-                            backgroundColor: Colors.red,
-                            duration: Duration(seconds: 3),
-                          ),
-                        );
-                      },
-                    ),
-                ],
-              ],
+                ),
+              ),
+              if (_showStamp)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Center(child: _buildStamp(palette)),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStamp(SeyirPalette palette) {
+    final scale = Tween<double>(begin: 1.28, end: 1).animate(
+      CurvedAnimation(parent: _stampController, curve: Curves.easeOutBack),
+    );
+    return ScaleTransition(
+      scale: scale,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: SeyirTokens.space4,
+          vertical: SeyirTokens.space3,
+        ),
+        decoration: BoxDecoration(
+          color: palette.card,
+          borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+          border: Border.all(color: SeyirTokens.brand, width: 3),
+          boxShadow: palette.cardShadow,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.verified,
+              color: palette.foreground(SeyirTokens.brand),
+              size: 28,
             ),
-          ),
+            const SizedBox(width: SeyirTokens.space2),
+            Text(
+              'ONAYLANDI',
+              style: palette.headline(
+                color: palette.foreground(SeyirTokens.brand),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// Üst/alt bölüm sınırı (daha belirgin kesik çizgi)
+  Widget _swipeBackground({required bool accept}) {
+    final palette = SeyirPalette.of(context);
+    final color = accept ? SeyirTokens.accept : SeyirTokens.reject;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: SeyirTokens.space4),
+      alignment: accept ? Alignment.centerLeft : Alignment.centerRight,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusLg),
+      ),
+      child: Text(
+        accept ? 'Kabul et' : 'Reddet',
+        style: TextStyle(
+          color: palette.onSolid(color),
+          fontSize: SeyirTokens.typeTitle,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
   Widget _buildDashedLine() {
+    final palette = SeyirPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
       child: CustomPaint(
-        painter: DashedLinePainter(color: Colors.green.shade300),
+        painter: DashedLinePainter(color: palette.tintBorder(SeyirTokens.brand)),
         child: const SizedBox(height: 1, width: double.infinity),
       ),
     );
   }
 
-  /// Satırlar / alt başlıklar arası (daha açık kesik çizgi)
   Widget _buildCaseInfoSeparator() {
+    final palette = SeyirPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space1),
       child: CustomPaint(
-        painter: DashedLinePainter(color: Colors.green.shade100),
+        painter: DashedLinePainter(color: palette.border),
         child: const SizedBox(height: 1, width: double.infinity),
       ),
     );
@@ -242,14 +640,15 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
     return HiveDatabaseService.getRegistrationByEmail(key) == null;
   }
 
-  Widget _buildCaseInfo() {
+  Widget _buildCaseInfo(String? urgentLabel, bool disableAnimations) {
     final palette = SeyirPalette.of(context);
     final guest = _davaliIsGuest();
+    final konu = widget.dava.davaKonusu.trim();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: palette.card,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
         border: Border.all(color: palette.border),
       ),
       child: Column(
@@ -260,6 +659,19 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
             widget.dava.adi.isNotEmpty ? widget.dava.adi : 'Belirtilmedi',
             Icons.description,
           ),
+          if (konu.isNotEmpty) ...[
+            const SizedBox(height: SeyirTokens.space2),
+            Text(
+              konu,
+              key: Key('gelen-dava-konu-${widget.dava.id}'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: palette.body(
+                weight: FontWeight.w500,
+                color: palette.textSecondary,
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           _buildYargilaStyleSeparator(),
           const SizedBox(height: 10),
@@ -275,19 +687,20 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
           const SizedBox(height: 10),
           _buildYargilaStyleSeparator(),
           const SizedBox(height: 10),
-          _buildStyledCountdownRow(),
+          _buildStyledCountdownRow(urgentLabel, disableAnimations),
         ],
       ),
     );
   }
 
   Widget _buildYargilaStyleSeparator() {
+    final palette = SeyirPalette.of(context);
     return SizedBox(
       height: 10,
       child: CustomPaint(
         size: const Size(double.infinity, 10),
         painter: DashedLinePainter(
-          color: const Color(0xFFD8E5DE),
+          color: palette.border,
           strokeWidth: 1.6,
         ),
       ),
@@ -325,37 +738,6 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
     );
   }
 
-  Widget _buildModernRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label :',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-              fontSize: 14,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.start,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-                fontSize: 15,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildModernDavaliRow(bool guest) {
     final palette = SeyirPalette.of(context);
     return Row(
@@ -386,11 +768,11 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
                   ),
                   if (guest) ...[
                     const SizedBox(width: 6),
-                    Tooltip(
+                    const Tooltip(
                       message: 'Bu davalı WhoBoom üyesi değil (misafir)',
                       child: Icon(
                         Icons.person_off_outlined,
-                        color: Colors.red.shade700,
+                        color: SeyirTokens.reject,
                         size: 20,
                       ),
                     ),
@@ -404,8 +786,50 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
     );
   }
 
-  Widget _buildStyledCountdownRow() {
+  Widget _buildStyledCountdownRow(String? urgentLabel, bool disableAnimations) {
     final palette = SeyirPalette.of(context);
+    final timer = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Kalan Süre',
+          style: palette.caption(weight: FontWeight.w600),
+        ),
+        const SizedBox(height: 4),
+        _buildCountdownRow(),
+        if (urgentLabel != null) ...[
+          const SizedBox(height: SeyirTokens.space1),
+          Text(
+            urgentLabel,
+            key: const Key('gelen-karar-suresi'),
+            style: palette.body(
+              weight: FontWeight.w700,
+              color: SeyirTokens.warning,
+            ),
+          ),
+        ],
+      ],
+    );
+
+    Widget pulsed = timer;
+    if (urgentLabel != null && !disableAnimations) {
+      pulsed = AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          final t = _pulseController.value;
+          return Opacity(
+            opacity: 0.72 + (0.28 * t),
+            child: Transform.scale(
+              alignment: Alignment.centerLeft,
+              scale: 1 + (0.015 * t),
+              child: child,
+            ),
+          );
+        },
+        child: timer,
+      );
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -415,28 +839,14 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
           color: SeyirTokens.brand,
         ),
         const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Kalan Süre',
-                style: palette.caption(weight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              _buildCountdownRow(),
-            ],
-          ),
-        ),
+        Expanded(child: pulsed),
       ],
     );
   }
 
-  /// Geriye doğru sayan sayaç satırı (168 saatlik 3 aşamalı döngü segmenti)
   Widget _buildCountdownRow() {
     final openedAt = widget.dava.createdAt ?? DateTime.now();
     final segment = DavaTimerService.buildIncomingListCountdown(openedAt: openedAt);
-
     final palette = SeyirPalette.of(context);
     if (segment == null) {
       return Row(
@@ -492,11 +902,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
                 accentColor: segment.accentColor,
                 showHourglass: true,
                 onTimeUp: () {
+                  final scheme = Theme.of(context).colorScheme;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('⏰ Bu fazın süresi doldu!'),
-                      backgroundColor: Colors.red,
-                      duration: Duration(seconds: 3),
+                    seyirNoticeSnackBar(
+                      scheme: scheme,
+                      message: 'Bu fazın süresi doldu',
+                      duration: const Duration(seconds: 3),
                     ),
                   );
                 },
@@ -513,75 +924,29 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
       children: [
         Expanded(
           child: _buildActionButton(
+            key: const Key('gelen-reddet'),
             label: 'RED ET',
             isReject: true,
-            onPressed: () {
-              print('🔴 RED ET butonuna basıldı - Dava ID: ${widget.dava.id}');
-              
-              setState(() {
-                isRejected = true;
-                isAccepted = false;
-                showRoleSelection = false;
-                isRoleConfirmed = false;
-                selectedRole = null;
-              });
-              
-              if (_isAppealJudgeAssignmentCard()) {
-                _handleAppealJudgeDeclined();
-              } else {
-                print('🔴 State güncellendi, dava taşıma işlemi başlatılıyor...');
-                _moveDavaToKatildigim();
-              }
-              
-              widget.onDavaRejected?.call();
-              
-              print('🔴 UI callback çağrıldı');
-            },
+            onPressed: _onRejectPressed,
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: SeyirTokens.space4),
         Expanded(
           child: _buildActionButton(
+            key: const Key('gelen-kabul'),
             label: 'KABUL ET',
             isReject: false,
             onPressed: () {
-              setState(() {
-                isAccepted = !isAccepted;
-                if (isAccepted) {
-                  isRejected = false;
-                  // ADIM 1: Kullanıcının bu davada zaten bir görevi olup olmadığını kontrol et
-                  _checkExistingRole().then((hasRole) {
-                    if (hasRole && _hasExistingRole) {
-                      // Kullanıcının zaten bir görevi varsa, görev seçimini engelle
-                      setState(() {
-                        isAccepted = false;
-                        showRoleSelection = false;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Bu davada zaten "$_existingRole" görevini seçtiniz. Aynı davada farklı bir görev seçemezsiniz.',
-                          ),
-                          backgroundColor: Colors.red,
-                          duration: const Duration(seconds: 4),
-                        ),
-                      );
-                    } else {
-                      // Görev seçimine izin ver
-                      setState(() {
-                        showRoleSelection = true;
-                        if (_isAppealJudgeAssignmentCard()) {
-                          selectedRole = DavaAppealJudgeAssignService.appealJudgeRole;
-                        }
-                      });
-                    }
-                  });
-                } else {
+              if (isAccepted) {
+                setState(() {
+                  isAccepted = false;
                   showRoleSelection = false;
                   isRoleConfirmed = false;
                   selectedRole = null;
-                }
-              });
+                });
+                return;
+              }
+              _startAcceptFlow();
             },
           ),
         ),
@@ -590,6 +955,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
   }
 
   Widget _buildActionButton({
+    required Key key,
     required String label,
     required bool isReject,
     required VoidCallback onPressed,
@@ -601,10 +967,12 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
     final Color ink = isSelected ? palette.onSolid(tone) : palette.textPrimary;
 
     return Container(
+      key: key,
       height: 50,
+      constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
       decoration: BoxDecoration(
         color: fill,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
         border: Border.all(
           color: isSelected ? tone : palette.border,
           width: 2,
@@ -613,13 +981,13 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
           onTap: onPressed,
           child: Center(
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 16,
+                fontSize: SeyirTokens.typeTitle,
                 fontWeight: FontWeight.bold,
                 color: ink,
               ),
@@ -630,23 +998,23 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
     );
   }
 
-  /// Kullanıcının bu davada zaten bir görevi olup olmadığını kontrol et
   Future<bool> _checkExistingRole() async {
     if (widget.userEmail == null || widget.userEmail!.isEmpty) {
       return false;
     }
-    
+
     try {
       final participants = await HiveDatabaseService.getDavaParticipants(widget.dava.id);
       final existingParticipant = participants.firstWhere(
         (p) => (p['userEmail']?.toString() ?? '').toLowerCase() == widget.userEmail!.toLowerCase(),
         orElse: () => <String, dynamic>{},
       );
-      
+
+      if (!mounted) return false;
       if (existingParticipant.isNotEmpty) {
         final status = existingParticipant['status']?.toString() ?? '';
         final existingRole = existingParticipant['mevkii']?.toString() ?? '';
-        
+
         if (status == 'accepted' && existingRole.isNotEmpty) {
           setState(() {
             _hasExistingRole = true;
@@ -655,14 +1023,14 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
           return true;
         }
       }
-      
+
       setState(() {
         _hasExistingRole = false;
         _existingRole = null;
       });
       return false;
     } catch (e) {
-      print('❌ [FiveCardCaseInformation] Katılımcı kontrolü sırasında hata: $e');
+      debugPrint('Katılımcı kontrolü sırasında hata: $e');
       return false;
     }
   }
@@ -683,508 +1051,362 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> {
     }
 
     return Column(
-      children: roles.map((role) {
-        final isSelected = selectedRole == role['label'];
-        // Eğer kullanıcının zaten bir görevi varsa, butonları devre dışı bırak
-        final isDisabled = _hasExistingRole;
-        
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: isDisabled ? null : () {
-                setState(() {
-                  selectedRole = role['label'];
-                });
-              },
-              onDoubleTap: () async {
-                // Çift tıklama - mevkiyi onayla
-                // ADIM 1: Kullanıcının bu davada zaten bir görevi olup olmadığını kontrol et
-                if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-                  try {
-                    final participants = await HiveDatabaseService.getDavaParticipants(widget.dava.id);
-                    final existingParticipant = participants.firstWhere(
-                      (p) => (p['userEmail']?.toString() ?? '').toLowerCase() == widget.userEmail!.toLowerCase(),
-                      orElse: () => <String, dynamic>{},
-                    );
-                    
-                    // Eğer kullanıcının bu davada zaten bir görevi varsa ve kabul edilmişse
-                    if (existingParticipant.isNotEmpty) {
-                      final status = existingParticipant['status']?.toString() ?? '';
-                      final existingRole = existingParticipant['mevkii']?.toString() ?? '';
-                      
-                      if (status == 'accepted' && existingRole.isNotEmpty) {
-                        // Kullanıcıya bilgi ver ve görev seçimini engelle
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Bu davada zaten "$existingRole" görevini seçtiniz. Aynı davada farklı bir görev seçemezsiniz.',
-                            ),
-                            backgroundColor: Colors.red,
-                            duration: const Duration(seconds: 4),
-                          ),
-                        );
-                        return;
-                      }
-                    }
-                  } catch (e) {
-                    print('❌ [GelenDavalarPage] Katılımcı kontrolü sırasında hata: $e');
-                    // Hata durumunda devam et (kullanıcı deneyimini bozmamak için)
-                  }
-                }
-
-                final acceptedTime = DateTime.now();
-                setState(() {
-                  selectedRole = role['label'];
-                  isRoleConfirmed = true;
-                  showRoleSelection = false;
-                  _acceptedAt = acceptedTime;
-                });
-                
-                // Davayı kabul edilmiş olarak kaydet
-                // ÖNEMLİ: 'id' alanı orijinal dava ID'si olmalı, yoksa gelen davalardan kaldırılamaz
-                final davaData = {
-                  'id': widget.dava.id, // Orijinal dava ID'si (yeni ID oluşturma!)
-                  'davaId': widget.dava.id,
-                  'adi': widget.dava.adi,
-                  'davali': widget.dava.davali,
-                  'mevkii': selectedRole,
-                  'kalanSure': widget.dava.kalanSure,
-                  'profilResmi': widget.dava.profilResmi,
-                  'davaKonusu': widget.dava.davaKonusu,
-                  'davaci': widget.dava.davaci,
-                  'userEmail': widget.userEmail,
-                  'userRole': selectedRole,
-                  'status': 'accepted',
-                  'acceptedAt': acceptedTime.toIso8601String(),
-                  'createdAt': widget.dava.createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
-                  'remainingHours': 76,
-                  if (_isAppealJudgeAssignmentCard())
-                    'isAppealJudgeAssignment': true,
-                };
-                
-                print('✅ [GelenDavalarPage] Dava kabul ediliyor:');
-                print('   - Dava ID: ${widget.dava.id}');
-                print('   - Dava Adı: ${widget.dava.adi}');
-                print('   - Seçilen Görev: $selectedRole');
-                print('   - User Email: ${widget.userEmail}');
-                
-                // Provider üzerinden davayı kabul edilenlere ekle
-                // Bu metod otomatik olarak gelen davalardan kaldırır
-                final davaProvider = Provider.of<DavaProvider>(context, listen: false);
-                final success = await davaProvider.acceptDava(davaData);
-                
-                if (success) {
-                  print('✅ [GelenDavalarPage] Dava başarıyla kabul edildi ve gelen davalardan kaldırıldı');
-
-                  if (_isAppealJudgeAssignmentCard()) {
-                    await HiveDatabaseService.updateOpenedDava(widget.dava.id, {
-                      'appealJudgeAssignmentPending': false,
-                      'appealJudgeAcceptedAt': acceptedTime.toIso8601String(),
-                    });
-                    if (widget.userEmail != null &&
-                        widget.userEmail!.isNotEmpty) {
-                      await HiveDatabaseService.markDavaParticipantStatus(
-                        davaId: widget.dava.id,
-                        userEmail: widget.userEmail!,
-                        status: 'accepted',
-                        reason: 'appeal_judge_accepted',
-                        extra: {
-                          'mevkii': selectedRole,
-                          'userRole': selectedRole,
-                          'acceptedAt': acceptedTime.toIso8601String(),
-                          'isAppealJudgeAssignment': true,
-                        },
-                      );
-                    }
-                  }
-
-                  // Katıldığım Davalar: açılmış orijinal dava + seçilen görev (ör. 1.Jüri)
-                  if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-                    final opened = HiveDatabaseService.getOpenedDavaById(widget.dava.id);
-                    final katildigimKayit = Map<String, dynamic>.from(davaData);
-                    katildigimKayit['davaAdi'] = widget.dava.adi;
-                    katildigimKayit['isAccepted'] = true;
-                    katildigimKayit['isRejected'] = false;
-                    katildigimKayit['source'] = 'gelen_davalar_accept';
-                    if (opened != null) {
-                      final kat = opened['kategori'] ?? opened['davaKategorisi'];
-                      if (kat != null && kat.toString().trim().isNotEmpty) {
-                        katildigimKayit['kategori'] = kat;
-                        katildigimKayit['davaKategori'] = kat;
-                      }
-                      final oa = opened['openedAt']?.toString();
-                      if (oa != null && oa.isNotEmpty) {
-                        katildigimKayit['openedAt'] = oa;
-                      }
-                      if (opened['isOpened'] != null) {
-                        katildigimKayit['isOpened'] = opened['isOpened'];
-                      }
-                    } else {
-                      katildigimKayit['openedAt'] =
-                          katildigimKayit['acceptedAt']?.toString();
-                      katildigimKayit['isOpened'] = true;
-                    }
-                    await HiveDatabaseService.removeKatildigimDava(
-                      widget.userEmail!,
-                      widget.dava.id,
-                    );
-                    await HiveDatabaseService.addKatildigimDava(
-                      widget.userEmail!,
-                      katildigimKayit,
-                    );
-                    await davaProvider.reloadKatildigimDavalar(widget.userEmail!);
-                  }
-                  
-                  // UI'dan dava kartını kaldır (callback ile)
-                  widget.onDavaRejected?.call();
-                  
-                  // Gelen davalar listesini yeniden yükle (Provider'dan)
-                  if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-                    await davaProvider.loadUserData(widget.userEmail!);
-                  }
-                } else {
-                  print('❌ [GelenDavalarPage] Dava kabul edilirken hata oluştu');
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('❌ Dava kabul edilirken hata oluştu. Lütfen tekrar deneyin.'),
-                        backgroundColor: Colors.red,
-                        duration: Duration(seconds: 3),
-                      ),
-                    );
-                  }
-                  return;
-                }
-                
-                // Yargıla sayfasına yönlendir
-                if (mounted) {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => YargilaPage(userEmail: widget.userEmail),
-                    ),
-                  );
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                  color: isDisabled 
-                    ? Colors.grey.shade200 
-                    : (isSelected ? Colors.green.shade50 : Colors.white),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isDisabled 
-                      ? Colors.grey.shade400 
-                      : (isSelected ? Colors.green : Colors.grey.shade300),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                    children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDisabled 
-                            ? Colors.grey.shade400 
-                            : (isSelected ? Colors.green : Colors.grey.shade400),
-                          width: 2,
-                        ),
-                        color: isDisabled 
-                          ? Colors.grey.shade300 
-                          : (isSelected ? Colors.green : Colors.transparent),
-                      ),
-                      child: isDisabled
-                        ? const Icon(Icons.block, size: 12, color: Colors.grey)
-                        : (isSelected
-                          ? const Icon(Icons.check, size: 12, color: Colors.white)
-                          : null),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        '${role['label']}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: isDisabled 
-                            ? Colors.grey.shade500 
-                            : (isSelected ? Colors.green.shade700 : Colors.grey.shade800),
-                        ),
-                      ),
-                    ),
-                    // Çift tıklama ipucu
-                    if (!isRoleConfirmed)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          'Çift tıkla',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.blue.shade700,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ),
-          ),
-        );
-      }).toList(),
+      children: [
+        ...roles.map(_buildRoleRow),
+        _buildConfirmTaskButton(),
+      ],
     );
   }
 
-  Widget _buildSelectedRoleDisplay() {
+  Widget _buildRoleRow(Map<String, String> role) {
+    final palette = SeyirPalette.of(context);
+    final label = role['label'] ?? '';
+    final isSelected = selectedRole == label;
+    final isDisabled = _hasExistingRole;
+    final Color borderColor = isDisabled
+        ? palette.border
+        : (isSelected ? SeyirTokens.brand : palette.border);
+    final Color fill = isDisabled
+        ? palette.surfaceMuted
+        : (isSelected ? palette.brandSoft : palette.card);
+    final Color ink = isDisabled
+        ? palette.textMuted
+        : (isSelected
+            ? palette.foreground(SeyirTokens.brand)
+            : palette.textPrimary);
+
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.blue.shade50, Colors.blue.shade100],
+      key: Key('gelen-role-$label'),
+      margin: const EdgeInsets.only(bottom: SeyirTokens.space2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
+          onTap: isDisabled
+              ? null
+              : () {
+                  setState(() {
+                    selectedRole = label;
+                  });
+                },
+          child: Container(
+            constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+            padding: const EdgeInsets.symmetric(
+              horizontal: SeyirTokens.space3,
+              vertical: SeyirTokens.space2,
+            ),
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: BorderRadius.circular(SeyirTokens.radiusSm),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDisabled
+                          ? palette.border
+                          : (isSelected ? SeyirTokens.brand : palette.border),
+                      width: 2,
+                    ),
+                    color: isDisabled
+                        ? palette.surfaceMuted
+                        : (isSelected ? SeyirTokens.brand : Colors.transparent),
+                  ),
+                  child: isDisabled
+                      ? Icon(Icons.block, size: 12, color: palette.textMuted)
+                      : (isSelected
+                          ? Icon(
+                              Icons.check,
+                              size: 12,
+                              color: palette.onSolid(SeyirTokens.brand),
+                            )
+                          : null),
+                ),
+                const SizedBox(width: SeyirTokens.space3),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: palette.title(weight: FontWeight.w600, color: ink),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade300, width: 2),
+      ),
+    );
+  }
+
+  Widget _buildConfirmTaskButton() {
+    final palette = SeyirPalette.of(context);
+    final enabled = selectedRole != null && !_hasExistingRole && !_confirmingRole;
+    return Padding(
+      padding: const EdgeInsets.only(top: SeyirTokens.space2),
+      child: SizedBox(
+        key: const Key('gorevi-onayla'),
+        width: double.infinity,
+        height: SeyirTokens.tapTarget,
+        child: ElevatedButton(
+          onPressed: enabled ? _confirmSelectedRole : null,
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size.fromHeight(SeyirTokens.tapTarget),
+            backgroundColor: SeyirTokens.brand,
+            disabledBackgroundColor: palette.surfaceMuted,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+            ),
+          ),
+          child: Text(
+            'Görevi onayla',
+            style: TextStyle(
+              fontSize: SeyirTokens.typeTitle,
+              fontWeight: FontWeight.bold,
+              color: enabled ? palette.onSolid(SeyirTokens.brand) : palette.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmSelectedRole() async {
+    if (selectedRole == null || _confirmingRole) return;
+    final email = widget.userEmail;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final provider = Provider.of<DavaProvider>(context, listen: false);
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+
+    if (email != null && email.isNotEmpty) {
+      try {
+        final participants = await HiveDatabaseService.getDavaParticipants(widget.dava.id);
+        final existingParticipant = participants.firstWhere(
+          (p) => (p['userEmail']?.toString() ?? '').toLowerCase() == email.toLowerCase(),
+          orElse: () => <String, dynamic>{},
+        );
+        if (existingParticipant.isNotEmpty) {
+          final status = existingParticipant['status']?.toString() ?? '';
+          final existingRole = existingParticipant['mevkii']?.toString() ?? '';
+          if (status == 'accepted' && existingRole.isNotEmpty) {
+            messenger.showSnackBar(
+              seyirNoticeSnackBar(
+                scheme: scheme,
+                message:
+                    'Bu davada zaten "$existingRole" görevini seçtiniz. Aynı davada farklı bir görev seçemezsiniz.',
+                duration: const Duration(seconds: 4),
+              ),
+            );
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('Katılımcı kontrolü sırasında hata: $e');
+      }
+    }
+
+    if (!mounted) return;
+    _confirmingRole = true;
+    final acceptedTime = DateTime.now();
+    HapticFeedback.mediumImpact();
+    setState(() {
+      isRoleConfirmed = true;
+      showRoleSelection = false;
+      _acceptedAt = acceptedTime;
+      _showStamp = !disableAnimations;
+    });
+    if (!disableAnimations) {
+      try {
+        await _stampController.forward(from: 0);
+      } catch (_) {}
+      if (mounted) setState(() => _showStamp = false);
+    }
+
+    final role = selectedRole;
+    final davaData = {
+      'id': widget.dava.id,
+      'davaId': widget.dava.id,
+      'adi': widget.dava.adi,
+      'davali': widget.dava.davali,
+      'mevkii': role,
+      'kalanSure': widget.dava.kalanSure,
+      'profilResmi': widget.dava.profilResmi,
+      'davaKonusu': widget.dava.davaKonusu,
+      'davaci': widget.dava.davaci,
+      'userEmail': email,
+      'userRole': role,
+      'status': 'accepted',
+      'acceptedAt': acceptedTime.toIso8601String(),
+      'createdAt': widget.dava.createdAt?.toIso8601String() ?? acceptedTime.toIso8601String(),
+      'remainingHours': 76,
+      if (_isAppealJudgeAssignmentCard()) 'isAppealJudgeAssignment': true,
+    };
+
+    final success = await provider.acceptDava(davaData);
+    if (!success) {
+      _confirmingRole = false;
+      messenger.showSnackBar(
+        seyirNoticeSnackBar(
+          scheme: scheme,
+          message: 'Dava kabul edilirken hata oluştu. Lütfen tekrar deneyin.',
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      if (mounted) {
+        setState(() {
+          isRoleConfirmed = false;
+          showRoleSelection = true;
+        });
+      }
+      return;
+    }
+
+    messenger.showSnackBar(
+      seyirNoticeSnackBar(
+        scheme: scheme,
+        message: 'Dava kabul edildi',
+        actionLabel: _yargilaGit,
+        onAction: () {
+          navigator.push(
+            MaterialPageRoute<void>(
+              builder: (context) => YargilaPage(userEmail: email),
+            ),
+          );
+        },
+      ),
+    );
+    widget.onDavaRejected?.call();
+    _confirmingRole = false;
+
+    try {
+      await _persistAcceptedRole(
+        provider: provider,
+        email: email,
+        role: role,
+        acceptedTime: acceptedTime,
+        davaData: davaData,
+      );
+    } catch (e) {
+      debugPrint('Kabul sonrası kayıt tamamlanamadı: $e');
+    }
+  }
+
+  Future<void> _persistAcceptedRole({
+    required DavaProvider provider,
+    required String? email,
+    required String? role,
+    required DateTime acceptedTime,
+    required Map<String, dynamic> davaData,
+  }) async {
+    if (_isAppealJudgeAssignmentCard()) {
+      await HiveDatabaseService.updateOpenedDava(widget.dava.id, {
+        'appealJudgeAssignmentPending': false,
+        'appealJudgeAcceptedAt': acceptedTime.toIso8601String(),
+      });
+      if (email != null && email.isNotEmpty) {
+        await HiveDatabaseService.markDavaParticipantStatus(
+          davaId: widget.dava.id,
+          userEmail: email,
+          status: 'accepted',
+          reason: 'appeal_judge_accepted',
+          extra: {
+            'mevkii': role,
+            'userRole': role,
+            'acceptedAt': acceptedTime.toIso8601String(),
+            'isAppealJudgeAssignment': true,
+          },
+        );
+      }
+    }
+
+    if (email != null && email.isNotEmpty) {
+      final opened = HiveDatabaseService.getOpenedDavaById(widget.dava.id);
+      final katildigimKayit = Map<String, dynamic>.from(davaData);
+      katildigimKayit['davaAdi'] = widget.dava.adi;
+      katildigimKayit['isAccepted'] = true;
+      katildigimKayit['isRejected'] = false;
+      katildigimKayit['source'] = 'gelen_davalar_accept';
+      if (opened != null) {
+        final kat = opened['kategori'] ?? opened['davaKategorisi'];
+        if (kat != null && kat.toString().trim().isNotEmpty) {
+          katildigimKayit['kategori'] = kat;
+          katildigimKayit['davaKategori'] = kat;
+        }
+        final oa = opened['openedAt']?.toString();
+        if (oa != null && oa.isNotEmpty) {
+          katildigimKayit['openedAt'] = oa;
+        }
+        if (opened['isOpened'] != null) {
+          katildigimKayit['isOpened'] = opened['isOpened'];
+        }
+      } else {
+        katildigimKayit['openedAt'] = katildigimKayit['acceptedAt']?.toString();
+        katildigimKayit['isOpened'] = true;
+      }
+      await HiveDatabaseService.removeKatildigimDava(email, widget.dava.id);
+      await HiveDatabaseService.addKatildigimDava(email, katildigimKayit);
+      await provider.reloadKatildigimDavalar(email);
+      await provider.reloadIncomingDavalar(email);
+    }
+  }
+
+  Widget _buildSelectedRoleDisplay() {
+    final palette = SeyirPalette.of(context);
+    final tone = palette.foreground(SeyirTokens.brand);
+    return Container(
+      key: const Key('secilen-mevki'),
+      padding: const EdgeInsets.all(SeyirTokens.space4),
+      decoration: BoxDecoration(
+        color: palette.brandSoft,
+        borderRadius: BorderRadius.circular(SeyirTokens.radiusMd),
+        border: Border.all(color: palette.tintBorder(SeyirTokens.brand), width: 2),
       ),
       child: Column(
         children: [
           Icon(
             Icons.check_circle,
             size: 48,
-            color: Colors.blue.shade700,
+            color: tone,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: SeyirTokens.space3),
           Text(
             'Seçilen Mevki:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.blue.shade700,
-            ),
+            style: palette.headline(color: tone),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: SeyirTokens.space2),
           Text(
             selectedRole ?? '',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.blue.shade800,
+            style: palette.display(color: palette.textPrimary),
+          ),
+          const SizedBox(height: SeyirTokens.space3),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SeyirTokens.space4,
+              vertical: SeyirTokens.space2,
+            ),
+            decoration: BoxDecoration(
+              color: SeyirTokens.brand,
+              borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
+            ),
+            child: Text(
+              'Mevki Onaylandı',
+              style: TextStyle(
+                color: palette.onSolid(SeyirTokens.brand),
+                fontWeight: FontWeight.bold,
+                fontSize: SeyirTokens.typeBody,
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade700,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              'Mevki Onaylandı ✓',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-                ),
-        ),
-      ],
+        ],
       ),
     );
   }
-
-
-  /// Temyiz hakimi görevi reddedildi: yeniden atama yok, dava mevcut haliyle kalır.
-  Future<void> _handleAppealJudgeDeclined() async {
-    try {
-      if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-        await HiveDatabaseService.markDavaParticipantStatus(
-          davaId: widget.dava.id,
-          userEmail: widget.userEmail!,
-          status: 'manual_rejected',
-          reason: 'appeal_judge_declined',
-          extra: {
-            'mevkii': widget.dava.mevkii.isNotEmpty
-                ? widget.dava.mevkii
-                : DavaAppealJudgeAssignService.appealJudgeRole,
-            'isAppealJudgeAssignment': true,
-          },
-        );
-      }
-
-      await HiveDatabaseService.updateOpenedDava(widget.dava.id, {
-        'appealJudgeAssignmentPending': false,
-        'appealJudgeDeclined': true,
-        'appealJudgeDeclinedAt': DateTime.now().toIso8601String(),
-      });
-
-      if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-        await HiveDatabaseService.removeIncomingDavaForUser(
-          widget.userEmail!,
-          widget.dava.id,
-        );
-      }
-    } catch (e) {
-      print('❌ Temyiz hakimi görevi reddi kaydedilemedi: $e');
-    }
-  }
-
-  /// Dava reddedildiğinde katıldığım davalar sayfasına ekle
-  void _moveDavaToKatildigim() async {
-    print('🔄 _moveDavaToKatildigim başlatıldı - Dava: ${widget.dava.adi}');
-    
-    try {
-      if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-        await HiveDatabaseService.markDavaParticipantStatus(
-          davaId: widget.dava.id,
-          userEmail: widget.userEmail!,
-          status: 'manual_rejected',
-          reason: 'user_rejected',
-          extra: {
-            if (widget.dava.mevkii.isNotEmpty) 'mevkii': widget.dava.mevkii,
-          },
-        );
-      }
-
-      final reg = widget.userEmail != null
-          ? HiveDatabaseService.getRegistrationByEmail(widget.userEmail!)
-          : null;
-      final mevkiiLabel =
-          widget.dava.mevkii.isNotEmpty ? widget.dava.mevkii : 'Katılımcı';
-      final kisiAdi = reg?.judgeName ??
-          (widget.userEmail?.split('@').first ?? 'Kullanıcı');
-      final davaciAd =
-          widget.dava.davaci.isNotEmpty ? widget.dava.davaci : 'Davacı';
-      final davaliAd =
-          widget.dava.davali.isNotEmpty ? widget.dava.davali : 'Davalı';
-      final davaAdi = widget.dava.adi.isNotEmpty ? widget.dava.adi : 'Dava';
-      final narrative =
-          '"$mevkiiLabel" "$kisiAdi", vicdanıyla girdiği düelloyu kaybettiği için '
-          '"$davaciAd"\'in "$davaliAd"\'ya açtığı "$davaAdi" davasından çekilmek zorunda kalmıştır.';
-
-      await HiveDatabaseService.appendWithdrawalNarrative(widget.dava.id, narrative);
-      await HiveDatabaseService.appendDavaHistoryEvent(widget.dava.id, {
-        'type': 'withdraw_reject',
-        'userEmail': widget.userEmail,
-        'mevkii': mevkiiLabel,
-        'narrative': narrative,
-      });
-      await HiveDatabaseService.updateOpenedDava(widget.dava.id, {
-        'davaOverallStatus': 'Reddedildi/Çekildi',
-      });
-      if (widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-        await HiveDatabaseService.saveHukum(
-          davaId: widget.dava.id,
-          userRole: mevkiiLabel,
-          hukumText: narrative,
-          userEmail: widget.userEmail!,
-          hukumSentiment: 'positive',
-          isFinalized: true,
-        );
-      }
-
-      // Dava verilerini hazırla
-      final davaData = {
-        'id': widget.dava.id,
-        'adi': widget.dava.adi,
-        'davaAdi': widget.dava.adi,
-        'davaKonusu': widget.dava.davaKonusu,
-        'davaci': widget.dava.davaci,
-        'davali': widget.dava.davali,
-        'displayName': widget.dava.davaci,
-        'userEmail': widget.userEmail ?? '',
-        'mevkii': 'Katılımcı', // Red edilen dava katıldığım davalar sayfasında
-        'kalanSure': DateTime.now().add(const Duration(days: 3)).toIso8601String(), // 3 gün sonra
-        'profilResmi': widget.dava.profilResmi,
-        'openedAt': DateTime.now().toIso8601String(),
-        'acceptedAt': DateTime.now().toIso8601String(), // Kabul edildi olarak işaretle
-        'kategori': 'Genel',
-        'davaKategori': 'Genel',
-        'source': 'gelen_davalar_page', // Kaynak bilgisi
-        'isAccepted': true, // Kabul edilmiş olarak işaretle
-        'isRejected': false, // Red edilmiş ama katıldığım davalar sayfasında
-        'status': 'Reddedildi/Çekildi',
-      };
-
-      print('💾 Dava verileri hazırlandı, veritabanına kaydediliyor...');
-      
-      // Katıldığım davalar sayfasına ekle
-      await HiveDatabaseService.addKatildigimDava(widget.userEmail!, davaData);
-      print('✅ Dava katıldığım davalar sayfasına eklendi');
-      
-      // Provider'ı güncelle
-      final davaProvider = Provider.of<DavaProvider>(context, listen: false);
-      await davaProvider.reloadKatildigimDavalar(widget.userEmail!);
-      print('✅ Katıldığım davalar provider güncellendi');
-      
-      // Gelen davalar sayfasından kaldır
-      await _removeFromGelenDavalar();
-      print('✅ Dava gelen davalar sayfasından kaldırıldı');
-      
-      // Gelen davalar provider'ını da güncelle
-      final gelenDavaProvider = Provider.of<DavaProvider>(context, listen: false);
-      await gelenDavaProvider.reloadIncomingDavalar(widget.userEmail!);
-      print('✅ Gelen davalar provider güncellendi');
-      
-      print('✅ Dava katıldığım davalar sayfasına taşındı: ${widget.dava.adi}');
-      
-      // Kullanıcıya bildirim göster
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('❌ Dava reddedildi - Katıldığım Davalar sayfasına taşındı'),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 3),
-          action: SnackBarAction(
-            label: 'Katıldığım Davalar',
-            textColor: Colors.white,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => KatildigimDavalarPage(userEmail: widget.userEmail),
-                ),
-              );
-            },
-          ),
-        ),
-      );
-      
-    } catch (e) {
-      print('❌ Dava taşınırken hata: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Dava taşınırken hata oluştu: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
-  }
-
-  /// Gelen davalar sayfasından dava kaldır
-  Future<void> _removeFromGelenDavalar() async {
-    try {
-      // Gelen davalar listesinden kaldır
-      await HiveDatabaseService.removeIncomingDava(widget.dava.id);
-      
-      // Provider güncelleme - sayfa yeniden yüklenecek
-      
-      print('✅ Dava gelen davalar sayfasından kaldırıldı: ${widget.dava.id}');
-      
-    } catch (e) {
-      print('❌ Gelen davalar sayfasından kaldırılırken hata: $e');
-    }
-  }
-
 }
 
 /// Dashed Line Painter for creating dashed borders
@@ -1220,5 +1442,10 @@ class DashedLinePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant DashedLinePainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.dashWidth != dashWidth ||
+        oldDelegate.dashSpace != dashSpace;
+  }
 }

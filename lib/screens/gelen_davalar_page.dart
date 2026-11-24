@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:provider/provider.dart';
 import '../widgets/common_header_widgets.dart';
+import '../widgets/delil_surface.dart';
 import '../widgets/seyir_defteri_menu_items.dart';
 import '../widgets/shared/app_expandable_icon_menu.dart';
 import '../widgets/gelen_dava_card.dart';
@@ -17,183 +18,352 @@ export '../widgets/gelen_dava_card.dart' show Dava, FiveCardCaseInformation, Das
 class GelenDavalarPage extends StatefulWidget {
   final String? userEmail; // Kullanıcı e-posta adresi
 
-  const GelenDavalarPage({super.key, this.userEmail});
+  /// Test: gelen davalar yüklenemesin.
+  final bool forceLoadError;
+
+  /// Test: yükleme göstergesinde kalsın.
+  final bool forceLoading;
+
+  const GelenDavalarPage({
+    super.key,
+    this.userEmail,
+    this.forceLoadError = false,
+    this.forceLoading = false,
+  });
 
   @override
   State<GelenDavalarPage> createState() => _GelenDavalarPageState();
 }
 
+class _PendingGelenReject {
+  _PendingGelenReject(this.dava);
+
+  final Dava dava;
+  bool settled = false;
+  bool undone = false;
+}
+
 class _GelenDavalarPageState extends State<GelenDavalarPage> {
-  int? expandedCardIndex; // Hangi card'ın açık olduğunu kontrol eder
-  List<Dava> _davaList = [];
-  StreamSubscription? _incomingSub;
-  DavaProvider? _davaProvider; // Provider referansını sakla
+  String? _expandedDavaId;
+  DavaProvider? _davaProvider;
+  bool _isLoading = true;
+  String? _loadError;
+  bool _bootstrapped = false;
+  final Set<String> _pendingRejectIds = <String>{};
+  final Map<String, _PendingGelenReject> _pendingRejects = <String, _PendingGelenReject>{};
+  final GlobalKey<ScaffoldMessengerState> _messengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
     super.initState();
-    _initializeProviders();
-
-    // Geçici LOG: testyargic1'in incoming kayıtlarını konsola yazdır
     Future.microtask(() {
       HiveDatabaseService.debugPrintIncomingFor('testyargic1@gmail.com');
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _bootstrapped) return;
+      _bootstrapped = true;
+      _load();
     });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Provider referansını güvenli bir şekilde al
     _davaProvider ??= Provider.of<DavaProvider>(context, listen: false);
   }
 
-  /// Provider'ları başlat ve verileri yükle
-  void _initializeProviders() async {
-    _davaProvider ??= Provider.of<DavaProvider>(context, listen: false);
-    
-    // Kullanıcı verilerini yükle
-    if (widget.userEmail != null && _davaProvider != null) {
-      await _davaProvider!.loadUserData(widget.userEmail!);
-      
-      // Canlı izlemeyi başlat
-      _davaProvider!.startWatchingIncoming(widget.userEmail!);
+  @override
+  void didUpdateWidget(GelenDavalarPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userEmail != widget.userEmail ||
+        oldWidget.forceLoadError != widget.forceLoadError ||
+        oldWidget.forceLoading != widget.forceLoading) {
+      _load();
     }
-    
-    // Eski veri yükleme metodunu çağır (geçiş için)
-    _loadIncomingDavalar();
   }
 
   @override
   void dispose() {
-    _incomingSub?.cancel();
-    // Provider'dan canlı izlemeyi durdur (mounted kontrolü ile)
-    if (mounted && _davaProvider != null) {
-      _davaProvider!.stopWatchingIncoming();
+    for (final pending in _pendingRejects.values) {
+      if (pending.settled || pending.undone) continue;
+      pending.settled = true;
+      unawaited(
+        commitGelenDavaRejection(
+          dava: pending.dava,
+          userEmail: widget.userEmail,
+          provider: _davaProvider,
+        ),
+      );
     }
+    _davaProvider?.stopWatchingIncoming();
     super.dispose();
   }
 
-  void _loadIncomingDavalar() {
-    if (widget.userEmail == null || widget.userEmail!.isEmpty) {
+  Future<void> _load({bool refresh = false}) async {
+    if (widget.forceLoading) return;
+    _davaProvider ??= Provider.of<DavaProvider>(context, listen: false);
+    if (!refresh) {
       setState(() {
-        _davaList = [];
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      if (widget.forceLoadError) {
+        throw Exception('Gelen davalar yüklenemedi');
+      }
+      final email = widget.userEmail;
+      if (email != null && email.isNotEmpty) {
+        if (refresh) {
+          await _davaProvider!.reloadIncomingDavalar(email);
+        } else {
+          await _davaProvider!.loadUserData(email);
+        }
+        if (!mounted) return;
+        _davaProvider!.startWatchingIncoming(email);
+        if (!refresh &&
+            _davaProvider!.error != null &&
+            _davaProvider!.incomingDavalar.isEmpty) {
+          throw Exception(_davaProvider!.error);
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      final hasItems = _davaProvider?.incomingDavalar.isNotEmpty ?? false;
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Gelen davalar yüklenemedi';
+      });
+      if (refresh && hasItems) {
+        final scheme = Theme.of(context).colorScheme;
+        _messengerKey.currentState?.showSnackBar(
+          seyirNoticeSnackBar(
+            scheme: scheme,
+            message: 'Gelen davalar yüklenemedi',
+            actionLabel: 'Tekrar dene',
+            onAction: () => _load(refresh: true),
+          ),
+        );
+      }
+    }
+  }
+
+  Dava _davaFromMap(Map<dynamic, dynamic> raw) {
+    final safeMap = <String, dynamic>{};
+    raw.forEach((key, value) {
+      safeMap[key.toString()] = value;
+    });
+
+    DateTime? createdAt;
+    DateTime? acceptedAt;
+    final createdRaw = safeMap['createdAt'] ?? safeMap['openedAt'];
+    if (createdRaw != null) {
+      createdAt = DateTime.tryParse(createdRaw.toString());
+    }
+    if (safeMap['acceptedAt'] != null) {
+      acceptedAt = DateTime.tryParse(safeMap['acceptedAt'].toString());
+    }
+
+    final davaliRaw = (safeMap['davali'] ?? '').toString();
+    final davaliEmailRaw = (safeMap['davaliEmail'] ?? '').toString().trim();
+    return Dava(
+      id: (safeMap['id'] ?? safeMap['davaId'] ?? '').toString(),
+      adi: (safeMap['adi'] ?? safeMap['davaAdi'] ?? '').toString(),
+      davali: davaliRaw,
+      mevkii: (safeMap['mevkii'] ?? '').toString(),
+      kalanSure: (safeMap['kalanSure'] ?? '.../.../.....').toString(),
+      profilResmi: (safeMap['profilResmi'] ?? 'lib/icons/03_davala_ana_icon.png').toString(),
+      davaKonusu: (safeMap['davaKonusu'] ?? '').toString(),
+      davaci: (safeMap['davaci'] ?? '').toString(),
+      createdAt: createdAt,
+      acceptedAt: acceptedAt,
+      lifecycleStatus: (safeMap['lifecycleStatus'] ?? DavaLifecycleStatuses.awaitingRole).toString(),
+      davaliEmail: davaliEmailRaw.isNotEmpty
+          ? davaliEmailRaw
+          : (davaliRaw.contains('@') ? davaliRaw : null),
+      isAppealJudgeAssignment: safeMap['isAppealJudgeAssignment'] == true,
+    );
+  }
+
+  List<Dava> _visibleDavalar(DavaProvider provider) {
+    return provider.incomingDavalar
+        .map(_davaFromMap)
+        .where((dava) => dava.id.isNotEmpty && !_pendingRejectIds.contains(dava.id))
+        .toList();
+  }
+
+  void _queueReject(Dava dava) {
+    if (_pendingRejects.containsKey(dava.id) && !(_pendingRejects[dava.id]?.undone ?? false)) {
+      return;
+    }
+    final pending = _PendingGelenReject(dava);
+    setState(() {
+      _pendingRejectIds.add(dava.id);
+      _pendingRejects[dava.id] = pending;
+      if (_expandedDavaId == dava.id) _expandedDavaId = null;
+    });
+
+    final scheme = Theme.of(context).colorScheme;
+    final messenger = _messengerKey.currentState;
+    if (messenger == null) {
+      Future<void>.delayed(const Duration(seconds: 5), () {
+        if (pending.settled || pending.undone) return;
+        pending.settled = true;
+        unawaited(_finishReject(pending));
       });
       return;
     }
-    final incoming = HiveDatabaseService.getIncomingDavalar(widget.userEmail!);
-    setState(() {
-      _davaList = incoming.map((m) {
-        // Güvenli tip dönüşümü
-        final safeMap = <String, dynamic>{};
-        m.forEach((key, value) {
-          safeMap[key.toString()] = value;
-        });
-        
-        // Tarih alanlarını parse et
-        DateTime? createdAt;
-        DateTime? acceptedAt;
-        
-        try {
-          if (safeMap['createdAt'] != null) {
-            createdAt = DateTime.parse(safeMap['createdAt'].toString());
-          }
-        } catch (e) {
-          createdAt = null;
-        }
-        
-        try {
-          if (safeMap['acceptedAt'] != null) {
-            acceptedAt = DateTime.parse(safeMap['acceptedAt'].toString());
-          }
-        } catch (e) {
-          acceptedAt = null;
-        }
-        
-        final davaliRaw = (safeMap['davali'] ?? '').toString();
-        final davaliEmailRaw = (safeMap['davaliEmail'] ?? '').toString().trim();
-        return Dava(
-          id: (safeMap['id'] ?? DateTime.now().millisecondsSinceEpoch.toString()).toString(),
-          adi: (safeMap['adi'] ?? safeMap['davaAdi'] ?? '').toString(),
-          davali: davaliRaw,
-          mevkii: (safeMap['mevkii'] ?? '').toString(),
-          kalanSure: (safeMap['kalanSure'] ?? '.../.../.....').toString(),
-          profilResmi: (safeMap['profilResmi'] ?? 'lib/icons/03_davala_ana_icon.png').toString(),
-          davaKonusu: (safeMap['davaKonusu'] ?? safeMap['adi'] ?? safeMap['davaAdi'] ?? '').toString(),
-          davaci: (safeMap['davaci'] ?? '').toString(), // Davacı verisi eklendi
-          createdAt: createdAt,
-          acceptedAt: acceptedAt,
-          lifecycleStatus: (safeMap['lifecycleStatus'] ?? DavaLifecycleStatuses.awaitingRole)
-              .toString(),
-          davaliEmail: davaliEmailRaw.isNotEmpty
-              ? davaliEmailRaw
-              : (davaliRaw.contains('@') ? davaliRaw : null),
-          isAppealJudgeAssignment: safeMap['isAppealJudgeAssignment'] == true,
-        );
-      }).toList();
+    final controller = messenger.showSnackBar(
+      seyirNoticeSnackBar(
+        scheme: scheme,
+        message: 'Dava reddedildi',
+        duration: const Duration(seconds: 5),
+        actionLabel: 'Geri al',
+        onAction: () {
+          pending.undone = true;
+          pending.settled = true;
+          if (!mounted) return;
+          setState(() {
+            _pendingRejectIds.remove(dava.id);
+            _pendingRejects.remove(dava.id);
+          });
+        },
+      ),
+    );
+    controller.closed.then((reason) {
+      if (pending.settled) return;
+      if (pending.undone || reason == SnackBarClosedReason.action) {
+        pending.settled = true;
+        return;
+      }
+      pending.settled = true;
+      unawaited(_finishReject(pending));
     });
+  }
+
+  Future<void> _finishReject(_PendingGelenReject pending) async {
+    await commitGelenDavaRejection(
+      dava: pending.dava,
+      userEmail: widget.userEmail,
+      provider: _davaProvider,
+    );
+    if (!mounted) return;
+    setState(() {
+      _pendingRejectIds.remove(pending.dava.id);
+      _pendingRejects.remove(pending.dava.id);
+    });
+  }
+
+  Widget _scrollable({required Widget child}) {
+    return RefreshIndicator(
+      color: SeyirTokens.brand,
+      onRefresh: () => _load(refresh: true),
+      child: child,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: AppExpandableIconMenu.seyirDefteri(
-          items: buildSeyirDefteriMenuItems(
-            context,
-            userEmail: widget.userEmail,
-          ),
-          headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
-            return Column(
-              children: [
-                ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
-                Padding(
-                  padding: kSeyirFriendRowPadding,
-                  child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
-                ),
-                Padding(
-                  padding: kSeyirProfilePadding,
-                  child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
-                    userEmail: widget.userEmail,
-                    onShowSavedDavalar: () {},
+    return ScaffoldMessenger(
+      key: _messengerKey,
+      child: Scaffold(
+        body: SafeArea(
+          child: AppExpandableIconMenu.seyirDefteri(
+            items: buildSeyirDefteriMenuItems(
+              context,
+              userEmail: widget.userEmail,
+            ),
+            headerBuilder: (BuildContext context, Widget menuButton, VoidCallback toggle, bool isOpen) {
+              return Column(
+                children: [
+                  ZeroWhoboomSearchMessage(userEmail: widget.userEmail),
+                  Padding(
+                    padding: kSeyirFriendRowPadding,
+                    child: OneFriendPhoneBellMenu(userEmail: widget.userEmail),
                   ),
-                ),
-                GelenDavalarHeadlineRow(menuButton: menuButton),
-              ],
-            );
-          },
-          body: _davaList.isEmpty
-              ? const _GelenEmptyState()
-              : ListView.builder(
-                        itemCount: _davaList.length,
-                        itemBuilder: (context, index) {
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: FiveCardCaseInformation(
-                              dava: _davaList[index],
-                              isExpanded: expandedCardIndex == index,
-                              userEmail: widget.userEmail,
-                              onTap: () {
-                                setState(() {
-                                  if (expandedCardIndex == index) {
-                                    expandedCardIndex = null;
-                                  } else {
-                                    expandedCardIndex = index;
-                                  }
-                                });
-                              },
-                              onDavaRejected: () {
-                                // Dava listeden kaldırıldığında UI'ı güncelle
-                                setState(() {
-                                  _davaList.removeAt(index);
-                                  if (expandedCardIndex == index) {
-                                    expandedCardIndex = null;
-                                  }
-                                });
-                              },
-                            ),
-                          );
+                  Padding(
+                    padding: kSeyirProfilePadding,
+                    child: SecondProfileJudgenameIconknifeEnergyPicturePokeSueChant(
+                      userEmail: widget.userEmail,
+                      onShowSavedDavalar: () {},
+                    ),
+                  ),
+                  GelenDavalarHeadlineRow(
+                    menuButton: menuButton,
+                    pendingRejectIds: _pendingRejectIds,
+                  ),
+                ],
+              );
+            },
+            body: Consumer<DavaProvider>(
+              builder: (context, provider, _) {
+                if (widget.forceLoading || (_isLoading && _loadError == null)) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(SeyirTokens.space6),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+                final visible = _visibleDavalar(provider);
+                if (_loadError != null && visible.isEmpty) {
+                  return _scrollable(
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        DelilLoadError(
+                          message: _loadError!,
+                          onRetry: () => _load(),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                if (visible.isEmpty) {
+                  return _scrollable(
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        _GelenEmptyState(),
+                      ],
+                    ),
+                  );
+                }
+                return _scrollable(
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: visible.length,
+                    itemBuilder: (context, index) {
+                      final dava = visible[index];
+                      return FiveCardCaseInformation(
+                        key: ValueKey(dava.id),
+                        dava: dava,
+                        isExpanded: _expandedDavaId == dava.id,
+                        userEmail: widget.userEmail,
+                        onTap: () {
+                          setState(() {
+                            _expandedDavaId = _expandedDavaId == dava.id ? null : dava.id;
+                          });
                         },
-                      ),
+                        onRejectQueued: () => _queueReject(dava),
+                        onDavaRejected: () {
+                          if (!mounted) return;
+                          setState(() {
+                            if (_expandedDavaId == dava.id) _expandedDavaId = null;
+                          });
+                        },
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -203,10 +373,12 @@ class _GelenDavalarPageState extends State<GelenDavalarPage> {
 /// Menü, sayfa başlığı ve gelen dava sayısı rozetini tek satırda hizalar.
 class GelenDavalarHeadlineRow extends StatelessWidget {
   final Widget menuButton;
+  final Set<String> pendingRejectIds;
 
   const GelenDavalarHeadlineRow({
     super.key,
     required this.menuButton,
+    this.pendingRejectIds = const <String>{},
   });
 
   @override
@@ -227,7 +399,7 @@ class GelenDavalarHeadlineRow extends StatelessWidget {
                     style: palette.headline(weight: FontWeight.w600),
                   ),
                   const SizedBox(width: 7),
-                  const _IncomingDavaCountBadge(),
+                  _IncomingDavaCountBadge(pendingRejectIds: pendingRejectIds),
                 ],
               ),
             ),
@@ -279,7 +451,9 @@ class _GelenEmptyState extends StatelessWidget {
 
 /// Özet sayfasına giden, sayı rozeti taşıyan ikon.
 class _IncomingDavaCountBadge extends StatelessWidget {
-  const _IncomingDavaCountBadge();
+  const _IncomingDavaCountBadge({required this.pendingRejectIds});
+
+  final Set<String> pendingRejectIds;
 
   @override
   Widget build(BuildContext context) {
@@ -315,7 +489,12 @@ class _IncomingDavaCountBadge extends StatelessWidget {
                     top: -6,
                     child: Consumer<DavaProvider>(
                       builder: (context, davaProvider, child) {
-                        final count = davaProvider.incomingDavaCount;
+                        final incomingIds = davaProvider.incomingDavalar
+                            .map((dava) => (dava['id'] ?? dava['davaId'] ?? '').toString())
+                            .where((id) => id.isNotEmpty)
+                            .toSet();
+                        final hidden = pendingRejectIds.where(incomingIds.contains).length;
+                        final count = davaProvider.incomingDavaCount - hidden;
                         if (count <= 0) return const SizedBox.shrink();
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
