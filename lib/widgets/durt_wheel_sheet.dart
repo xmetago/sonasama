@@ -12,106 +12,89 @@ class DurtWheelWord {
   const DurtWheelWord({
     required this.kelime,
     required this.icon,
-    required this.color,
     this.fontWeight = FontWeight.w600,
   });
 
   final String kelime;
   final IconData icon;
-  final Color color;
   final FontWeight fontWeight;
 }
 
-/// Profil dürtmesinde kullanılan kelimeler, ikonlar ve renkler.
+/// Profil dürtmesinde kullanılan kelimeler ve çizgi ikonlar.
 const List<DurtWheelWord> durtmeWheelWords = <DurtWheelWord>[
   DurtWheelWord(
     kelime: 'İyi',
-    icon: Icons.thumb_up,
-    color: Colors.green,
+    icon: Icons.thumb_up_outlined,
     fontWeight: FontWeight.w600,
   ),
   DurtWheelWord(
     kelime: 'Kötü',
-    icon: Icons.thumb_down,
-    color: Colors.red,
+    icon: Icons.thumb_down_outlined,
     fontWeight: FontWeight.w700,
   ),
   DurtWheelWord(
     kelime: 'Çirkin',
-    icon: Icons.sentiment_very_dissatisfied,
-    color: Colors.brown,
+    icon: Icons.sentiment_very_dissatisfied_outlined,
     fontWeight: FontWeight.w500,
   ),
   DurtWheelWord(
     kelime: 'Özel',
-    icon: Icons.star,
-    color: Colors.amber,
+    icon: Icons.star_outlined,
     fontWeight: FontWeight.w600,
   ),
   DurtWheelWord(
     kelime: 'Güzel',
-    icon: Icons.favorite,
-    color: Colors.pink,
+    icon: Icons.favorite_outlined,
     fontWeight: FontWeight.w600,
   ),
   DurtWheelWord(
     kelime: 'Fena',
-    icon: Icons.warning,
-    color: Colors.orange,
+    icon: Icons.warning_outlined,
     fontWeight: FontWeight.w700,
   ),
   DurtWheelWord(
     kelime: 'Hoş',
-    icon: Icons.mood,
-    color: Colors.lightBlue,
+    icon: Icons.mood_outlined,
     fontWeight: FontWeight.w500,
   ),
   DurtWheelWord(
     kelime: 'Yakışıklı',
-    icon: Icons.face,
-    color: Colors.blue,
+    icon: Icons.face_outlined,
     fontWeight: FontWeight.w600,
   ),
   DurtWheelWord(
     kelime: 'Boş ver',
-    icon: Icons.block,
-    color: Colors.grey,
+    icon: Icons.block_outlined,
     fontWeight: FontWeight.w500,
   ),
   DurtWheelWord(
     kelime: 'İmkansız',
-    icon: Icons.cancel,
-    color: Colors.redAccent,
+    icon: Icons.cancel_outlined,
     fontWeight: FontWeight.w700,
   ),
   DurtWheelWord(
     kelime: 'Aptal',
-    icon: Icons.sentiment_dissatisfied,
-    color: Colors.deepOrange,
+    icon: Icons.sentiment_dissatisfied_outlined,
     fontWeight: FontWeight.w600,
   ),
   DurtWheelWord(
     kelime: 'Çılgın',
-    icon: Icons.bolt,
-    color: Colors.purple,
+    icon: Icons.bolt_outlined,
     fontWeight: FontWeight.w700,
   ),
   DurtWheelWord(
     kelime: 'Deli',
-    icon: Icons.psychology,
-    color: Colors.indigo,
+    icon: Icons.psychology_outlined,
     fontWeight: FontWeight.w600,
   ),
   DurtWheelWord(
     kelime: 'Olmaz',
-    icon: Icons.close,
-    color: Colors.red,
+    icon: Icons.close_outlined,
     fontWeight: FontWeight.w700,
   ),
   DurtWheelWord(
     kelime: 'Belki',
-    icon: Icons.help_outline,
-    color: Colors.teal,
+    icon: Icons.help_outlined,
     fontWeight: FontWeight.w500,
   ),
 ];
@@ -410,8 +393,9 @@ class _DurtWheelSheetState extends State<DurtWheelSheet>
     final int index = widget.words.isEmpty
         ? 0
         : math.min(_selectedIndex, widget.words.length - 1);
-    final DurtWheelWord? word =
-        widget.words.isEmpty ? null : widget.words[index];
+    final DurtWheelWord? word = widget.words.isEmpty
+        ? null
+        : widget.words[index];
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxSheet),
@@ -452,8 +436,9 @@ class _DurtWheelSheetState extends State<DurtWheelSheet>
                       constraints.maxWidth,
                       constraints.maxHeight,
                     );
-                    final double diameter =
-                        math.min(300, math.max(0, available - 20)).toDouble();
+                    final double diameter = math
+                        .min(300, math.max(0, available - 20))
+                        .toDouble();
                     if (diameter < 96 || word == null) {
                       return const SizedBox.shrink();
                     }
@@ -529,7 +514,7 @@ class _SheetHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(Icons.touch_app, color: Colors.amber[800], size: 22),
+        Icon(Icons.touch_app_outlined, color: palette.textPrimary, size: 22),
         const SizedBox(width: SeyirTokens.space3),
         Expanded(
           child: Column(
@@ -580,7 +565,7 @@ class _SelectedWordBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool reduce = MediaQuery.disableAnimationsOf(context);
-    final Color foreground = palette.foreground(word.color);
+    final Color foreground = palette.textPrimary;
     return AnimatedContainer(
       duration: reduce ? Duration.zero : SeyirTokens.motion,
       curve: Curves.easeOut,
@@ -590,11 +575,11 @@ class _SelectedWordBanner extends StatelessWidget {
         vertical: SeyirTokens.space2,
       ),
       decoration: BoxDecoration(
-        color: palette.tint(word.color),
+        color: palette.surfaceMuted,
         borderRadius: SeyirTokens.radiusLgAll,
         border: Border.all(
-          color: settled ? word.color : palette.tintBorder(word.color),
-          width: settled ? 2 : 1,
+          color: settled ? SeyirTokens.brand : palette.border,
+          width: 1,
         ),
       ),
       child: Row(
@@ -609,8 +594,10 @@ class _SelectedWordBanner extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style:
-                  palette.display(color: foreground, weight: word.fontWeight),
+              style: palette.display(
+                color: foreground,
+                weight: word.fontWeight,
+              ),
             ),
           ),
         ],
@@ -732,47 +719,45 @@ class _Wheel extends StatelessWidget {
             left: 0,
             width: diameter,
             height: diameter,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: palette.cardShadow,
-              ),
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTapUp: onTapUp,
-                onPanStart: onPanStart,
-                onPanUpdate: onPanUpdate,
-                onPanEnd: onPanEnd,
-                onPanCancel: onPanCancel,
-                child: RepaintBoundary(
-                  child: Transform.rotate(
-                    angle: rotation,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        CustomPaint(
-                          size: Size.square(diameter),
-                          painter: _DurtWheelPainter(
-                            colors: [for (final word in words) word.color],
-                            selectedIndex: selectedIndex,
-                            settled: settled,
-                            rim: palette.textPrimary.withValues(alpha: 0.88),
-                            gap: palette.card,
-                          ),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapUp: onTapUp,
+              onPanStart: onPanStart,
+              onPanUpdate: onPanUpdate,
+              onPanEnd: onPanEnd,
+              onPanCancel: onPanCancel,
+              child: RepaintBoundary(
+                child: Transform.rotate(
+                  angle: rotation,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CustomPaint(
+                        size: Size.square(diameter),
+                        painter: _DurtWheelPainter(
+                          count: words.length,
+                          even: palette.surface,
+                          odd: palette.surfaceMuted,
+                          selectedIndex: selectedIndex,
+                          settled: settled,
+                          rim: palette.border,
+                          gap: palette.border,
+                          accent: SeyirTokens.brand,
+                          accentTint: palette.brandSoft,
                         ),
-                        for (var i = 0; i < words.length; i++)
-                          _SegmentLabel(
-                            index: i,
-                            count: words.length,
-                            word: words[i],
-                            diameter: diameter,
-                            selected: i == selectedIndex && settled,
-                            onTap: onSegmentTap == null
-                                ? null
-                                : () => onSegmentTap!(i),
-                          ),
-                      ],
-                    ),
+                      ),
+                      for (var i = 0; i < words.length; i++)
+                        _SegmentLabel(
+                          index: i,
+                          count: words.length,
+                          word: words[i],
+                          diameter: diameter,
+                          selected: i == selectedIndex && settled,
+                          onTap: onSegmentTap == null
+                              ? null
+                              : () => onSegmentTap!(i),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -788,15 +773,15 @@ class _Wheel extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: palette.card,
-                  border: Border.all(color: SeyirTokens.brand, width: 3),
+                  border: Border.all(color: palette.border, width: 1),
                 ),
                 child: Center(
                   child: Container(
                     width: SeyirTokens.space3,
                     height: SeyirTokens.space3,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: SeyirTokens.brand,
+                      color: palette.textSecondary,
                     ),
                   ),
                 ),
@@ -852,7 +837,7 @@ class _SegmentLabel extends StatelessWidget {
     final double dy = math.sin(mid) * orbit;
     var labelAngle = mid;
     if (math.cos(mid) < 0) labelAngle += math.pi;
-    final Color foreground = SeyirPalette.of(context).onSolid(word.color);
+    final Color foreground = SeyirPalette.of(context).textPrimary;
 
     return Align(
       alignment: Alignment.center,
@@ -874,11 +859,7 @@ class _SegmentLabel extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      word.icon,
-                      size: 14,
-                      color: foreground,
-                    ),
+                    Icon(word.icon, size: 14, color: foreground),
                     const SizedBox(width: 2),
                     Flexible(
                       child: Text(
@@ -888,8 +869,9 @@ class _SegmentLabel extends StatelessWidget {
                         style: TextStyle(
                           color: foreground,
                           fontSize: SeyirTokens.typeCaption,
-                          fontWeight:
-                              selected ? FontWeight.w800 : word.fontWeight,
+                          fontWeight: selected
+                              ? FontWeight.w800
+                              : word.fontWeight,
                           height: 1.05,
                         ),
                       ),
@@ -907,62 +889,74 @@ class _SegmentLabel extends StatelessWidget {
 
 class _DurtWheelPainter extends CustomPainter {
   const _DurtWheelPainter({
-    required this.colors,
+    required this.count,
+    required this.even,
+    required this.odd,
     required this.selectedIndex,
     required this.settled,
     required this.rim,
     required this.gap,
+    required this.accent,
+    required this.accentTint,
   });
 
-  final List<Color> colors;
+  final int count;
+  final Color even;
+  final Color odd;
   final int selectedIndex;
   final bool settled;
   final Color rim;
   final Color gap;
+  final Color accent;
+  final Color accentTint;
+
+  Color _base(int index) => index.isEven ? even : odd;
+
+  Color _fill(int index) {
+    final Color base = _base(index);
+    if (settled && index == selectedIndex) {
+      return Color.alphaBlend(accentTint, base);
+    }
+    return base;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final Offset center = size.center(Offset.zero);
     final double radius = size.width / 2 - 3;
-    final int count = colors.length;
     if (count == 0 || radius <= 0) return;
     final double sweep = 2 * math.pi / count;
     final Rect base = Rect.fromCircle(center: center, radius: radius);
+    final int selected = math.min(selectedIndex, count - 1);
 
     for (var i = 0; i < count; i++) {
-      if (i == selectedIndex) continue;
+      if (i == selected) continue;
       _drawSlice(
         canvas,
         rect: base,
         start: -math.pi / 2 - sweep / 2 + i * sweep,
         sweep: sweep,
-        color: Color.alphaBlend(
-          Colors.black.withValues(alpha: 0.06),
-          colors[i],
-        ),
+        color: _fill(i),
       );
     }
-
-    final int selected = math.min(selectedIndex, count - 1);
-    final double pop = settled ? 4 : 0;
     _drawSlice(
       canvas,
-      rect: Rect.fromCircle(center: center, radius: radius + pop),
+      rect: base,
       start: -math.pi / 2 - sweep / 2 + selected * sweep,
       sweep: sweep,
-      color: colors[selected],
+      color: _fill(selected),
     );
 
     final Paint gapPaint = Paint()
       ..color = gap
-      ..strokeWidth = 2
+      ..strokeWidth = 1
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
     for (var i = 0; i < count; i++) {
       final double angle = -math.pi / 2 - sweep / 2 + i * sweep;
       final Offset edge = Offset(
-        center.dx + math.cos(angle) * (radius + (i == selected ? pop : 0)),
-        center.dy + math.sin(angle) * (radius + (i == selected ? pop : 0)),
+        center.dx + math.cos(angle) * radius,
+        center.dy + math.sin(angle) * radius,
       );
       canvas.drawLine(center, edge, gapPaint);
     }
@@ -972,21 +966,21 @@ class _DurtWheelPainter extends CustomPainter {
       radius,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
+        ..strokeWidth = 1
         ..color = rim,
     );
 
     if (settled) {
       canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius + pop),
+        Rect.fromCircle(center: center, radius: radius),
         -math.pi / 2 - sweep / 2 + selected * sweep,
         sweep,
         false,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 3
+          ..strokeWidth = 1.5
           ..strokeCap = StrokeCap.round
-          ..color = SeyirTokens.brand,
+          ..color = accent,
       );
     }
   }
@@ -1003,11 +997,15 @@ class _DurtWheelPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DurtWheelPainter oldDelegate) {
-    return oldDelegate.selectedIndex != selectedIndex ||
+    return oldDelegate.count != count ||
+        oldDelegate.even != even ||
+        oldDelegate.odd != odd ||
+        oldDelegate.selectedIndex != selectedIndex ||
         oldDelegate.settled != settled ||
         oldDelegate.rim != rim ||
         oldDelegate.gap != gap ||
-        oldDelegate.colors.length != colors.length;
+        oldDelegate.accent != accent ||
+        oldDelegate.accentTint != accentTint;
   }
 }
 
