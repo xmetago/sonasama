@@ -12,7 +12,6 @@ import '../services/hive_database_service.dart';
 import '../services/evidence_service.dart';
 import '../theme/seyir_tokens.dart';
 import '../utils/dialog_utils.dart';
-import '../widgets/delil_surface.dart';
 
 class DelilDetayPage extends StatefulWidget {
   final String? userEmail;
@@ -39,9 +38,18 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
   @override
   void initState() {
     super.initState();
-    _evidence = widget.evidence;
+    _evidence = _storedEvidence() ?? widget.evidence;
     _loadUserRole();
     _refreshEvidenceFromStore();
+  }
+
+  /// Açılışta kutudaki oy kaydını kullan. Sayfaya verilen kopya eski olabilir.
+  EvidenceModel? _storedEvidence() {
+    try {
+      return EvidenceService().getEvidenceById(widget.evidence.id);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _refreshEvidenceFromStore() async {
@@ -116,26 +124,16 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
               ),
             ),
 
-            // ROW 4: Başlık
+            // ROW 4: Başlık. Geri ok yok; sistem geri hareketi ve tuşu duruyor.
             Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: 'Geri',
-                    style: delilIconButtonStyle(foreground: palette.textPrimary),
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'DELİL DETAYI',
-                      style: palette.headline(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(width: SeyirTokens.tapTarget),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: Text(
+                  'DELİL DETAYI',
+                  style: palette.headline(),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
 

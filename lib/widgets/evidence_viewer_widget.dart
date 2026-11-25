@@ -387,9 +387,6 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
   List<EvidenceModel> _items = [];
   bool _loading = true;
   String? _loadError;
-  final Map<String, bool> _userLikes = {}; // evidenceId -> isLiked
-  final Map<String, bool> _userDislikes = {}; // evidenceId -> isDisliked
-  final Map<String, bool> _userNeutral = {}; // evidenceId -> nötr oy
   bool _isVoteLockedByFinalizedHukum = false;
   bool _forcedValidVote = false;
 
@@ -417,17 +414,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
         return e.davaId.trim().toLowerCase() == normalizedDavaId && 
                e.type.trim().toLowerCase() == normalizedType;
       }).toList();
-      
-      // Kullanıcının oy durumunu yükle
-      if (widget.userEmail != null) {
-        for (var evidence in filtered) {
-          final vote = evidence.getUserVote(widget.userEmail!);
-          _userLikes[evidence.id] = vote == 'like';
-          _userDislikes[evidence.id] = vote == 'dislike';
-          _userNeutral[evidence.id] = vote == 'neutral';
-        }
-      }
-      
+
       setState(() {
         _items = filtered;
         _loading = false;
@@ -705,12 +692,35 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
     );
   }
 
+  /// Seçimi kutuya yazar, çubuğu hemen günceller, sonra diske bırakır.
+  Future<void> _castVote(String evidenceId, String userEmail, String vote) async {
+    await _service.initialize();
+    final updated = _service.mutateUserToggle(evidenceId, userEmail, vote);
+    _showStoredVotes();
+    if (updated != null) {
+      await _service.persistEvidence(updated);
+    }
+  }
+
+  /// Kayıtlı oyları kutudan yeniden okur. Detay sayfasından dönünce seçim kaybolmasın.
+  void _showStoredVotes() {
+    if (!mounted) return;
+    final normalizedDavaId = widget.davaId.trim().toLowerCase();
+    final normalizedType = widget.typeInfo.type.trim().toLowerCase();
+    final filtered = _service.loadAllEvidence().where((e) {
+      return e.davaId.trim().toLowerCase() == normalizedDavaId &&
+          e.type.trim().toLowerCase() == normalizedType;
+    }).toList();
+    setState(() => _items = filtered);
+  }
+
   /// Like/Dislike Bar
   Widget _buildEvidenceLikeBar(EvidenceModel evidence) {
-    final userEmail = widget.userEmail ?? '';
-    final isLiked = _userLikes[evidence.id] ?? false;
-    final isDisliked = _userDislikes[evidence.id] ?? false;
-    final isNeutral = _userNeutral[evidence.id] ?? false;
+    final userEmail = (widget.userEmail ?? '').trim();
+    final vote = userEmail.isEmpty ? null : evidence.getUserVote(userEmail);
+    final isLiked = vote == 'like';
+    final isDisliked = vote == 'dislike';
+    final isNeutral = vote == 'neutral';
     
     final palette = SeyirPalette.of(context);
     return Container(
@@ -755,17 +765,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
                   return;
                 }
 
-                await _service.toggleLike(evidence.id, userEmail);
-
-                setState(() {
-                  _userLikes[evidence.id] = !isLiked;
-                  if (_userLikes[evidence.id] == true) {
-                    _userDislikes[evidence.id] = false;
-                    _userNeutral[evidence.id] = false;
-                  }
-                });
-
-                _load();
+                await _castVote(evidence.id, userEmail, 'like');
               },
               isActive: isLiked,
             ),
@@ -806,17 +806,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
                   return;
                 }
 
-                await _service.toggleNeutral(evidence.id, userEmail);
-
-                setState(() {
-                  _userNeutral[evidence.id] = !isNeutral;
-                  if (_userNeutral[evidence.id] == true) {
-                    _userLikes[evidence.id] = false;
-                    _userDislikes[evidence.id] = false;
-                  }
-                });
-
-                _load();
+                await _castVote(evidence.id, userEmail, 'neutral');
               },
               isActive: isNeutral,
             ),
@@ -857,17 +847,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
                   return;
                 }
 
-                await _service.toggleDislike(evidence.id, userEmail);
-
-                setState(() {
-                  _userDislikes[evidence.id] = !isDisliked;
-                  if (_userDislikes[evidence.id] == true) {
-                    _userLikes[evidence.id] = false;
-                    _userNeutral[evidence.id] = false;
-                  }
-                });
-
-                _load();
+                await _castVote(evidence.id, userEmail, 'dislike');
               },
               isActive: isDisliked,
             ),
@@ -888,7 +868,12 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
     bool isDisabled = false,
   }) {
     final palette = SeyirPalette.of(context);
-    return InkWell(
+    return Semantics(
+      button: true,
+      selected: isActive,
+      enabled: !isDisabled,
+      label: label,
+      child: InkWell(
       onTap: isDisabled ? null : onTap,
       borderRadius: BorderRadius.circular(12),
       child: ConstrainedBox(
@@ -959,6 +944,7 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
         ),
       ),
       ),
+    ),
     );
   }
 
@@ -980,15 +966,19 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
 
   /// Delil detay sayfasını aç
   void _openEvidenceDetail(EvidenceModel evidence) {
+    final fresh = _service.getEvidenceById(evidence.id) ?? evidence;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => DelilDetayPage(
           userEmail: widget.userEmail,
-          evidence: evidence,
+          evidence: fresh,
         ),
       ),
-    );
+    ).then((_) {
+      if (!mounted) return;
+      _showStoredVotes();
+    });
   }
 }
 
