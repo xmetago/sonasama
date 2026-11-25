@@ -1411,7 +1411,57 @@ class HiveDatabaseService {
   }
 
   // ========== GRUP ALGORİTMASI (BASİT) ==========
-  /// Grup seçimine göre (örn. Grup19) rastgele alıcılar seç
+
+  /// Davalı metnini kayıtlı e-postaya çevirir. Metin e-posta ya da yargıç adı olabilir.
+  static String? resolveRegisteredEmail(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return null;
+    final byEmail = getRegistrationByEmail(text);
+    if (byEmail != null) return byEmail.email;
+    if (text.contains('@')) return text;
+    return getRegistrationByJudgeName(text)?.email;
+  }
+
+  /// Hükme giden davanın gelen kutusu: seçilen yargıçlar, davacı ve davalı.
+  static Set<String> hukumInboxEmails({
+    required Iterable<String> judgeEmails,
+    required String openerEmail,
+    String? defendant,
+  }) {
+    final emails = <String>{};
+    for (final email in judgeEmails) {
+      final trimmed = email.trim();
+      if (trimmed.isNotEmpty) emails.add(trimmed);
+    }
+    final opener = openerEmail.trim();
+    if (opener.isNotEmpty) emails.add(opener);
+    final resolved = resolveRegisteredEmail(defendant);
+    if (resolved != null && resolved.isNotEmpty) {
+      emails.add(resolved);
+    } else {
+      final raw = defendant?.trim() ?? '';
+      if (raw.isNotEmpty) emails.add(raw);
+    }
+    return emails;
+  }
+
+  static bool _isCaseParty(RegistrationModel person, String? label) {
+    final needle = label?.trim().toLowerCase() ?? '';
+    if (needle.isEmpty) return false;
+    if (person.email.trim().toLowerCase() == needle) return true;
+    if (person.judgeName.trim().toLowerCase() == needle) return true;
+    final resolved = resolveRegisteredEmail(label);
+    if (resolved == null) return false;
+    return person.email.trim().toLowerCase() == resolved.trim().toLowerCase();
+  }
+
+  /// Grup havuzundan 7 yargıç seçer.
+  ///
+  /// Grup19, Arkadaşlar, Takipçiler, Tanımadıklarım ve diğer gruplar aynı
+  /// kuralı kullanır: davacı ile davalı havuzdan çıkar, kalanlardan [count]
+  /// kişi alınır. Havuz yetmezse Grup-19 zinciri eksikleri tamamlar
+  /// (arkadaş, takipçi, tanımadık, aynı ülke, sonra herhangi bir kayıt).
+  /// [sameCountryOnly] kadroyu [count] altına düşürmez.
   static Future<List<RegistrationModel>> pickGroupRecipients(
     String openerEmail,
     String groupName, {
@@ -1419,287 +1469,122 @@ class HiveDatabaseService {
     String? defendantEmail,
     bool sameCountryOnly = false,
   }) async {
-    // Grup adı normalizasyonu ("Grup-19" ve "Grup19" desteklenir)
     final normalized = groupName.toLowerCase().replaceAll('-', '').trim();
-
-    // ✅ ADIM-1: Dava açan kullanıcının mavi tik sahibi olup olmadığını kontrol et
+    // Ülke bayrağı kadroyu 7'nin altına düşürmez; Grup-19 zinciri aynı kalır.
+    final _ = sameCountryOnly;
     final opener = getRegistrationByEmail(openerEmail);
-    final openerJudgeName = opener?.judgeName ?? '';
-    final isOpenerVerified = VerifiedUsersService.isVerified(openerJudgeName);
-
-    // Eğer Grup19 ise eksikleri zincirli fallback ile 7'ye tamamla
-    if (normalized == 'grup19') {
-      final openerId = opener?.id;
-      final openerCountry = opener?.country.trim().toLowerCase() ?? '';
-      final allUsers = getAllRegistrations();
-      final selected = <RegistrationModel>[];
-      final selectedEmails = <String>{};
-      final privacyCache = <String, bool>{};
-
-      Future<bool> canReceive(RegistrationModel r) async {
-        if (r.email == openerEmail) return false;
-        if (defendantEmail != null && r.email == defendantEmail) return false;
-        if (selectedEmails.contains(r.email)) return false;
-
-        final cached = privacyCache[r.email];
-        if (cached != null) return cached;
-        try {
-          final s = await getOrCreateSettings(r.email);
-          // 7 kişilik hüküm listesine girebilmek için iki şart:
-          // 1) Bana Dava Açılsın açık olmalı
-          // 2) Davetler > 7-Yargıç açık olmalı
-          final allowsDava = s.privacySettings['genel_davaacilsin'] ?? true;
-          final allowsSevenJudge = s.privacySettings['davet_7yargic'] ?? true;
-          final ok = allowsDava && allowsSevenJudge;
-          privacyCache[r.email] = ok;
-          return ok;
-        } catch (_) {
-          privacyCache[r.email] = true;
-          return true;
-        }
-      }
-
-      Future<void> addFromPool(List<RegistrationModel> pool) async {
-        for (final r in pool) {
-          if (selected.length >= count) break;
-          if (await canReceive(r)) {
-            selected.add(r);
-            selectedEmails.add(r.email);
-          }
-        }
-      }
-
-      // 1) Grup19 havuzu
-      final grup19Pool = allUsers
-          .where((r) => _grup19Members.contains(r.email))
-          .toList()
-        ..shuffle();
-      await addFromPool(grup19Pool);
-
-      // 2) Arkadaşlar havuzu
-      if (selected.length < count) {
-        final friendIds = getAcceptedFriendships(openerId ?? '')
-            .map((f) => f.requesterId == openerId ? f.recipientId : f.requesterId)
-            .toSet();
-        final friendsPool = allUsers
-            .where((r) => friendIds.contains(r.id))
-            .toList()
-          ..shuffle();
-        await addFromPool(friendsPool);
-      }
-
-      // 3) Takipçiler havuzu
-      if (selected.length < count) {
-        final followerIds = getFollowers(openerId ?? '').map((f) => f.requesterId).toSet();
-        final followersPool = allUsers
-            .where((r) => followerIds.contains(r.id))
-            .toList()
-          ..shuffle();
-        await addFromPool(followersPool);
-      }
-
-      // 4) Herkes havuzu (tanımadıklar / ilişkisiz kullanıcılar)
-      if (selected.length < count) {
-        final friendIds = getAcceptedFriendships(openerId ?? '')
-            .expand((f) => [f.requesterId, f.recipientId])
-            .toSet();
-        final followerIds = getFollowers(openerId ?? '').map((f) => f.requesterId).toSet();
-        final followingIds = getFollowingUsers(openerId ?? '').map((f) => f.recipientId).toSet();
-        final excludeIds = <String>{}
-          ..addAll(friendIds)
-          ..addAll(followerIds)
-          ..addAll(followingIds)
-          ..add(openerId ?? '');
-        final everyonePool = allUsers
-            .where((r) => !excludeIds.contains(r.id))
-            .toList()
-          ..shuffle();
-        await addFromPool(everyonePool);
-      }
-
-      // 5) Hala eksikse: aynı ülkeden herhangi kullanıcı
-      if (selected.length < count && openerCountry.isNotEmpty) {
-        final sameCountryPool = allUsers
-            .where((r) => r.country.trim().toLowerCase() == openerCountry)
-            .toList()
-          ..shuffle();
-        await addFromPool(sameCountryPool);
-      }
-
-      // 6) Hala eksikse: ülke şartı aranmaksızın herhangi kullanıcı
-      if (selected.length < count) {
-        final anyPool = List<RegistrationModel>.from(allUsers)..shuffle();
-        await addFromPool(anyPool);
-      }
-
-      if (selected.length <= count) return selected;
-      return selected.take(count).toList();
-    }
-
-    // Opener bilgisi (yukarıda zaten tanımlanmış, tekrar tanımlamaya gerek yok)
     final openerId = opener?.id;
-
-    List<RegistrationModel> pool;
-
-    // Arkadaşlar / Takipçiler / Tanımadıklarım mantığı
-    if (normalized == 'arkadaşlar' || normalized == 'arkadaslar') {
-      // Accepted friendships => karşılıklı arkadaşlar
-      final friends = getAcceptedFriendships(openerId ?? '')
-          .map((f) => f.requesterId == openerId ? f.recipientId : f.requesterId)
-          .toSet();
-      pool = getAllRegistrations()
-          .where((r) => r.email != openerEmail && friends.contains(r.id))
-          .toList();
-    } else if (normalized == 'takipçiler' || normalized == 'takipciler') {
-      // Followers => beni takip edenler
-      final followers = getFollowers(openerId ?? '').map((f) => f.requesterId).toSet();
-      pool = getAllRegistrations()
-          .where((r) => r.email != openerEmail && followers.contains(r.id))
-          .toList();
-    } else if (normalized == 'tanımadıklarım' || normalized == 'tanimadiklarim') {
-      // Tanımadıklarım => arkadaş ve takip ilişkisi olmayanlar
-      final friendIds = getAcceptedFriendships(openerId ?? '')
-          .expand((f) => [f.requesterId, f.recipientId])
-          .toSet();
-      final followerIds = getFollowers(openerId ?? '').map((f) => f.requesterId).toSet();
-      final followingIds = getFollowingUsers(openerId ?? '').map((f) => f.recipientId).toSet();
-      final exclude = <String>{}
-        ..addAll(friendIds)
-        ..addAll(followerIds)
-        ..addAll(followingIds)
-        ..add(openerId ?? '');
-      pool = getAllRegistrations()
-          .where((r) => !exclude.contains(r.id))
-          .toList();
-    } else {
-      // Diğer grup adları için rastgele havuz (tüm kullanıcılar, opener hariç)
-      pool = getAllRegistrations().where((r) => r.email != openerEmail).toList();
-    }
-
-    // Gizlilik ayarı: Bana Dava Açılsın filtresi
-    final allowed = <RegistrationModel>[];
-    for (final r in pool) {
-      try {
-        final s = await getOrCreateSettings(r.email);
-        if (s.privacySettings['genel_davaacilsin'] ?? true) {
-          allowed.add(r);
-        }
-      } catch (_) {
-        allowed.add(r); // Hata olursa dahil et
-      }
-    }
-
-    // Eğer seçilen kategoride kimse yoksa tüm kullanıcılardan rastgele 7 kişiye gönder (opener hariç)
-    List<RegistrationModel> finalPool = allowed;
-    if (finalPool.isEmpty) {
-      // Fallback: açan ve davalı hariç tüm kullanıcılar
-      var all = getAllRegistrations()
-          .where((r) => r.email != openerEmail && (defendantEmail == null || r.email != defendantEmail))
-          .toList();
-      
-      final fallback = <RegistrationModel>[];
-      for (final r in all) {
-        try {
-          final s = await getOrCreateSettings(r.email);
-          if (s.privacySettings['genel_davaacilsin'] ?? true) {
-            fallback.add(r);
-          }
-        } catch (_) {
-          fallback.add(r);
-        }
-      }
-      finalPool = fallback;
-    }
-
-    // ✅ ADIM-3: Eğer dava açan mavi tik sahibi ise, önce mavi tik sahiplerini seç, 7'den azsa mavi tik sahibi olmayanlarla tamamla
-    if (isOpenerVerified) {
-      final verifiedUsers = finalPool.where((r) {
-        return VerifiedUsersService.isVerified(r.judgeName);
-      }).toList();
-      
-      final nonVerifiedUsers = finalPool.where((r) {
-        return !VerifiedUsersService.isVerified(r.judgeName);
-      }).toList();
-      
-      // Mavi tik sahiplerini karıştır
-      verifiedUsers.shuffle();
-      
-      // Eğer 7'den az mavi tik sahibi varsa, mavi tik sahibi olmayanlarla tamamla
-      if (verifiedUsers.length < count) {
-        final remaining = count - verifiedUsers.length;
-        nonVerifiedUsers.shuffle();
-        final selectedNonVerified = nonVerifiedUsers.take(remaining).toList();
-        finalPool = [...verifiedUsers, ...selectedNonVerified];
-      } else {
-        // 7 veya daha fazla mavi tik sahibi varsa, sadece onları kullan
-        finalPool = verifiedUsers.take(count).toList();
-      }
-    }
-
-    // Ülke önceliği ve tamamlama kuralı
     final openerCountry = opener?.country.trim().toLowerCase() ?? '';
+    final allUsers = getAllRegistrations();
+    final selected = <RegistrationModel>[];
+    final selectedEmails = <String>{};
+    final privacyCache = <String, bool>{};
 
-    // "Herkes" seçildiyse: grup bağımsız, sadece aynı ülkeden global havuzdan seç
-    if (normalized == 'herkes' && openerCountry.isNotEmpty) {
-      final allRegs = getAllRegistrations()
-          .where((r) => r.email != openerEmail && (defendantEmail == null || r.email != defendantEmail))
-          .toList();
-      
-      final sameCountryGlobal = <RegistrationModel>[];
-      for (final r in allRegs) {
-        if (r.country.trim().toLowerCase() != openerCountry) continue;
-        try {
-          final s = await getOrCreateSettings(r.email);
-          if (s.privacySettings['genel_davaacilsin'] ?? true) {
-            sameCountryGlobal.add(r);
-          }
-        } catch (_) {
-          sameCountryGlobal.add(r);
-        }
+    Future<bool> canReceive(RegistrationModel person) async {
+      if (person.email == openerEmail ||
+          person.email.trim().toLowerCase() == openerEmail.trim().toLowerCase()) {
+        return false;
       }
-      
-      // ✅ ADIM-5: "Herkes" seçildiğinde, eğer dava açan mavi tik sahibi ise, önce mavi tik sahiplerini seç, 7'den azsa mavi tik sahibi olmayanlarla tamamla
-      if (isOpenerVerified) {
-        final verifiedUsers = sameCountryGlobal.where((r) {
-          return VerifiedUsersService.isVerified(r.judgeName);
-        }).toList();
-        
-        final nonVerifiedUsers = sameCountryGlobal.where((r) {
-          return !VerifiedUsersService.isVerified(r.judgeName);
-        }).toList();
-        
-        // Mavi tik sahiplerini karıştır
-        verifiedUsers.shuffle();
-        
-        // Eğer 7'den az mavi tik sahibi varsa, mavi tik sahibi olmayanlarla tamamla
-        if (verifiedUsers.length < count) {
-          final remaining = count - verifiedUsers.length;
-          nonVerifiedUsers.shuffle();
-          final selectedNonVerified = nonVerifiedUsers.take(remaining).toList();
-          return [...verifiedUsers, ...selectedNonVerified];
-        } else {
-          // 7 veya daha fazla mavi tik sahibi varsa, sadece onları kullan
-          return verifiedUsers.take(count).toList();
-        }
+      if (openerId != null && openerId.isNotEmpty && person.id == openerId) {
+        return false;
       }
-      
-      // Normal kullanıcı için mevcut mantık
-      sameCountryGlobal.shuffle();
-      return sameCountryGlobal.take(count).toList();
+      if (_isCaseParty(person, defendantEmail)) return false;
+      if (selectedEmails.contains(person.email)) return false;
+
+      final cached = privacyCache[person.email];
+      if (cached != null) return cached;
+      try {
+        final settings = await getOrCreateSettings(person.email);
+        final allowsDava = settings.privacySettings['genel_davaacilsin'] ?? true;
+        final allowsSevenJudge = settings.privacySettings['davet_7yargic'] ?? true;
+        final ok = allowsDava && allowsSevenJudge;
+        privacyCache[person.email] = ok;
+        return ok;
+      } catch (_) {
+        privacyCache[person.email] = true;
+        return true;
+      }
     }
 
-    // Diğer gruplar (Grup-19/Arkadaş/Takipçi): ülke şartı aranmaz, grup havuzundan rastgele seç
-    var resultPool = finalPool;
-    if (sameCountryOnly && openerCountry.isNotEmpty) {
-      resultPool = resultPool
-          .where((r) => r.country.trim().toLowerCase() == openerCountry)
-          .toList();
+    Future<void> addFromPool(List<RegistrationModel> pool) async {
+      for (final person in pool) {
+        if (selected.length >= count) break;
+        if (await canReceive(person)) {
+          selected.add(person);
+          selectedEmails.add(person.email);
+        }
+      }
     }
 
-    resultPool.shuffle();
-    if (resultPool.length <= count) return resultPool;
-    return resultPool.take(count).toList();
+    List<RegistrationModel> shuffled(Iterable<RegistrationModel> source) {
+      final copy = List<RegistrationModel>.from(source);
+      copy.shuffle();
+      return copy;
+    }
+
+    final accepted = getAcceptedFriendships(openerId ?? '');
+    final friendIds = accepted
+        .map((f) => f.requesterId == openerId ? f.recipientId : f.requesterId)
+        .toSet();
+    final followerIds =
+        getFollowers(openerId ?? '').map((f) => f.requesterId).toSet();
+    final followingIds =
+        getFollowingUsers(openerId ?? '').map((f) => f.recipientId).toSet();
+    final relationExclude = <String>{
+      ...accepted.expand((f) => [f.requesterId, f.recipientId]),
+      ...followerIds,
+      ...followingIds,
+      if ((openerId ?? '').isNotEmpty) openerId!,
+    };
+
+    final grup19Pool =
+        allUsers.where((person) => _grup19Members.contains(person.email));
+    final friendsPool =
+        allUsers.where((person) => friendIds.contains(person.id));
+    final followersPool =
+        allUsers.where((person) => followerIds.contains(person.id));
+    final strangersPool =
+        allUsers.where((person) => !relationExclude.contains(person.id));
+
+    final Iterable<RegistrationModel> primary;
+    if (normalized == 'grup19') {
+      primary = grup19Pool;
+    } else if (normalized == 'arkadaşlar' || normalized == 'arkadaslar') {
+      primary = friendsPool;
+    } else if (normalized == 'takipçiler' || normalized == 'takipciler') {
+      primary = followersPool;
+    } else if (normalized == 'tanımadıklarım' ||
+        normalized == 'tanimadiklarim') {
+      primary = strangersPool;
+    } else {
+      primary = allUsers;
+    }
+
+    await addFromPool(shuffled(primary));
+
+    if (selected.length < count) {
+      await addFromPool(shuffled(friendsPool));
+    }
+    if (selected.length < count) {
+      await addFromPool(shuffled(followersPool));
+    }
+    if (selected.length < count) {
+      await addFromPool(shuffled(strangersPool));
+    }
+    if (selected.length < count && openerCountry.isNotEmpty) {
+      final sameCountryPool = allUsers.where(
+        (person) => person.country.trim().toLowerCase() == openerCountry,
+      );
+      await addFromPool(shuffled(sameCountryPool));
+    }
+    if (selected.length < count) {
+      await addFromPool(shuffled(allUsers));
+    }
+
+    if (selected.length <= count) return selected;
+    return selected.take(count).toList();
   }
+
 
   /// Davet alıcıları seç (dava gönderilmeyen kişilerden)
   static Future<List<RegistrationModel>> pickInvitationRecipients(

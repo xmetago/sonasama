@@ -151,10 +151,16 @@ void main() {
 
     expect(find.text('Takipçiler’e ata'), findsOneWidget);
     expect(
-      find.text('3 yargıç + sen + davalı, toplam 5 kişi alacak'),
+      find.text('7 yargıç + sen + davalı, toplam 9 kişi alacak'),
       findsOneWidget,
     );
-    expect(find.text('7 yargıç + sen + davalı, toplam 9 kişi alacak'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('dava-grup-Takipçiler')),
+        matching: find.textContaining('Eksik yerler rastgele doldurulur.'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('dava-grup-Grup19')));
     await tester.pumpAndSettle();
@@ -189,7 +195,14 @@ void main() {
 
     expect(find.text('Tanımadıklarım’a ata'), findsOneWidget);
     expect(
-      find.text('6 yargıç + sen + davalı, toplam 8 kişi alacak'),
+      find.text('7 yargıç + sen + davalı, toplam 9 kişi alacak'),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('dava-grup-Tanımadıklarım')),
+        matching: find.textContaining('Eksik yerler rastgele doldurulur.'),
+      ),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

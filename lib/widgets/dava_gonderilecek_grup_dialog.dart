@@ -13,10 +13,13 @@ import '../theme/seyir_tokens.dart';
 /// Dava açılırken yargıç grubunu seçtiren bilet diyalogu.
 ///
 /// Atama dizeleri değişmez: `Grup19`, `Arkadaşlar`, `Takipçiler`,
-/// `Tanımadıklarım`. Dördüncü kartın havuzu arkadaş kategorisi değildir.
-/// Kaldırılan Herkes / Tanımadıklarım kategorileri Takipçi sayılır; bu kart
-/// ise [HiveDatabaseService.pickGroupRecipients] ile aynı kümedir: kabul
-/// edilmiş arkadaşı, takipçisi ve takip ettiği olmayan kayıtlı kişiler.
+/// `Tanımadıklarım`. Her kart kendi havuzundan 7 yargıç seçer; davacı ve
+/// davalı bu yediye girmez. Havuz 7'den kısaysa eksik kadro Grup-19 ile aynı
+/// zincirle tamamlanır. Seçili kartın özeti 7 yargıç + sen + davalı, toplam
+/// 9 kişidir. Dördüncü kartın havuzu arkadaş kategorisi değildir. Kaldırılan
+/// Herkes / Tanımadıklarım kategorileri Takipçi sayılır; bu kart ise
+/// [HiveDatabaseService.pickGroupRecipients] ile aynı kümedir: kabul edilmiş
+/// arkadaşı, takipçisi ve takip ettiği olmayan kayıtlı kişiler.
 class DavaGonderilecekGrupDialog extends StatefulWidget {
   const DavaGonderilecekGrupDialog({
     super.key,
@@ -875,7 +878,6 @@ class _DavaGrupSecimi {
         : HiveDatabaseService.getRegistrationByEmail(openerEmail.trim());
     final openerId = opener?.id;
     final openerMail = opener?.email ?? openerEmail?.trim();
-    final country = opener?.country.trim().toLowerCase() ?? '';
     final defendantText = _meaningfulDefendant(defendant);
     final all = HiveDatabaseService.getAllRegistrations();
 
@@ -914,7 +916,6 @@ class _DavaGrupSecimi {
         .toList();
 
     final davaliVar = defendantText != null;
-    final defendantEmail = _emailOrNull(defendantText);
 
     _GrupCardData build({
       required String value,
@@ -924,15 +925,12 @@ class _DavaGrupSecimi {
       required List<RegistrationModel> members,
       required Color color,
       required IconData icon,
-      required bool grup19,
     }) {
       final plan = _planJudges(
-        grup19: grup19,
         primary: members,
         everyone: all,
         openerEmail: openerMail,
-        openerCountry: country,
-        defendantEmail: defendantEmail,
+        defendant: defendantText,
       );
       return _GrupCardData(
         value: value,
@@ -958,7 +956,6 @@ class _DavaGrupSecimi {
         members: grupMembers,
         color: SeyirTokens.sectionEvidence,
         icon: Icons.group_rounded,
-        grup19: true,
       ),
       build(
         value: 'Arkadaşlar',
@@ -968,7 +965,6 @@ class _DavaGrupSecimi {
         members: friendMembers,
         color: SeyirTokens.sectionPeople,
         icon: Icons.people_alt_rounded,
-        grup19: false,
       ),
       build(
         value: 'Takipçiler',
@@ -978,7 +974,6 @@ class _DavaGrupSecimi {
         members: followerMembers,
         color: SeyirTokens.sectionGift,
         icon: Icons.notifications_active_rounded,
-        grup19: false,
       ),
       build(
         value: 'Tanımadıklarım',
@@ -988,7 +983,6 @@ class _DavaGrupSecimi {
         members: strangerMembers,
         color: SeyirTokens.sectionAppeal,
         icon: Icons.public_rounded,
-        grup19: false,
       ),
     ]);
   }
@@ -1002,70 +996,40 @@ class _JudgePlan {
 }
 
 _JudgePlan _planJudges({
-  required bool grup19,
   required List<RegistrationModel> primary,
   required List<RegistrationModel> everyone,
   required String? openerEmail,
-  required String openerCountry,
-  required String? defendantEmail,
+  required String? defendant,
 }) {
-  bool blocked(RegistrationModel person, {required bool seven}) {
+  bool blocked(RegistrationModel person) {
     final settings = HiveDatabaseService.getSettings(person.email);
     if (settings == null) return false;
     final allowsDava = settings.privacySettings['genel_davaacilsin'] ?? true;
-    if (!allowsDava) return true;
-    if (seven && !(settings.privacySettings['davet_7yargic'] ?? true)) {
-      return true;
-    }
-    return false;
+    final allowsSevenJudge = settings.privacySettings['davet_7yargic'] ?? true;
+    return !allowsDava || !allowsSevenJudge;
   }
 
   bool isOpener(RegistrationModel person) =>
-      openerEmail != null && person.email == openerEmail;
+      openerEmail != null &&
+      person.email.trim().toLowerCase() == openerEmail.trim().toLowerCase();
 
-  bool isDefendant(RegistrationModel person) =>
-      defendantEmail != null && person.email == defendantEmail;
-
-  if (grup19) {
-    final own = primary
-        .where((person) =>
-            !isOpener(person) &&
-            !isDefendant(person) &&
-            !blocked(person, seven: true))
-        .length;
-    final eligible = <String>{};
-    for (final person in everyone) {
-      if (isOpener(person) || isDefendant(person)) continue;
-      if (blocked(person, seven: true)) continue;
-      eligible.add(person.email);
-    }
-    final yargic = math.min(7, eligible.length);
-    return _JudgePlan(yargic: yargic, rastgele: own < 7 && yargic > own);
+  bool isDefendant(RegistrationModel person) {
+    final needle = defendant?.trim().toLowerCase() ?? '';
+    if (needle.isEmpty) return false;
+    return person.email.trim().toLowerCase() == needle ||
+        person.judgeName.trim().toLowerCase() == needle;
   }
 
-  var allowed = primary
-      .where((person) => !isOpener(person) && !blocked(person, seven: false))
-      .toList();
-  var filledFromEveryone = false;
-  if (allowed.isEmpty) {
-    filledFromEveryone = true;
-    allowed = everyone
-        .where((person) =>
-            !isOpener(person) &&
-            !isDefendant(person) &&
-            !blocked(person, seven: false))
-        .toList();
+  final own = primary
+      .where((person) => !isOpener(person) && !isDefendant(person) && !blocked(person))
+      .length;
+  final eligible = <String>{};
+  for (final person in everyone) {
+    if (isOpener(person) || isDefendant(person) || blocked(person)) continue;
+    eligible.add(person.email);
   }
-  if (openerCountry.isNotEmpty) {
-    allowed = allowed
-        .where((person) => person.country.trim().toLowerCase() == openerCountry)
-        .toList();
-  }
-  final yargic = math.min(7, allowed.length);
-  return _JudgePlan(
-    yargic: yargic,
-    rastgele: filledFromEveryone && yargic > 0,
-  );
+  final yargic = math.min(7, eligible.length);
+  return _JudgePlan(yargic: yargic, rastgele: own < 7 && yargic > own);
 }
 
 String _atamaOzeti({required int yargic, required bool davaliVar}) {
@@ -1098,11 +1062,6 @@ String? _meaningfulDefendant(String? raw) {
       text == 'Beklemede') {
     return null;
   }
-  return text;
-}
-
-String? _emailOrNull(String? text) {
-  if (text == null || !text.contains('@')) return null;
   return text;
 }
 
