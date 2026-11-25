@@ -1437,17 +1437,15 @@ class _DavaAcPageState extends State<DavaAcPage> {
           sameCountryOnly: true,
         );
 
-        // 7 (seçilen grup) + 1 (dava açan) + 1 (dava açılan) kuralı
-        final Set<String> recipientEmails = {
-          ...recipients.map((r) => r.email),
-        };
-        // Dava açan
-        recipientEmails.add(widget.userEmail!);
-        // Dava açılan (varsa ve boş değilse)
-        final davaliEmail = (openedDava.davali ?? '').trim();
-        if (davaliEmail.isNotEmpty) {
-          recipientEmails.add(davaliEmail);
-        }
+        // Her grup: 7 yargıç + davacı + davalı. Davalı yargıç adıysa e-postasına gider.
+        final davaliRaw = openedDava.davali.trim();
+        final davaliEmail =
+            HiveDatabaseService.resolveRegisteredEmail(davaliRaw) ?? davaliRaw;
+        final Set<String> recipientEmails = HiveDatabaseService.hukumInboxEmails(
+          judgeEmails: recipients.map((r) => r.email),
+          openerEmail: widget.userEmail!,
+          defendant: davaliRaw,
+        );
 
         // Gelen Davalar'a yaz
         for (final email in recipientEmails) {
