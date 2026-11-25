@@ -320,6 +320,10 @@ void main() {
     );
     await waitForText(tester, 'Gece fotoğrafı');
     expect(find.text('DELİL DETAYI'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.byTooltip('Geri'), findsNothing);
+    final title = tester.getRect(find.text('DELİL DETAYI'));
+    expect((title.center.dx - tester.view.physicalSize.width / 2).abs(), lessThan(8));
     await saveShot(tester, shot('detay', 'light'));
     await releasePage(tester);
   });
@@ -336,6 +340,8 @@ void main() {
       size: const Size(420, 2200),
     );
     await waitForText(tester, 'Gece fotoğrafı');
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.byTooltip('Geri'), findsNothing);
     await saveShot(tester, shot('detay', 'dark'));
     await releasePage(tester);
   });

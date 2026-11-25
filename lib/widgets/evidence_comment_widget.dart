@@ -68,11 +68,28 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
   List<EvidenceCommentModel> _comments = [];
   Map<String, int> _commentCounts = {};
   bool _isLoading = true;
+  EvidenceModel? _barEvidence;
 
   @override
   void initState() {
     super.initState();
+    _barEvidence = _storedEvidence() ?? widget.evidenceSnapshot;
     _loadComments();
+  }
+
+  @override
+  void didUpdateWidget(covariant EvidenceCommentWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _barEvidence = _storedEvidence() ?? widget.evidenceSnapshot;
+  }
+
+  /// Oy çubuğu kutudaki kaydı gösterir. Sayfaya verilen kopya eski kalsa da seçim kaybolmaz.
+  EvidenceModel? _storedEvidence() {
+    try {
+      return EvidenceService().getEvidenceById(widget.evidenceId);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Yorumları yükle
@@ -133,7 +150,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
             ),
             const SizedBox(height: 16),
 
-            if (widget.evidenceSnapshot != null &&
+            if ((_barEvidence ?? widget.evidenceSnapshot) != null &&
                 widget.userEmail != null &&
                 widget.userEmail!.trim().isNotEmpty)
               Padding(
@@ -161,7 +178,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
     );
   }
 
-  Future<void> _onAssessmentVoteTap(Future<void> Function() action) async {
+  Future<void> _onAssessmentVoteTap(String vote) async {
     if (widget.isVoteLockedByFinalizedHukum) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -176,18 +193,26 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
       );
       return;
     }
-    await action();
+    final email = widget.userEmail?.trim() ?? '';
+    if (email.isEmpty) return;
+    final svc = EvidenceService();
+    await svc.initialize();
+    final updated = svc.mutateUserToggle(widget.evidenceId, email, vote);
+    if (!mounted) return;
+    setState(() => _barEvidence = updated ?? _storedEvidence() ?? _barEvidence);
     widget.onEvidenceVoteChanged?.call();
+    if (updated != null) {
+      await svc.persistEvidence(updated);
+    }
   }
 
   Widget _buildEvidenceAssessmentBar() {
-    final e = widget.evidenceSnapshot!;
+    final e = _barEvidence ?? widget.evidenceSnapshot!;
     final email = widget.userEmail!.trim();
     final vote = e.getUserVote(email);
     final isLiked = vote == 'like';
     final isNeutral = vote == 'neutral';
     final isDisliked = vote == 'dislike';
-    final svc = EvidenceService();
 
     final palette = SeyirPalette.of(context);
     return Container(
@@ -211,10 +236,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                   color: Colors.blue,
                   active: isLiked,
                   disabled: widget.isVoteLockedByFinalizedHukum,
-                  onTap: () => _onAssessmentVoteTap(() async {
-                    await svc.initialize();
-                    await svc.toggleLike(e.id, email);
-                  }),
+                  onTap: () => _onAssessmentVoteTap('like'),
                 ),
               ),
               Container(width: 10, height: 22, color: palette.border),
@@ -226,10 +248,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                   color: Colors.grey,
                   active: isNeutral,
                   disabled: widget.isVoteLockedByFinalizedHukum,
-                  onTap: () => _onAssessmentVoteTap(() async {
-                    await svc.initialize();
-                    await svc.toggleNeutral(e.id, email);
-                  }),
+                  onTap: () => _onAssessmentVoteTap('neutral'),
                 ),
               ),
               Container(width: 10, height: 22, color: palette.border),
@@ -241,10 +260,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
                   color: Colors.red,
                   active: isDisliked,
                   disabled: widget.isVoteLockedByFinalizedHukum,
-                  onTap: () => _onAssessmentVoteTap(() async {
-                    await svc.initialize();
-                    await svc.toggleDislike(e.id, email);
-                  }),
+                  onTap: () => _onAssessmentVoteTap('dislike'),
                 ),
               ),
             ],
@@ -264,7 +280,12 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
     required VoidCallback onTap,
   }) {
     final palette = SeyirPalette.of(context);
-    return InkWell(
+    return Semantics(
+      button: true,
+      selected: active,
+      enabled: !disabled,
+      label: label,
+      child: InkWell(
       onTap: disabled ? null : onTap,
       borderRadius: BorderRadius.circular(8),
       child: ConstrainedBox(
@@ -336,6 +357,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
         ),
       ),
       ),
+    ),
     );
   }
 
@@ -666,8 +688,9 @@ class _CommentDialogState extends State<_CommentDialog> {
     if (widget.existingComment != null) {
       _commentController.text = widget.existingComment!.commentText;
       _selectedCriticism = widget.existingComment!.criticism;
-    } else if (widget.userEvidenceVote != null &&
-        widget.userEvidenceVote!.isNotEmpty) {
+    }
+    // Kayıtlı delil oyu, yorumun eski eleştirisinden yeni kabul edilir.
+    if (widget.userEvidenceVote != null && widget.userEvidenceVote!.isNotEmpty) {
       _selectedCriticism = _criticismFromEvidenceVote(widget.userEvidenceVote);
     }
     if (!widget.isEvidenceValid && _selectedCriticism == 'positive') {

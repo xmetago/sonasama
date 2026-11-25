@@ -153,25 +153,31 @@ class EvidenceModel extends HiveObject {
     );
   }
   
-  /// Kullanıcının bu delili beğenip beğenmediğini kontrol et
+  /// Kullanıcının bu delildeki oyu: `like`, `dislike`, `neutral` veya yok.
+  /// E-posta boşluk ve büyük/küçük harf farkı aynı kullanıcı sayılır.
   String? getUserVote(String userEmail) {
-    return likedBy[userEmail]?.toString();
+    final wanted = userEmail.trim().toLowerCase();
+    if (wanted.isEmpty) return null;
+    String? found;
+    likedBy.forEach((key, value) {
+      if (found != null) return;
+      final rawKey = key?.toString().trim().toLowerCase();
+      final rawValue = value?.toString();
+      if (rawKey == wanted && rawValue != null && rawValue.isNotEmpty) {
+        found = rawValue;
+      }
+    });
+    return found;
   }
   
   /// Kullanıcı beğendi mi?
-  bool hasUserLiked(String userEmail) {
-    return likedBy[userEmail] == 'like';
-  }
+  bool hasUserLiked(String userEmail) => getUserVote(userEmail) == 'like';
   
   /// Kullanıcı beğenmedi mi?
-  bool hasUserDisliked(String userEmail) {
-    return likedBy[userEmail] == 'dislike';
-  }
+  bool hasUserDisliked(String userEmail) => getUserVote(userEmail) == 'dislike';
 
   /// Kullanıcı nötr mü oy kullandı?
-  bool hasUserNeutral(String userEmail) {
-    return likedBy[userEmail] == 'neutral';
-  }
+  bool hasUserNeutral(String userEmail) => getUserVote(userEmail) == 'neutral';
 }
 
 // Evidence limits and constraints
