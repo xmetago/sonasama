@@ -216,25 +216,6 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  tooltip: 'Geri',
-                  style: delilIconButtonStyle(
-                    foreground: palette.isDark
-                        ? Colors.green.shade300
-                        : Colors.green.shade700,
-                  ),
-                  icon: Icon(
-                    Icons.arrow_back,
-                    size: 26,
-                    color: palette.isDark
-                        ? Colors.green.shade300
-                        : Colors.green.shade700,
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
               Container(
                 decoration: BoxDecoration(
                   color: palette.card,

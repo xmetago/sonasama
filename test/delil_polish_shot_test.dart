@@ -352,6 +352,8 @@ void main() {
     );
     await waitForText(tester, 'Delil Türlerini İncele');
     expect(find.textContaining('Delilleri İncele'), findsWidgets);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.byTooltip('Geri'), findsNothing);
     await saveShot(tester, shot('incele', 'light'));
     await releasePage(tester);
   });
@@ -367,6 +369,8 @@ void main() {
       size: const Size(420, 1800),
     );
     await waitForText(tester, 'Delil Türlerini İncele');
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.byTooltip('Geri'), findsNothing);
     await saveShot(tester, shot('incele', 'dark'));
     await releasePage(tester);
   });
@@ -545,6 +549,8 @@ void main() {
     );
     await waitForText(tester, 'Delil Türlerini İncele');
     expect(find.text('Henüz kabul edilmiş dava yok'), findsNothing);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.byTooltip('Geri'), findsNothing);
     expect(find.text('1'), findsWidgets);
     await saveShot(tester, 'delil-incele-with-user-after-light.png');
     await releasePage(tester);
