@@ -247,23 +247,7 @@ class _YargilaPageState extends State<YargilaPage> {
                 padding: const EdgeInsets.all(2.0),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: Icon(
-                        MdiIcons.menuOpen,
-                        size: 19,
-                        color: Colors.red.shade700,
-                      ),
-                      onPressed: toggle,
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.red.withValues(alpha: 0.10),
-                        padding: const EdgeInsets.all(10),
-                        minimumSize: const Size(
-                          SeyirTokens.tapTarget,
-                          SeyirTokens.tapTarget,
-                        ),
-                        tapTargetSize: MaterialTapTargetSize.padded,
-                      ),
-                    ),
+                    menuButton,
 
                     // Fixed YARGILA Row
                     Expanded(
