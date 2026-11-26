@@ -1,5 +1,5 @@
-import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -79,8 +79,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
   String? _sealError;
 
   AnimationController? _coffinAnimationController;
-  late final AnimationController _stampController;
-  late final Animation<double> _stampScale;
+  AnimationController? _shakeController;
   bool _isSealTapInProgress = false;
   final GlobalKey _kararBoundaryKey = GlobalKey();
 
@@ -269,23 +268,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       vsync: this,
     )..repeat();
 
-    _stampController = AnimationController(
-      vsync: this,
-      duration: SeyirTokens.motion,
-    );
-    _stampScale = TweenSequence<double>(<TweenSequenceItem<double>>[
-      TweenSequenceItem<double>(
-        tween: Tween<double>(begin: 1.18, end: 0.84)
-            .chain(CurveTween(curve: Curves.easeIn)),
-        weight: 42,
-      ),
-      TweenSequenceItem<double>(
-        tween: Tween<double>(begin: 0.84, end: 1)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 58,
-      ),
-    ]).animate(_stampController);
-    _stampController.value = 1;
+    _ensureShakeController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSavedCeza();
@@ -338,7 +321,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
   @override
   void dispose() {
     _coffinAnimationController?.dispose();
-    _stampController.dispose();
+    _shakeController?.dispose();
     super.dispose();
   }
 
@@ -1360,22 +1343,38 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       return;
     }
 
+    _ensureShakeController();
     setState(() {
       _isSealTapInProgress = true;
       _sealError = null;
     });
     await HapticFeedback.lightImpact();
-    unawaited(_stampController.forward(from: 0));
-    if (!mounted) {
-      return;
-    }
+    _shakeController!.repeat(period: const Duration(milliseconds: 120));
+
     try {
+      await Future<void>.delayed(const Duration(seconds: 3));
+      if (!mounted) {
+        return;
+      }
+      _shakeController!
+        ..stop()
+        ..value = 0.0;
       await _finalizePenaltyWithSeal();
     } finally {
       if (mounted) {
+        _shakeController!
+          ..stop()
+          ..value = 0.0;
         setState(() => _isSealTapInProgress = false);
       }
     }
+  }
+
+  void _ensureShakeController() {
+    _shakeController ??= AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
   }
 
   Future<void> _finalizePenaltyWithSeal() async {
@@ -1735,8 +1734,21 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                                     ),
                                   ),
                                   const SizedBox(height: SeyirTokens.space2),
-                                  ScaleTransition(
-                                    scale: _stampScale,
+                                  AnimatedBuilder(
+                                    animation: _shakeController!,
+                                    builder: (BuildContext context, Widget? child) {
+                                      final double offset =
+                                          sin(_shakeController!.value * pi * 4) * 3;
+                                      return Transform.translate(
+                                        offset: Offset(
+                                          hasSelection && !_isPenaltyApplied
+                                              ? offset
+                                              : 0,
+                                          0,
+                                        ),
+                                        child: child,
+                                      );
+                                    },
                                     child: Container(
                                       padding: const EdgeInsets.all(SeyirTokens.space2),
                                       decoration: BoxDecoration(

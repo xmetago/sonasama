@@ -267,8 +267,9 @@ void main() {
       expect(find.text('Emin misin?'), findsOneWidget);
       await tester.tap(find.widgetWithText(TextButton, 'Mühürle'));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      // Dokunsal geri bildirim gerçek zamanlı biter; ardından 3 sn titreme sahte zamanda akar.
       await flushIo(tester);
+      await tester.pump(const Duration(seconds: 3));
       await tester.pump();
     }
 
