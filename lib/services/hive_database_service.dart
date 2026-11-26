@@ -2351,7 +2351,7 @@ class HiveDatabaseService {
 
   /// Hüküm kaydet
   /// key: davaId_userRole (örn: "dava_123_Yargıç")
-  static Future<void> saveHukum({
+  static Future<bool> saveHukum({
     required String davaId,
     required String userRole,
     required String hukumText,
@@ -2360,6 +2360,13 @@ class HiveDatabaseService {
     bool isFinalized = false,
   }) async {
     await _ensureHukumBoxOpen();
+    if (_hukumBox == null) {
+      return false;
+    }
+    if (davaId.trim().isEmpty) {
+      print('⚠️ [HiveDatabaseService] Boş dava kimliği ile hüküm yazılmadı.');
+      return false;
+    }
     
     final key = '${davaId}_$userRole';
     final existingData = _hukumBox?.get(key) as Map<dynamic, dynamic>?;
@@ -2374,7 +2381,7 @@ class HiveDatabaseService {
       final String? existingText = existingData?['hukumText']?.toString();
       if (existingText != null && existingText != hukumText) {
         print('⚠️ [HiveDatabaseService] Finalize edilmiş hüküm değiştirilemez: $key');
-        return;
+        return false;
       }
     }
     final createdAt = existingData?['createdAt']?.toString() ?? DateTime.now().toIso8601String();
@@ -2390,7 +2397,7 @@ class HiveDatabaseService {
       'isFinalized': finalizationState,
     };
     
-    _hukumBox?.put(key, hukumData);
+    await _hukumBox!.put(key, hukumData);
     print('✅ [HiveDatabaseService] Hüküm kaydedildi:');
     print('   - Key: $key');
     print('   - Dava ID: $davaId');
@@ -2398,6 +2405,7 @@ class HiveDatabaseService {
     print('   - Hüküm Text: ${hukumText.length > 50 ? hukumText.substring(0, 50) : hukumText}...');
     print('   - Sentiment: ${hukumSentiment ?? "null"}');
     print('   - Is Finalized: $finalizationState');
+    return true;
   }
 
   /// Belirli bir dava için hükümleri getir
@@ -2419,12 +2427,16 @@ class HiveDatabaseService {
     return hukumler;
   }
 
-  /// Belirli bir dava ve mevki için hükmü getir
-  /// Eğer davaId ile bulunamazsa, davaAdi'ne göre de arama yapar
+  /// Belirli bir dava ve mevki için hükmü getir.
+  ///
+  /// Dava adı hash'i oturumlar arasında değişir; bölünmüş kayıt okunmaz.
   static Future<Map<String, dynamic>?> getHukumByDavaIdAndRole(String davaId, String userRole, {String? davaAdi}) async {
     await _ensureHukumBoxOpen();
+    if (davaId.trim().isEmpty) {
+      print('⚠️ Boş dava kimliği; ad ile hash üretilmedi (${davaAdi ?? '-'})');
+      return null;
+    }
     
-    // Önce davaId ile ara
     final key = '${davaId}_$userRole';
     final hukumData = _hukumBox?.get(key);
     
@@ -2432,23 +2444,12 @@ class HiveDatabaseService {
       return Map<String, dynamic>.from(hukumData as Map);
     }
     
-    // Eğer bulunamadıysa ve davaAdi verildiyse, davaAdi hash'i ile ara
-    if (davaAdi != null && davaAdi.isNotEmpty) {
-      final alternativeId = 'dava_${davaAdi.hashCode}';
-      final alternativeKey = '${alternativeId}_$userRole';
-      final alternativeHukumData = _hukumBox?.get(alternativeKey);
-      
-      if (alternativeHukumData != null) {
-        print('   ✅ Alternatif ID ile hüküm bulundu: Key="$alternativeKey"');
-        return Map<String, dynamic>.from(alternativeHukumData as Map);
-      }
-    }
-    
     return null;
   }
 
-  /// Bir dava için tüm hükümleri getir (mevkiye göre)
-  /// Eğer davaId ile bulunamazsa, davaAdi'ne göre de arama yapar
+  /// Bir dava için tüm hükümleri getir (mevkiye göre).
+  ///
+  /// Yalnızca verilen dava kimliği okunur. Ad hash'i kayıtları böler.
   static Future<Map<String, Map<String, dynamic>>> getHukumlerByDavaIdGrouped(String davaId, {String? davaAdi}) async {
     await _ensureHukumBoxOpen();
     
@@ -2456,6 +2457,10 @@ class HiveDatabaseService {
     print('   - Dava ID: "$davaId"');
     if (davaAdi != null) {
       print('   - Dava Adı: "$davaAdi"');
+    }
+    if (davaId.trim().isEmpty) {
+      print('⚠️ Boş dava kimliği; ad hash ile arama yapılmadı.');
+      return {};
     }
     
     final Map<String, Map<String, dynamic>> hukumlerByRole = {};
@@ -2484,99 +2489,6 @@ class HiveDatabaseService {
           if (userRole.isNotEmpty) {
             hukumlerByRole[userRole] = hukumMap;
             print('   ✅ Eşleşme bulundu: Key="$keyStr", Role="$userRole"');
-          }
-        }
-      }
-    }
-    
-    // Eğer davaId ile bulunamadıysa ve davaAdi verildiyse, davaAdi hash'i ile ara
-    if (hukumlerByRole.isEmpty && davaAdi != null && davaAdi.isNotEmpty) {
-      final alternativeId = 'dava_${davaAdi.hashCode}';
-      print('   ⚠️ Dava ID ile bulunamadı, dava adı hash ile deneniyor: "$alternativeId"');
-      
-      for (final key in keys) {
-        final keyStr = key.toString();
-        if (keyStr.startsWith('${alternativeId}_')) {
-          matchCount++;
-          final hukumData = _hukumBox?.get(key);
-          if (hukumData != null) {
-            final hukumMap = Map<String, dynamic>.from(hukumData as Map);
-            final userRole = hukumMap['userRole'] as String? ?? '';
-            if (userRole.isNotEmpty) {
-              hukumlerByRole[userRole] = hukumMap;
-              print('   ✅ Alternatif ID ile eşleşme bulundu: Key="$keyStr", Role="$userRole"');
-            }
-          }
-        }
-      }
-      
-      // Eğer hala bulunamadıysa, tüm key'leri kontrol et ve dava adına göre eşleştir
-      if (hukumlerByRole.isEmpty) {
-        print('   🔍 Tüm key\'ler kontrol ediliyor (dava adı eşleştirmesi için)...');
-        final davaAdiHash = davaAdi.hashCode;
-        final davaAdiHashWithoutComma = davaAdi.replaceAll(',', '').trim().hashCode;
-        final davaAdiHashClean = davaAdi.replaceAll(RegExp(r'[^\w\s]'), '').trim().hashCode;
-        
-        print('   🔍 Dava adı hash\'leri:');
-        print('      - Orijinal: $davaAdiHash');
-        print('      - Virgülsüz: $davaAdiHashWithoutComma');
-        print('      - Temizlenmiş: $davaAdiHashClean');
-        
-        // Önce tüm key'leri logla
-        print('   🔍 Veritabanındaki tüm key\'ler:');
-        for (int i = 0; i < keys.length; i++) {
-          print('      ${i + 1}. ${keys[i]}');
-        }
-        
-        for (final key in keys) {
-          final keyStr = key.toString();
-          // Key formatı: "davaId_userRole" veya "davaId_Role"
-          // Örnek: "dava_1763765980367_Yargıç Kararı"
-          // Key'i "_" ile böl, son kısım rol adı, önceki kısımlar dava ID'si
-          final parts = keyStr.split('_');
-          if (parts.length >= 2) {
-            // Son kısmı (rol adı) çıkar, kalan kısımları birleştir (dava ID'si)
-            // "dava_1763765980367_Yargıç Kararı" -> ["dava", "1763765980367", "Yargıç", "Kararı"]
-            // extractedDavaId = "dava_1763765980367"
-            final extractedDavaId = parts.sublist(0, parts.length - 1).join('_');
-            
-            print('   🔍 Key analizi: "$keyStr" -> Dava ID: "$extractedDavaId"');
-            
-            // Eğer dava ID'si "dava_" ile başlıyorsa, hash'i çıkar
-            if (extractedDavaId.startsWith('dava_')) {
-              final hashStr = extractedDavaId.replaceFirst('dava_', '');
-              final hash = int.tryParse(hashStr);
-              
-              print('   🔍 Hash analizi: "$hashStr" -> $hash');
-              
-              if (hash != null && 
-                  (hash == davaAdiHash || 
-                   hash == davaAdiHashWithoutComma || 
-                   hash == davaAdiHashClean)) {
-                print('   ✅ Hash eşleşmesi bulundu! Key: "$keyStr", Dava ID: "$extractedDavaId"');
-                final hukumData = _hukumBox?.get(key);
-                if (hukumData != null) {
-                  final hukumMap = Map<String, dynamic>.from(hukumData as Map);
-                  final userRole = hukumMap['userRole'] as String? ?? '';
-                  if (userRole.isNotEmpty) {
-                    hukumlerByRole[userRole] = hukumMap;
-                    print('   ✅ Eşleşme eklendi: Role="$userRole"');
-                  }
-                }
-              } else {
-                // Hash eşleşmedi, ancak dava ID'sini direkt kontrol et
-                // Eğer extractedDavaId, davaAdi hash'i ile eşleşiyorsa
-                final extractedHash = int.tryParse(hashStr);
-                if (extractedHash != null) {
-                  print('   ⚠️ Hash eşleşmedi: extracted=$extractedHash, davaAdi=$davaAdiHash');
-                }
-              }
-            } else {
-              // Dava ID'si "dava_" ile başlamıyor, direkt kontrol et
-              print('   ⚠️ Key "dava_" ile başlamıyor: "$extractedDavaId"');
-            }
-          } else {
-            print('   ⚠️ Key formatı beklenmeyen: "$keyStr" (parts: ${parts.length})');
           }
         }
       }

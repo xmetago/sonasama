@@ -84,7 +84,7 @@ class CezaMuhurKilit {
         DavaHukumEligibilityService.isMainTrialEnded(openedAt, now);
     final bool temyizDuzenleme = temyizPenceresiAcik && anaSureBitti;
     final bool isTemyiz = DavaHukumEligibilityService.roleLabelIsTemyiz(gorev);
-    final bool isYargic = _gorevYargic(gorev);
+    final bool isYargic = DavaHukumEligibilityService.roleLabelIsYargic(gorev);
 
     if (temyizDuzenleme) {
       if (!isTemyiz) {
@@ -121,22 +121,6 @@ class CezaMuhurKilit {
 
     return const CezaMuhurKilit.acik();
   }
-}
-
-/// "Yargıç" küçük harfe inince ı düz i olur; paylaşılan yardımcı bu hali kaçırır.
-bool _gorevYargic(String gorev) {
-  if (DavaHukumEligibilityService.roleLabelIsYargic(gorev)) {
-    return true;
-  }
-  final String folded = gorev
-      .toLowerCase()
-      .replaceAll('ç', 'c')
-      .replaceAll('ğ', 'g')
-      .replaceAll('ş', 's')
-      .replaceAll('ö', 'o')
-      .replaceAll('ü', 'u')
-      .replaceAll('ı', 'i');
-  return folded.contains('yargic');
 }
 
 /// Panelin ceza kaydını yazması. Üretimde [DavaProvider], testte sahte kayıt.

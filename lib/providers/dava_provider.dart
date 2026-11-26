@@ -641,7 +641,7 @@ class DavaProvider extends BaseProvider {
   }) async {
     return await executeAsync(
       () async {
-        await HiveDatabaseService.saveHukum(
+        final bool saved = await HiveDatabaseService.saveHukum(
           davaId: davaId,
           userRole: userRole,
           hukumText: hukumText,
@@ -649,6 +649,9 @@ class DavaProvider extends BaseProvider {
           hukumSentiment: hukumSentiment,
           isFinalized: isFinalized,
         );
+        if (!saved) {
+          throw StateError('Hüküm kaydedilemedi');
+        }
         // Hüküm güncelleme versiyonunu artır (senkronizasyon için)
         _hukumUpdateVersion++;
         // Hüküm kaydedildikten sonra tüm dinleyicilere bildir

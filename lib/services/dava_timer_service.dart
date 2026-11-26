@@ -350,3 +350,78 @@ Color seyirIncomingPhaseColor(BuildContext context, String storageStatus) {
     seyirIncomingPhaseToken(context, storageStatus),
   );
 }
+
+/// 8-Hüküm sayacının o anki fazı: 144. saat, 168. saat veya temyiz.
+class HukumPhaseClock {
+  const HukumPhaseClock({
+    required this.label,
+    required this.start,
+    required this.total,
+    required this.expired,
+    required this.storageStatus,
+  });
+
+  final String label;
+  final DateTime start;
+  final Duration total;
+  final bool expired;
+  final String storageStatus;
+}
+
+/// Aynı sayaç yerinde 144 / 168 / temyiz fazını anlatır.
+HukumPhaseClock hukumPhaseClock({
+  required DateTime openedAt,
+  required DateTime now,
+  DateTime? appealDeadline,
+}) {
+  final Duration elapsed = now.difference(openedAt);
+  const Duration t144 = Duration(hours: 144);
+  if (elapsed < t144) {
+    return HukumPhaseClock(
+      label: '144. saate kalan',
+      start: openedAt,
+      total: t144,
+      expired: false,
+      storageStatus: elapsed < DavaTimerService.voluntaryRoleWindow
+          ? DavaLifecycleStatuses.awaitingRole
+          : DavaLifecycleStatuses.roleAssigned,
+    );
+  }
+  if (elapsed < DavaTimerService.mainTrialWindow) {
+    return HukumPhaseClock(
+      label: '168. saate kalan',
+      start: openedAt,
+      total: DavaTimerService.mainTrialWindow,
+      expired: false,
+      storageStatus: DavaLifecycleStatuses.finalJudgement,
+    );
+  }
+  if (appealDeadline != null && now.isBefore(appealDeadline)) {
+    return HukumPhaseClock(
+      label: 'Temyiz',
+      start: appealDeadline.subtract(DavaTimerService.appealJudgeDecisionWindow),
+      total: DavaTimerService.appealJudgeDecisionWindow,
+      expired: false,
+      storageStatus: DavaLifecycleStatuses.appealProcess,
+    );
+  }
+  final DateTime temyizEnd = openedAt.add(
+    DavaTimerService.mainTrialWindow + DavaTimerService.appealOptionalWindow,
+  );
+  if (now.isBefore(temyizEnd)) {
+    return HukumPhaseClock(
+      label: 'Temyiz',
+      start: openedAt.add(DavaTimerService.mainTrialWindow),
+      total: DavaTimerService.appealOptionalWindow,
+      expired: false,
+      storageStatus: DavaLifecycleStatuses.appealProcess,
+    );
+  }
+  return HukumPhaseClock(
+    label: 'Süre doldu',
+    start: openedAt,
+    total: DavaTimerService.mainTrialWindow,
+    expired: true,
+    storageStatus: DavaLifecycleStatuses.archived,
+  );
+}

@@ -67,12 +67,19 @@ class DavaConsensusService {
     }
 
     final openedMap = HiveDatabaseService.getOpenedDavaById(davaId);
-    if (openedMap != null &&
-        openedMap['appealJudgeSentiment']?.toString() == 'positive') {
+    final HukumSentiment? appealRuling = hukumSentimentFromStorage(
+      openedMap?['appealJudgeSentiment']?.toString(),
+    );
+    final HukumSentiment? mirrored =
+        DavaHukumEligibilityService.mirroredAppealSentiment(openedMap);
+    final HukumSentiment? bindingDirection = appealRuling ?? mirrored;
+    if (bindingDirection != null) {
       return DavaConsensusEvaluation(
         positiveCount: positiveCount,
         negativeCount: negativeCount,
-        verdict: DavaConsensusVerdict.hakli,
+        verdict: bindingDirection == HukumSentiment.positive
+            ? DavaConsensusVerdict.hakli
+            : DavaConsensusVerdict.haksiz,
         isFinal: true,
         openedAt: resolvedOpenedAt,
         evaluationTime: now,

@@ -10,6 +10,7 @@ import '../providers/dava_provider.dart';
 import '../screens/sekiz_hukum_page.dart';
 import '../services/ceza_consensus_service.dart';
 import '../services/dava_consensus_service.dart';
+import '../services/dava_hukum_eligibility_service.dart';
 import '../services/dava_hukum_service.dart';
 import '../services/hediye_consensus_service.dart';
 import '../services/hive_database_service.dart';
@@ -1098,18 +1099,22 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     );
   }
 
-  /// Davacı tarafının nihai sonucunu belirler (Temyiz > Yargıç > Konsensus)
+  /// Davacı tarafının nihai sonucunu belirler (Temyiz > yansıyan yargıç > Yargıç > Konsensus)
   bool? _getFinalDavaciVerdict() {
     final normalizedTemyiz = _normalizeRole('Temyiz Hakimi Kararı');
-    final HukumSentiment? temyizSent = _rolSentimentleri[normalizedTemyiz];
-    if (temyizSent != null) {
-      return temyizSent == HukumSentiment.positive;
-    }
-
     final normalizedYargic = _normalizeRole('Yargıç Kararı');
-    final HukumSentiment? yargicSent = _rolSentimentleri[normalizedYargic];
-    if (yargicSent != null) {
-      return yargicSent == HukumSentiment.positive;
+    final String davaId = (widget.davaData['id'] as String? ??
+            widget.davaData['davaId'] as String? ??
+            '')
+        .trim();
+    final HukumSentiment? direction =
+        DavaHukumEligibilityService.appealOrYargicDirection(
+      davaId: davaId,
+      temyiz: _rolSentimentleri[normalizedTemyiz],
+      yargic: _rolSentimentleri[normalizedYargic],
+    );
+    if (direction != null) {
+      return direction == HukumSentiment.positive;
     }
 
     if (_consensusEvaluation != null && _consensusEvaluation!.totalVotes > 0) {

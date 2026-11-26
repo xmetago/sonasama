@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../theme/seyir_tokens.dart';
 import '../widgets/shared/dava_count_headline_page.dart';
 
 /// Gelen Davalar Kaç Tane Sayfası - GelenDavalarPage'in kopyası
@@ -29,19 +30,15 @@ class _MyCheckboxWidgetState extends State<MyCheckboxWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Row(
       children: [ const SizedBox(width: 38),
 
-        const Text(
+        Text(
           '8-HÜKÜM || ',
-          style: TextStyle(
-            fontSize: 22,
-            fontStyle: FontStyle.normal,
-            fontWeight: FontWeight.w600,
+          style: palette.display(weight: FontWeight.w600).copyWith(
             letterSpacing: 0.8,
-            color: Color(0xFF2F3E35),
           ),
-
         ),
 
         Stack(
@@ -49,7 +46,7 @@ class _MyCheckboxWidgetState extends State<MyCheckboxWidget> {
             Icon(
               MdiIcons.gavel,
               size: 24,
-              color: Colors.black54,
+              color: palette.textSecondary,
             ),
 
           ],
