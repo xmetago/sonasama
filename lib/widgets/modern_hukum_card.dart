@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../theme/seyir_tokens.dart';
@@ -8,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../models/hukum_sentiment.dart';
 import '../services/dava_consensus_service.dart';
 import '../services/dava_hukum_eligibility_service.dart';
+import '../services/dava_timer_service.dart';
 import '../services/hive_database_service.dart';
 import '../providers/dava_provider.dart';
 import 'hukum_sentiment_selector.dart';
@@ -17,6 +20,43 @@ import '../screens/hukum_gift_selection_page.dart';
 import 'rol_hukum_kartlari_section.dart';
 
 part 'modern_hukum_surec_slider.dart';
+
+enum _HukumLoadPhase { loading, ready, empty, error }
+
+/// Hüküm Verildi öncesi kısa onay.
+Future<bool> confirmHukumVerildi(BuildContext context) async {
+  final SeyirPalette palette = SeyirPalette.of(context);
+  final bool? ok = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext ctx) {
+      return AlertDialog(
+        title: Text('Emin misin?', style: palette.headline()),
+        content: Text(
+          'Hüküm verildikten sonra bu rolün metni kilitlenir.',
+          style: palette.body(),
+        ),
+        actions: <Widget>[
+          TextButton(
+            style: TextButton.styleFrom(
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Hüküm ver'),
+          ),
+        ],
+      );
+    },
+  );
+  return ok == true;
+}
+
 /// ✨ Modern 8 Hüküm Kartı Widget'ı
 ///
 /// Özellikler:
@@ -102,7 +142,17 @@ class _ModernHukumCardState extends State<ModernHukumCard>
   /// Temyiz penceresi / yargıç sırası gibi kurallardan dolayı düzenleme kilitli mi?
   bool _roleEditLocked = false;
   String? _lockReason;
+  /// true iken künye içeriği açıktır; başlıktaki ok aynı durumu gösterir.
   bool _kunyeExpanded = true;
+  _HukumLoadPhase _loadPhase = _HukumLoadPhase.loading;
+  String? _loadError;
+  DateTime? _resolvedOpenedAt;
+  String? _phaseLabel;
+  Timer? _phaseTimer;
+  bool _autoFinalizeQueued = false;
+  bool _showStamp = false;
+  String _stampCeza = '';
+  String _stampMasraf = '';
 
   /// Son Kaydet ile eşleşen taslak; aynıysa Kaydet gri, Hüküm Verildi duygu renginde kalır.
   String _kaydetBaselineTrimmedBody = '';
@@ -168,6 +218,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadExistingHukumler();
     });
+    _armPhaseTimer();
   }
 
   @override
@@ -187,6 +238,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
 
   @override
   void dispose() {
+    _phaseTimer?.cancel();
     _animationController.dispose();
     _cezaMasrafAnimationController?.dispose();
     _hukumFocusNode.dispose();
@@ -194,9 +246,122 @@ class _ModernHukumCardState extends State<ModernHukumCard>
     super.dispose();
   }
 
+  String? get _stableDavaId {
+    final String id = widget.davaId?.trim() ?? '';
+    return id.isEmpty ? null : id;
+  }
+
+  void _armPhaseTimer() {
+    _phaseTimer?.cancel();
+    _phaseTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final DateTime? opened = _resolvedOpenedAt ?? widget.openedAt;
+      if (opened == null) return;
+      final HukumPhaseClock clock = _phaseClock(opened);
+      if (clock.label == _phaseLabel) return;
+      _phaseLabel = clock.label;
+      _refreshEditLock();
+      final String? davaId = _stableDavaId;
+      if (davaId != null) {
+        DavaHukumEligibilityService.ensureAppealJudgeFallback(davaId);
+      }
+    });
+  }
+
+  HukumPhaseClock _phaseClock(DateTime openedAt) {
+    DateTime? appealDeadline;
+    final String? davaId = _stableDavaId;
+    if (davaId != null) {
+      final Map<String, dynamic>? opened =
+          HiveDatabaseService.getOpenedDavaById(davaId);
+      final DateTime? requested = DateTime.tryParse(
+        opened?['appealRequestedAt']?.toString() ?? '',
+      );
+      if (requested != null && opened?['isAppealable'] == true) {
+        appealDeadline =
+            requested.add(DavaTimerService.appealJudgeDecisionWindow);
+      }
+    }
+    return hukumPhaseClock(
+      openedAt: openedAt,
+      now: DateTime.now(),
+      appealDeadline: appealDeadline,
+    );
+  }
+
+  Future<void> _restoreCezaVeMasraf(String davaId) async {
+    final String? email = widget.userEmail?.trim();
+    bool sealed = false;
+    bool masraf = false;
+    String cezaText = '';
+    String masrafText = '';
+    if (email != null && email.isNotEmpty) {
+      final String? ceza = await HiveDatabaseService.getCeza(
+        davaId: davaId,
+        userEmail: email,
+      );
+      sealed = ceza != null && ceza.trim().isNotEmpty;
+      cezaText = ceza?.trim() ?? '';
+      final List<String>? expenses = await HiveDatabaseService.getMasrafExpenses(
+        davaId: davaId,
+        userEmail: email,
+      );
+      if (expenses != null) {
+        final List<String> lines = expenses
+            .map((String e) => e.trim())
+            .where((String e) => e.isNotEmpty)
+            .toList();
+        if (lines.isNotEmpty) {
+          masraf = true;
+          masrafText = lines.first;
+        }
+      }
+      if (!masraf) {
+        final Map<String, String> map =
+            await HiveDatabaseService.getMasrafGiftLineMapForDavaId(davaId);
+        final String? line = map[email.toLowerCase()];
+        if (line != null && line.trim().isNotEmpty) {
+          masraf = true;
+          masrafText = line.trim();
+        }
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _cezaMuhurluPersisted = sealed;
+      _cezaCompleted = sealed;
+      _masrafCompleted = masraf;
+      _stampCeza = cezaText;
+      _stampMasraf = masrafText;
+      final String role = normalizeRolKarari(widget.davaGorev);
+      if (cezaText.isNotEmpty) {
+        _rolCezalari[role] = cezaText;
+      }
+      if (masrafText.isNotEmpty) {
+        _rolMasraflari[role] = masrafText;
+      }
+    });
+  }
+
   /// Hive üzerinde kayıtlı hüküm verilerini yükler.
   Future<void> _loadExistingHukumler() async {
-    final String davaId = widget.davaId ?? 'dava_${widget.davaAdi.hashCode}';
+    final String? davaId = _stableDavaId;
+    if (davaId == null) {
+      if (!mounted) return;
+      setState(() {
+        _loadPhase = _HukumLoadPhase.error;
+        _loadError =
+            'Dava kimliği yok. Kayıt bölünmesin diye hüküm okunmadı.';
+      });
+      await _refreshEditLock();
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        _loadPhase = _HukumLoadPhase.loading;
+        _loadError = null;
+      });
+    }
     try {
       final Map<String, Map<String, dynamic>> existing =
           await HiveDatabaseService.getHukumlerByDavaIdGrouped(
@@ -283,10 +448,11 @@ class _ModernHukumCardState extends State<ModernHukumCard>
         _selectedSentiment = _rolSentimentleri[normalizedRole];
         _isCurrentRoleFinalized =
             _rolFinalizasyonlari[normalizedRole] ?? false;
-        // Her rol geçişinde ceza/masraf kartı varsayılan ikonlarla başlasın.
-        _cezaCompleted = false;
-        _masrafCompleted = false;
         _showCezaMasrafButtons = false;
+        _loadPhase = existing.isEmpty
+            ? _HukumLoadPhase.empty
+            : _HukumLoadPhase.ready;
+        _loadError = null;
         if (_isCurrentRoleFinalized) {
           _hukumController.value = _hukumController.value.copyWith(
             selection: TextSelection.collapsed(
@@ -299,108 +465,55 @@ class _ModernHukumCardState extends State<ModernHukumCard>
         _kaydetBaselineSentiment = _selectedSentiment;
       });
     } catch (_) {
-      // Hive erişiminde hata oluşursa UI tarafında sessizce devam edilir.
-    }
-
-    await _refreshConsensus();
-    await _refreshEditLock();
-    await _refreshCezaSealState();
-  }
-
-  /// Bu dava + oturumdaki kullanıcı için ceza mühürlü mü? (8-Hüküm: yalnızca ilgili kişi salt okunur.)
-  Future<void> _refreshCezaSealState() async {
-    final String? email = widget.userEmail?.trim();
-    if (email == null || email.isEmpty) {
-      if (mounted) {
-        setState(() => _cezaMuhurluPersisted = false);
-      }
-      return;
-    }
-    final String davaId = widget.davaId ?? 'dava_${widget.davaAdi.hashCode}';
-    final String? ceza = await HiveDatabaseService.getCeza(
-      davaId: davaId,
-      userEmail: email,
-    );
-    if (!mounted) {
-      return;
-    }
-    final bool sealed = ceza != null && ceza.trim().isNotEmpty;
-    setState(() {
-      _cezaMuhurluPersisted = sealed;
-      if (sealed) {
-        _cezaCompleted = true;
-      }
-    });
-  }
-
-  Future<void> _refreshEditLock() async {
-    if (widget.davaId == null || widget.davaId!.isEmpty) {
       if (!mounted) return;
       setState(() {
-        _roleEditLocked = false;
-        _lockReason = null;
+        _loadPhase = _HukumLoadPhase.error;
+        _loadError = 'Hükümler yüklenemedi. Tekrar dene.';
       });
       return;
     }
 
-    final opened = HiveDatabaseService.getOpenedDavaById(widget.davaId!);
-    final now = DateTime.now();
-    final openedAt = widget.openedAt;
+    await _refreshConsensus();
+    await _refreshEditLock();
+    await _restoreCezaVeMasraf(davaId);
+    await DavaHukumEligibilityService.ensureAppealJudgeFallback(davaId);
+    _maybeAutoFinalize();
+  }
 
-    final appealWindow =
+  void _maybeAutoFinalize() {
+    if (_roleEditLocked || _isCurrentRoleFinalized) return;
+    if (!_cezaCompleted || !_masrafCompleted) return;
+    _checkAndCompleteHukum();
+  }
+
+  Future<void> _refreshEditLock() async {
+    final String? davaId = _stableDavaId;
+    DateTime? openedAt = widget.openedAt;
+    Map<String, dynamic>? opened;
+    if (davaId != null) {
+      opened = HiveDatabaseService.getOpenedDavaById(davaId);
+      openedAt ??= DavaTimerService.parseOpenedAt(opened ?? <String, dynamic>{});
+    }
+    final bool appealWindow = davaId != null &&
         DavaHukumEligibilityService.isAppealJudgeWindowActive(opened);
-    final mainEnded =
-        DavaHukumEligibilityService.isMainTrialEnded(openedAt, now);
-    final appealEditingAllowed = appealWindow && mainEnded;
-
-    final gorev = widget.davaGorev;
-    final isTemyiz = DavaHukumEligibilityService.roleLabelIsTemyiz(gorev);
-    final isYargic = DavaHukumEligibilityService.roleLabelIsYargic(gorev);
-
-    String? reason;
-    var locked = false;
-
-    if (appealEditingAllowed) {
-      if (!isTemyiz) {
-        locked = true;
-        reason =
-            'Temyiz süreci aktif: yalnızca Temyiz Hakimi hüküm düzenleyebilir.';
-      }
-    } else if (isTemyiz) {
-      locked = true;
-      reason =
-          'Temyiz hükmü; 7 gün sonrası temyiz talebinden sonra 72 saatlik süre içinde açılır.';
-    }
-
-    if (!locked && isYargic && !appealEditingAllowed) {
-      final past144 = openedAt != null &&
-          now.difference(openedAt) >= const Duration(hours: 144);
-      final sixDone = await DavaHukumEligibilityService.hasSixPanelFinalized(
-        widget.davaId!,
-      );
-      if (!past144 && !sixDone) {
-        locked = true;
-        reason =
-            'Yargıç: Altı rol (jüri, avukatlar, şahitler) hükmünü tamamlayana veya 144. saat dolana kadar bekleyin.';
-      }
-    }
-
-    // Ana süre (168 saat) bittiyse jüri / avukat / şahit rolleri taslak da olsa
-    // metin güncelleyemez; yargıç ve temyiz (kendi pencerelerinde) hariç.
-    if (!locked &&
-        mainEnded &&
-        openedAt != null &&
-        !isTemyiz &&
-        !isYargic) {
-      locked = true;
-      reason =
-          'Ana dava süresi (168 saat) tamamlandı; hüküm metni artık güncellenemez.';
-    }
-
+    final bool sixDone = davaId != null &&
+        await DavaHukumEligibilityService.hasSixPanelFinalized(davaId);
+    final HukumRoleEditLock lock =
+        DavaHukumEligibilityService.evaluateRoleEditLock(
+      gorev: widget.davaGorev,
+      openedAt: openedAt,
+      now: DateTime.now(),
+      appealWindowActive: appealWindow,
+      sixPanelFinalized: sixDone,
+    );
     if (!mounted) return;
+    final HukumPhaseClock? clock =
+        openedAt == null ? null : _phaseClock(openedAt);
     setState(() {
-      _roleEditLocked = locked;
-      _lockReason = reason;
+      _resolvedOpenedAt = openedAt;
+      _roleEditLocked = lock.locked;
+      _lockReason = lock.reason;
+      _phaseLabel = clock?.label;
     });
   }
 
@@ -517,35 +630,49 @@ class _ModernHukumCardState extends State<ModernHukumCard>
 
   @override
   Widget build(BuildContext context) {
+    final SeyirPalette palette = SeyirPalette.of(context);
     return ScaleTransition(
       scale: _scaleAnimation,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+        margin: const EdgeInsets.fromLTRB(
+          SeyirTokens.space3,
+          2,
+          SeyirTokens.space3,
+          SeyirTokens.space2,
+        ),
         decoration: BoxDecoration(
-          color: SeyirPalette.of(context).card,
-          borderRadius: BorderRadius.circular(20),
+          color: palette.card,
+          borderRadius: SeyirTokens.radiusLgAll,
           border: Border.all(
-            color: SeyirPalette.of(context).border,
+            color: palette.border,
             width: 1.4,
           ),
-          boxShadow: SeyirPalette.of(context).cardShadow,
+          boxShadow: palette.cardShadow,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: SeyirTokens.radiusLgAll,
           child: Material(
             color: Colors.transparent,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
+                if (_loadPhase == _HukumLoadPhase.loading)
+                  const LinearProgressIndicator(minHeight: 2),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+                  padding: const EdgeInsets.fromLTRB(
+                    SeyirTokens.space4,
+                    SeyirTokens.space3,
+                    SeyirTokens.space4,
+                    SeyirTokens.space4,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
+                      _buildLoadStatus(palette),
                       _buildDavaInfo(),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: SeyirTokens.space3),
                       _buildHukumInput(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: SeyirTokens.space4),
                       RolHukumKartlariSection(
                         davaId: widget.davaId,
                         openedAt: widget.openedAt,
@@ -572,13 +699,54 @@ class _ModernHukumCardState extends State<ModernHukumCard>
     );
   }
 
+  Widget _buildLoadStatus(SeyirPalette palette) {
+    if (_loadPhase == _HukumLoadPhase.loading) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: SeyirTokens.space3),
+        child: Text('Hükümler yükleniyor', style: palette.caption()),
+      );
+    }
+    if (_loadPhase == _HukumLoadPhase.empty) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: SeyirTokens.space3),
+        child: Text(
+          'Bu dava için kayıtlı hüküm yok.',
+          style: palette.caption(),
+        ),
+      );
+    }
+    if (_loadPhase == _HukumLoadPhase.error) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: SeyirTokens.space3),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                _loadError ?? 'Hükümler yüklenemedi. Tekrar dene.',
+                style: palette.body(color: palette.foreground(SeyirTokens.reject)),
+              ),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+              ),
+              onPressed: _loadExistingHukumler,
+              child: const Text('Tekrar dene'),
+            ),
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   /// Dava bilgilerini gösteren kutuyu oluşturur.//bu kısmı dava künyesi 2 diyorum.
   Widget _buildDavaInfo() {
     final SeyirPalette palette = SeyirPalette.of(context);
     return Container(
       decoration: BoxDecoration(
         color: palette.card,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: SeyirTokens.radiusMdAll,
         border: Border.all(color: palette.border),
       ),
       clipBehavior: Clip.antiAlias,
@@ -591,8 +759,13 @@ class _ModernHukumCardState extends State<ModernHukumCard>
               onTap: () {
                 setState(() => _kunyeExpanded = !_kunyeExpanded);
               },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+                child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SeyirTokens.space3,
+                  vertical: SeyirTokens.space2,
+                ),
                 child: Row(
                   children: <Widget>[
                     Expanded(
@@ -615,6 +788,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                   ],
                 ),
               ),
+              ),
             ),
           ),
           AnimatedCrossFade(
@@ -623,10 +797,15 @@ class _ModernHukumCardState extends State<ModernHukumCard>
             sizeCurve: Curves.easeInOutCubic,
             duration: const Duration(milliseconds: 280),
             crossFadeState: _kunyeExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
             firstChild: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              padding: const EdgeInsets.fromLTRB(
+                SeyirTokens.space4,
+                0,
+                SeyirTokens.space4,
+                SeyirTokens.space3,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
@@ -634,30 +813,30 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                     'Göreviniz',
                     widget.davaGorev,
                     MdiIcons.briefcaseOutline,
-                    color: Colors.green.shade700,
+                    color: SeyirPalette.of(context).foreground(SeyirTokens.brandDeep),
                   ),
-                  const Divider(height: 20),
+                  const Divider(height: SeyirTokens.space6),
                   _buildInfoRow(
                     'Dava Adı',
                     widget.davaAdi,
                     MdiIcons.gavel,
-                    color: Colors.green.shade700,
+                    color: SeyirPalette.of(context).foreground(SeyirTokens.brandDeep),
                   ),
-                  const Divider(height: 20),
+                  const Divider(height: SeyirTokens.space6),
                   _buildInfoRow(
                     'Davacı',
                     widget.davaDavaci,
                     MdiIcons.account,
-                    color: Colors.green.shade700,
+                    color: SeyirPalette.of(context).foreground(SeyirTokens.brandDeep),
                   ),
-                  const Divider(height: 20),
+                  const Divider(height: SeyirTokens.space6),
                   _buildInfoRow(
                     'Davalı',
                     widget.davaDavali,
                     MdiIcons.accountOutline,
-                    color: Colors.green.shade700,
+                    color: SeyirPalette.of(context).foreground(SeyirTokens.brandDeep),
                   ),
-                  const Divider(height: 20),
+                  const Divider(height: SeyirTokens.space6),
                   _buildCountdownSection(),
                 ],
               ),
@@ -702,10 +881,16 @@ class _ModernHukumCardState extends State<ModernHukumCard>
   }
 
   Widget _buildCountdownSection() {
-    final DateTime? openedAt = widget.openedAt;
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final DateTime? openedAt = _resolvedOpenedAt ?? widget.openedAt;
     final String openedAtText = openedAt != null
         ? _formatDateTime(openedAt)
         : 'Açılış tarihi bulunamadı';
+    final HukumPhaseClock? clock =
+        openedAt == null ? null : _phaseClock(openedAt);
+    final Color phaseColor = clock == null
+        ? palette.foreground(SeyirTokens.warning)
+        : seyirIncomingPhaseColor(context, clock.storageStatus);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -716,42 +901,67 @@ class _ModernHukumCardState extends State<ModernHukumCard>
             Icon(
               MdiIcons.timerAlertOutline,
               size: 20,
-              color: Colors.orange.shade600,
+              color: phaseColor,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: SeyirTokens.space3),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
                     'Dava Açılış Tarihi',
-                    style: SeyirPalette.of(context).caption(weight: FontWeight.w600),
+                    style: palette.caption(weight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: SeyirTokens.space1),
                   Text(
                     openedAtText,
-                    style: SeyirPalette.of(context).body(weight: FontWeight.w700),
+                    style: palette.body(weight: FontWeight.w700),
                   ),
 
                   if (openedAt == null && widget.kalanSure.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: SeyirTokens.space2),
                     Text(
                       widget.kalanSure,
-                      style: TextStyle(
-                        fontSize: SeyirTokens.typeCaption,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.blue.shade700,
+                      style: palette.caption(
+                        weight: FontWeight.w600,
+                        color: palette.foreground(SeyirTokens.sectionPeople),
                       ),
                     ),
                   ],
+                  if (openedAt == null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: SeyirTokens.space2),
+                      child: Text(
+                        'Süre doğrulanamadı; düzenleme kilitli.',
+                        style: palette.caption(
+                          color: palette.foreground(SeyirTokens.warning),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
-            if (openedAt != null)
-              CountdownTimerWidget(
-                startTime: openedAt,
-                totalDuration: const Duration(hours: 168),
-                showHourglass: true,
+            if (clock != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  Text(
+                    clock.label,
+                    style: palette.caption(
+                      weight: FontWeight.w700,
+                      color: phaseColor,
+                    ),
+                  ),
+                  CountdownTimerWidget(
+                    key: ValueKey<String>(
+                      '${clock.label}-${clock.total.inHours}',
+                    ),
+                    startTime: clock.start,
+                    totalDuration: clock.total,
+                    showHourglass: true,
+                    accentColor: phaseColor,
+                  ),
+                ],
               ),
           ],
         ),
@@ -776,24 +986,25 @@ class _ModernHukumCardState extends State<ModernHukumCard>
             _lockReason != null &&
             _lockReason!.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: SeyirTokens.space3),
             child: Material(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(12),
+              color: SeyirPalette.of(context).tint(SeyirTokens.warning),
+              borderRadius: SeyirTokens.radiusMdAll,
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(SeyirTokens.space3),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Icon(Icons.lock_outline, color: Colors.orange.shade800),
-                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.lock_outline,
+                      color: SeyirPalette.of(context).foreground(SeyirTokens.warning),
+                    ),
+                    const SizedBox(width: SeyirTokens.space2),
                     Expanded(
                       child: Text(
                         _lockReason!,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.orange.shade900,
-                          height: 1.35,
+                        style: SeyirPalette.of(context).body(
+                          color: SeyirPalette.of(context).foreground(SeyirTokens.warning),
                         ),
                       ),
                     ),
@@ -814,19 +1025,19 @@ class _ModernHukumCardState extends State<ModernHukumCard>
               color: inputLocked
                   ? SeyirPalette.of(context).surfaceMuted
                   : SeyirPalette.of(context).surface,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: SeyirTokens.radiusLgAll,
               border: Border.all(
                 color: inputLocked
                     ? SeyirPalette.of(context).border
                     : (_hukumFocusNode.hasFocus
-                    ? const Color(0xFF4CAF50)
+                    ? SeyirTokens.brand
                     : SeyirPalette.of(context).border),
                 width: _hukumFocusNode.hasFocus ? 2 : 1,
               ),
               boxShadow: <BoxShadow>[
                 if (_hukumFocusNode.hasFocus && !inputLocked)
                   BoxShadow(
-                    color: const Color(0xFF4CAF50).withOpacity(0.14),
+                    color: SeyirTokens.brand.withValues(alpha: 0.14),
                     blurRadius: 14,
                     spreadRadius: 1,
                     offset: const Offset(0, 4),
@@ -842,7 +1053,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
               enabled: true,
               readOnly: inputLocked,
               showCursor: !inputLocked,
-              cursorColor: const Color(0xFF4CAF50),
+              cursorColor: SeyirTokens.brand,
               cursorWidth: 3,
               cursorRadius: const Radius.circular(2),
               onTap: () {
@@ -850,7 +1061,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                   final String lockMessage = _isCurrentRoleFinalized
                       ? 'Bu rol için hüküm nihai hale getirildiği için düzenleme yapılamaz.'
                       : (_lockReason ?? 'Bu alanda şu anda düzenleme yapılamıyor.');
-                  _showSnackBar(lockMessage, Colors.orange.shade800);
+                  _showSnackBar(lockMessage, SeyirTokens.warning);
                 }
               },
               decoration: InputDecoration(
@@ -860,10 +1071,13 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                   color: SeyirPalette.of(context).textMuted,
                 ),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.all(20),
+                contentPadding: const EdgeInsets.all(SeyirTokens.space4),
                 suffixIcon: Padding(
-                  padding: const EdgeInsets.only(top: 200, right: 4),
+                  padding: const EdgeInsets.only(top: 200, right: SeyirTokens.space1),
                   child: IconButton(
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                    ),
                     tooltip: _isCurrentRoleFinalized
                         ? 'Hüküm kesinleştiği için kaydedilemez'
                         : (!_kaydetHasPendingDraftChanges &&
@@ -877,16 +1091,16 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                     icon: Icon(
                       Icons.save_as_outlined,
                       color: _isCurrentRoleFinalized
-                          ? Colors.grey.shade300
+                          ? SeyirPalette.of(context).textMuted
                           : (!_kaydetHasPendingDraftChanges &&
                                   _extractHukumBody(_hukumController.text)
                                       .trim()
                                       .isNotEmpty &&
                                   _selectedSentiment != null)
-                              ? Colors.blue.shade700
+                              ? SeyirPalette.of(context).foreground(SeyirTokens.sectionPeople)
                               : (_isKaydetButtonEnabled
-                                  ? const Color(0xFF4CAF50)
-                                  : Colors.grey.shade300),
+                                  ? SeyirTokens.brandDeep
+                                  : SeyirPalette.of(context).textMuted),
                     ),
                   ),
                 ),
@@ -974,14 +1188,22 @@ class _ModernHukumCardState extends State<ModernHukumCard>
               disabledHint: disabledHint,
               focusNode: _hukumFocusNode,
               onSave: () => _saveHukumForRole(widget.davaGorev),
-              onHukum: () {
+              onHukum: () async {
+                final bool confirmed = await confirmHukumVerildi(context);
+                if (!confirmed || !mounted) return;
+                if (_roleEditLocked) {
+                  _showSnackBar(
+                    _lockReason ?? 'Bu alanda şu anda düzenleme yapılamıyor.',
+                    SeyirTokens.warning,
+                  );
+                  return;
+                }
                 if (!_showCezaMasrafButtons) {
                   setState(() {
                     _showCezaMasrafButtons = true;
-                    _cezaCompleted = false;
-                    _masrafCompleted = false;
                   });
                   _cezaMasrafAnimationController?.forward(from: 0);
+                  _maybeAutoFinalize();
                   return;
                 }
                 _saveHukumForRole(
@@ -1005,25 +1227,30 @@ class _ModernHukumCardState extends State<ModernHukumCard>
     }
     final HukumSentiment s = _selectedSentiment!;
     final String upper = s == HukumSentiment.positive ? 'OLUMLU' : 'OLUMSUZ';
+    final SeyirPalette palette = SeyirPalette.of(context);
     return Material(
-      color: const Color(0xFFE3F2FD),
-      borderRadius: BorderRadius.circular(8),
+      color: palette.tint(SeyirTokens.sectionPeople),
+      borderRadius: SeyirTokens.radiusSmAll,
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: const Border(
-            left: BorderSide(color: Color(0xFF2196F3), width: 4),
+          borderRadius: SeyirTokens.radiusSmAll,
+          border: Border(
+            left: BorderSide(
+              color: palette.foreground(SeyirTokens.sectionPeople),
+              width: 4,
+            ),
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 5),
+        padding: const EdgeInsets.fromLTRB(
+          SeyirTokens.space3,
+          SeyirTokens.space2,
+          SeyirTokens.space3,
+          SeyirTokens.space1,
+        ),
         child: RichText(
           text: TextSpan(
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.35,
-              color: Colors.grey.shade800,
-            ),
+            style: palette.body(),
             children: <TextSpan>[
               TextSpan(
                 text: upper,
@@ -1042,25 +1269,25 @@ class _ModernHukumCardState extends State<ModernHukumCard>
 
   /// Ceza Ver ve Masrafla butonlarını oluşturur
   Widget _buildCezaMasrafButtons() {
+    final SeyirPalette palette = SeyirPalette.of(context);
     final bool finalizedMode = _isCurrentRoleFinalized;
-    // Temayı canlı tutmak için kırmızı tonu kullanıyoruz
-    const Color primaryAccent = Colors.red;
-    const Color secondaryAccent = Colors.purple;
+    final Color primaryAccent = palette.foreground(SeyirTokens.sectionPenalty);
+    final Color secondaryAccent = palette.foreground(SeyirTokens.sectionGift);
 
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(SeyirTokens.space2),
       decoration: BoxDecoration(
-        color: SeyirPalette.of(context).card,
-        borderRadius: BorderRadius.circular(24),
+        color: palette.card,
+        borderRadius: SeyirTokens.radiusXlAll,
         border: Border.all(
           color: finalizedMode
-              ? SeyirPalette.of(context).border
-              : primaryAccent.withOpacity(0.15),
+              ? palette.border
+              : primaryAccent.withValues(alpha: 0.28),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: (finalizedMode ? Colors.grey : primaryAccent).withOpacity(0.06),
+            color: (finalizedMode ? palette.shadow : primaryAccent).withValues(alpha: 0.12),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -1069,11 +1296,17 @@ class _ModernHukumCardState extends State<ModernHukumCard>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (finalizedMode) _buildFinalizedSummary(palette),
+          if (_showStamp) _buildStampBanner(palette),
           // Bölüm Başlığı
           Row(
             children: [
-              Icon(MdiIcons.gavel, size: 20, color: finalizedMode ? Colors.grey : Colors.red.shade700),
-              const SizedBox(width:10),
+              Icon(
+                MdiIcons.gavel,
+                size: 20,
+                color: finalizedMode ? palette.textSecondary : primaryAccent,
+              ),
+              const SizedBox(width: SeyirTokens.space2),
               Text(
                 'Ceza ve Masraf İşlemleri',
                 style: SeyirPalette.of(context).title(
@@ -1121,7 +1354,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                                 userEmail: widget.userEmail,
                                 davaGorev: widget.davaGorev,
                                 kalanSure: widget.kalanSure,
-                                davaOpenedAt: widget.openedAt,
+                                davaOpenedAt: _resolvedOpenedAt ?? widget.openedAt,
                               ),
                             ),
                           );
@@ -1151,7 +1384,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                       _showSnackBar(
                         'Önce cezayı mühürlemeniz (Ceza Ver) gerekir. '
                         'Cezalama bitmeden masraf akışı seyir defterine düşmez.',
-                        Colors.orange.shade800,
+                        SeyirTokens.warning,
                       );
                       return;
                     }
@@ -1197,41 +1430,41 @@ class _ModernHukumCardState extends State<ModernHukumCard>
         ? (completedIcon ?? Icons.check_circle)
         : defaultIcon;
     final String displayLabel =
-        showDone && completedLabel != null ? completedLabel! : label;
+        showDone && completedLabel != null ? completedLabel : label;
+    final SeyirPalette palette = SeyirPalette.of(context);
     final bool warningDone =
         showDone && completedIcon != null && completedLabel != null;
-    // Tamamlandığında: varsayılan yeşil tik; masraf/hediye (özel ikon+UYAR!) için uyarı tonu.
+    final Color doneInk = warningDone
+        ? palette.foreground(SeyirTokens.warning)
+        : palette.foreground(SeyirTokens.accept);
     final Color statusColor = mutedDisabled
-        ? Colors.blueGrey.shade500
-        : (showDone
-            ? (warningDone ? Colors.deepOrange.shade800 : Colors.green.shade600)
-            : activeColor);
+        ? palette.textSecondary
+        : (showDone ? doneInk : activeColor);
     final Color bgColor = mutedDisabled
-        ? SeyirPalette.of(context).surfaceMuted
+        ? palette.surfaceMuted
         : (showDone
-            ? (warningDone
-                ? Colors.deepOrange.shade50
-                : Colors.green.shade50)
-            : activeColor.withOpacity(0.05));
+            ? palette.tint(warningDone ? SeyirTokens.warning : SeyirTokens.accept)
+            : activeColor.withValues(alpha: 0.08));
     final Color doneBorderColor = warningDone
-        ? Colors.deepOrange.withOpacity(0.35)
-        : Colors.green.withOpacity(0.2);
+        ? palette.tintBorder(SeyirTokens.warning)
+        : palette.tintBorder(SeyirTokens.accept);
 
     return Material(
       color: bgColor,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: SeyirTokens.radiusLgAll,
       child: InkWell(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: SeyirTokens.radiusLgAll,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
+          padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space4),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: SeyirTokens.radiusLgAll,
             border: Border.all(
               color: mutedDisabled
-                  ? Colors.blueGrey.shade200
-                  : (showDone ? doneBorderColor : activeColor.withOpacity(0.1)),
+                  ? palette.border
+                  : (showDone ? doneBorderColor : activeColor.withValues(alpha: 0.28)),
             ),
           ),
           child: Column(
@@ -1249,7 +1482,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
                 style: TextStyle(
                   color: statusColor,
                   fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                  fontSize: SeyirTokens.typeBody,
                 ),
               ),
             ],
@@ -1407,17 +1640,86 @@ class _ModernHukumCardState extends State<ModernHukumCard>
 
   /// Her iki işlem de tamamlandıysa hüküm verildi işlemini kontrol eder
   void _checkAndCompleteHukum() {
-    if (_cezaCompleted && _masrafCompleted) {
-      // Her iki işlem de tamamlandı, hüküm verildi işlemini yap
-      Future.delayed(const Duration(milliseconds: 500), () async {
-        if (mounted) {
-          await _saveHukumForRole(
-            widget.davaGorev,
-            isVerdi: true,
-          );
-        }
-      });
-    }
+    if (_roleEditLocked || _isCurrentRoleFinalized) return;
+    if (!_cezaCompleted || !_masrafCompleted || _autoFinalizeQueued) return;
+    _autoFinalizeQueued = true;
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      _autoFinalizeQueued = false;
+      if (!mounted || _roleEditLocked || _isCurrentRoleFinalized) return;
+      if (_cezaCompleted && _masrafCompleted) {
+        await _saveHukumForRole(
+          widget.davaGorev,
+          isVerdi: true,
+        );
+      }
+    });
+  }
+
+  void _playStamp() {
+    HapticFeedback.lightImpact();
+    if (!mounted) return;
+    setState(() => _showStamp = true);
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _showStamp = false);
+    });
+  }
+
+  Widget _buildStampBanner(SeyirPalette palette) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SeyirTokens.space2),
+      child: Material(
+        color: palette.tint(SeyirTokens.brand),
+        borderRadius: SeyirTokens.radiusMdAll,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SeyirTokens.space3,
+            vertical: SeyirTokens.space2,
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(MdiIcons.stamper, color: palette.foreground(SeyirTokens.brandDeep)),
+              const SizedBox(width: SeyirTokens.space2),
+              Expanded(
+                child: Text(
+                  'Mühürlendi',
+                  style: palette.title(color: palette.foreground(SeyirTokens.brandDeep)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFinalizedSummary(SeyirPalette palette) {
+    final String role = normalizeRolKarari(widget.davaGorev);
+    final HukumSentiment? sentiment =
+        _rolSentimentleri[role] ?? _selectedSentiment;
+    final String ceza = (_rolCezalari[role] ?? _stampCeza).trim();
+    final String masraf = (_rolMasraflari[role] ?? _stampMasraf).trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SeyirTokens.space3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('Hüküm özeti', style: palette.title()),
+          const SizedBox(height: SeyirTokens.space2),
+          Text(
+            'Yön: ${sentiment?.label ?? 'Belirtilmedi'}',
+            style: palette.body(),
+          ),
+          Text(
+            'Ceza: ${ceza.isEmpty ? 'Kayıt yok' : ceza}',
+            style: palette.body(),
+          ),
+          Text(
+            'Masraf: ${masraf.isEmpty ? 'Kayıt yok' : masraf}',
+            style: palette.body(),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Hükmü ilgili rol adına kaydeder ve Hive'a yazar.
@@ -1431,7 +1733,7 @@ class _ModernHukumCardState extends State<ModernHukumCard>
     if (hukumBody.isEmpty) {
       _showSnackBar(
         'Lütfen sabit ifadeden sonra hükmünüzü yazın.',
-        Colors.orange.shade800,
+        SeyirTokens.warning,
       );
       return;
     }
@@ -1439,21 +1741,21 @@ class _ModernHukumCardState extends State<ModernHukumCard>
       _showSnackBar(
         'Gereği düşünüldü metni en az $_hukumBodyMinChars karakter olmalıdır '
         '(şu an ${hukumBody.length}).',
-        Colors.orange.shade800,
+        SeyirTokens.warning,
       );
       return;
     }
     if (hukumBody.length > _hukumBodyMaxChars) {
       _showSnackBar(
         'Gereği düşünüldü metni en fazla $_hukumBodyMaxChars karakter olabilir.',
-        Colors.orange.shade800,
+        SeyirTokens.warning,
       );
       return;
     }
     if (sentiment == null) {
       _showSnackBar(
         'Lütfen hükmünüzün olumlu mu olumsuz mu olduğunu belirtmek için emojilerden birini seçin.',
-        Colors.orange.shade800,
+        SeyirTokens.warning,
       );
       return;
     }
@@ -1462,59 +1764,34 @@ class _ModernHukumCardState extends State<ModernHukumCard>
     if (_rolFinalizasyonlari[normalizedRolAdi] == true) {
       _showSnackBar(
         'Bu rol için hüküm nihai hale getirildi; düzenleme yapılamaz.',
-        Colors.orange.shade800,
+        SeyirTokens.warning,
       );
       return;
     }
 
-    // Süre / temyiz gibi kurallar taslak kaydını engeller; nihai "Hüküm Verildi"
-    // tamamlanırken (isVerdi) kayıt yine yazılabilir.
-    if (_roleEditLocked && !isVerdi) {
+    if (_roleEditLocked) {
       _showSnackBar(
         _lockReason ?? 'Bu alanda şu anda düzenleme yapılamıyor.',
-        Colors.orange.shade800,
+        SeyirTokens.warning,
       );
       return;
     }
 
-    final String davaId = widget.davaId ?? 'dava_${widget.davaAdi.hashCode}';
+    final String? davaId = _stableDavaId;
+    if (davaId == null) {
+      _showSnackBar(
+        'Dava kimliği yok. Kayıt bölünmesin diye hüküm yazılmadı. Tekrar dene.',
+        SeyirTokens.reject,
+      );
+      return;
+    }
     final bool nextFinalizationState = isVerdi;
     final String fullText = '$_hukumPrefix$hukumBody';
 
-    print('🔍 [ModernHukumCard] _saveHukumForRole çağrıldı:');
-    print('   - widget.davaId: ${widget.davaId}');
-    print('   - widget.davaAdi: ${widget.davaAdi}');
-    print('   - Hesaplanan davaId: $davaId');
-    print('   - normalizedRolAdi: $normalizedRolAdi');
-    print('   - hukumText uzunluğu: ${fullText.length}');
-    print('   - sentiment: ${sentiment.storageValue}');
-
-    setState(() {
-      _rolHukumleri[normalizedRolAdi] = fullText;
-      _rolSentimentleri[normalizedRolAdi] = sentiment;
-      _rolFinalizasyonlari[normalizedRolAdi] = nextFinalizationState;
-      _isCurrentRoleFinalized = nextFinalizationState;
-      _selectedSentiment = sentiment;
-      // Hüküm verildiğinde ceza ve masraf butonlarını gizle
-      if (isVerdi) {
-        _showCezaMasrafButtons = false;
-        _cezaCompleted = false;
-        _masrafCompleted = false;
-      }
-      if (!_isCurrentRoleFinalized) {
-        _hukumController.text = fullText;
-        _hukumController.selection = TextSelection.collapsed(
-          offset: _hukumController.text.length,
-        );
-      }
-    });
-
     try {
-      // Hive mutlaka güncellenmeli; userEmail boşken eskiden hiç yazılmıyordu ve
-      // _loadExistingHukumler isFinalized=false okuyup kesinleşmiş ekranı geri açıyordu.
       if ((widget.userEmail ?? '').isNotEmpty) {
         final davaProvider = Provider.of<DavaProvider>(context, listen: false);
-        final bool? providerOk = await davaProvider.updateHukumForDava(
+        final bool providerOk = await davaProvider.updateHukumForDava(
           davaId: davaId,
           userRole: normalizedRolAdi,
           hukumText: fullText,
@@ -1522,38 +1799,31 @@ class _ModernHukumCardState extends State<ModernHukumCard>
           hukumSentiment: sentiment.storageValue,
           isFinalized: nextFinalizationState,
         );
-        if (providerOk != true) {
-          throw Exception('Provider hüküm kaydını tamamlayamadı (sonuç: $providerOk).');
+        if (!providerOk) {
+          throw StateError('Hüküm kaydedilemedi');
         }
 
-        if (isVerdi &&
-            DavaHukumEligibilityService.roleLabelIsTemyiz(rolAdi) &&
-            widget.davaId != null &&
-            widget.davaId!.isNotEmpty) {
+        if (isVerdi && DavaHukumEligibilityService.roleLabelIsTemyiz(rolAdi)) {
           await HiveDatabaseService.updateOpenedDava(davaId, {
             'appealJudgeSentiment': sentiment.storageValue,
             'appealJudgeRuledAt': DateTime.now().toIso8601String(),
           });
         }
 
-        // Ceza mühürü + masraf sonrası kesin hüküm: kendi seyir defterine dava_share
-        // (anasayfadaki IlgililerinSeyirDefteriWidgeti ile aynı veri yapısı).
-        if (isVerdi &&
-            widget.davaId != null &&
-            widget.davaId!.trim().isNotEmpty) {
+        if (isVerdi) {
           final Map<String, dynamic>? feedPost =
               HiveDatabaseService.composeHomeFeedDavaSharePostAfterHukumFinalized(
-            davaId: widget.davaId!.trim(),
+            davaId: davaId,
             userEmail: widget.userEmail!,
             fallbackSnapshot: <String, dynamic>{
-              'id': widget.davaId,
+              'id': davaId,
               'davaAdi': widget.davaAdi,
               'davaci': widget.davaDavaci,
               'davali': widget.davaDavali,
               'davaKonusu': '',
               'kategori': '',
               'davaKategorisi': '',
-              'openedAt': widget.openedAt?.toIso8601String(),
+              'openedAt': (_resolvedOpenedAt ?? widget.openedAt)?.toIso8601String(),
             },
           );
           if (feedPost != null) {
@@ -1562,14 +1832,8 @@ class _ModernHukumCardState extends State<ModernHukumCard>
             await davaProvider.refreshHomeFeedSilent(widget.userEmail!);
           }
         }
-
-        print('✅ [ModernHukumCard] Hüküm Provider üzerinden kaydedildi:');
-        print('   - Dava ID: $davaId');
-        print('   - Rol: $normalizedRolAdi');
-        print('   - Sentiment: ${sentiment.storageValue}');
-        print('   - Provider versiyonu: ${davaProvider.hukumUpdateVersion}');
       } else {
-        await HiveDatabaseService.saveHukum(
+        final bool saved = await HiveDatabaseService.saveHukum(
           davaId: davaId,
           userRole: normalizedRolAdi,
           hukumText: fullText,
@@ -1577,7 +1841,34 @@ class _ModernHukumCardState extends State<ModernHukumCard>
           hukumSentiment: sentiment.storageValue,
           isFinalized: nextFinalizationState,
         );
-        print('✅ [ModernHukumCard] Hüküm Hive\'a yazıldı (userEmail boş).');
+        if (!saved) {
+          throw StateError('Hüküm kaydedilemedi');
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _rolHukumleri[normalizedRolAdi] = fullText;
+        _rolSentimentleri[normalizedRolAdi] = sentiment;
+        _rolFinalizasyonlari[normalizedRolAdi] = nextFinalizationState;
+        _isCurrentRoleFinalized = nextFinalizationState;
+        _selectedSentiment = sentiment;
+        _kaydetBaselineTrimmedBody = hukumBody;
+        _kaydetBaselineSentiment = sentiment;
+        if (isVerdi) {
+          _showCezaMasrafButtons = false;
+        } else {
+          _hukumController.text = fullText;
+          _hukumController.selection = TextSelection.collapsed(
+            offset: _hukumController.text.length,
+          );
+        }
+      });
+
+      if (isVerdi) {
+        _playStamp();
+      } else {
+        HapticFeedback.lightImpact();
       }
 
       final String successMessage = isVerdi
@@ -1585,33 +1876,21 @@ class _ModernHukumCardState extends State<ModernHukumCard>
           : '$rolAdi için hüküm kaydedildi';
 
       _showSnackBar(
-        '✅ Veritabanına kaydediliyor...\n'
-        '✅ Kalıcı olarak saklanıyor...\n'
-        '✅ Uygulama yeniden başlatıldığında korunuyor...\n'
-        '$successMessage',
-        isVerdi ? Colors.green.shade700 : Colors.blue.shade700,
+        successMessage,
+        isVerdi ? SeyirTokens.accept : SeyirTokens.brandDeep,
       );
 
       widget.onHukumSave?.call(fullText);
-
-      // Hüküm kaydedildikten sonra mevcut hükümleri yeniden yükle
-      // Bu, sentiment'lerin doğru gösterilmesini sağlar
       await _loadExistingHukumler();
 
-      // Nihai hüküm: _loadExistingHukumler bazen isFinalized'ı yanlış okuyor (Hive tipi,
-      // davaId/rol anahtarı uyumsuzluğu). Kayıt başarılıysa kesinleşmiş UI'yı garanti et.
       if (isVerdi && mounted) {
         setState(() {
           _isCurrentRoleFinalized = true;
           _rolFinalizasyonlari[normalizedRolAdi] = true;
           _showCezaMasrafButtons = false;
-          _cezaCompleted = false;
-          _masrafCompleted = false;
         });
       }
 
-      // Taslak kayıtta Hive yeniden yükleme gecikmesi veya anahtar uyumsuzluğu alanı
-      // boşaltabildiği için TextField'ı her zaman az önce kaydedilen metinle eşitle.
       if (!isVerdi && mounted) {
         setState(() {
           _hukumController.value = TextEditingValue(
@@ -1620,10 +1899,11 @@ class _ModernHukumCardState extends State<ModernHukumCard>
           );
         });
       }
-    } catch (error) {
+    } catch (_) {
+      if (!mounted) return;
       _showSnackBar(
-        '❌ Hüküm kaydedilirken hata oluştu: $error',
-        Colors.red.shade700,
+        'Hüküm kaydedilemedi. Tekrar dene.',
+        SeyirTokens.reject,
       );
     }
   }
@@ -1658,15 +1938,16 @@ class _ModernHukumCardState extends State<ModernHukumCard>
   }
 
   Color _hukumBodyLengthHintColor() {
+    final SeyirPalette palette = SeyirPalette.of(context);
     final String body = _extractHukumBody(_hukumController.text);
     if (body.isEmpty) {
-      return Colors.grey.shade600;
+      return palette.textMuted;
     }
     if (body.trim().length >= _hukumBodyMinChars &&
         body.length <= _hukumBodyMaxChars) {
-      return Colors.grey.shade600;
+      return palette.textMuted;
     }
-    return Colors.orange.shade800;
+    return palette.foreground(SeyirTokens.warning);
   }
 
   bool get _canEvaluateConsensus =>
@@ -1712,7 +1993,11 @@ class _ModernHukumCardState extends State<ModernHukumCard>
       SnackBar(
         content: Row(
           children: <Widget>[
-            const Icon(Icons.check_rounded, color: Colors.white, size: 20),
+            Icon(
+              Icons.check_rounded,
+              color: SeyirPalette.of(context).onSolid(accentColor),
+              size: 20,
+            ),
             const SizedBox(width: 12),
             const Expanded(child: Text('Panoya kopyalandı.')),
           ],
@@ -1739,7 +2024,10 @@ class _ModernHukumCardState extends State<ModernHukumCard>
         SnackBar(
           content: Text(
             message,
-            style: const TextStyle(fontSize: SeyirTokens.typeBody),
+            style: TextStyle(
+              fontSize: SeyirTokens.typeBody,
+              color: SeyirPalette.of(context).onSolid(backgroundColor),
+            ),
           ),
           backgroundColor: backgroundColor,
           behavior: SnackBarBehavior.floating,

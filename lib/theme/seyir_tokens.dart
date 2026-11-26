@@ -67,6 +67,8 @@ abstract final class SeyirTokens {
       BorderRadius.all(Radius.circular(radiusMd));
   static const BorderRadius radiusLgAll =
       BorderRadius.all(Radius.circular(radiusLg));
+  static const BorderRadius radiusXlAll =
+      BorderRadius.all(Radius.circular(radiusXl));
   static const BorderRadius sheetTop =
       BorderRadius.vertical(top: Radius.circular(radiusXl));
 }

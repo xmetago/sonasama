@@ -1,3 +1,4 @@
+import '../models/hukum_sentiment.dart';
 import 'hive_database_service.dart';
 import 'dava_timer_service.dart';
 
@@ -25,8 +26,56 @@ class DavaHukumEligibilityService {
     'Temyiz hakimi Kararı',
   ];
 
-  static String _compactKey(String s) =>
-      s.toLowerCase().replaceAll(RegExp(r'\s+'), '').replaceAll('ı', 'i');
+  /// Türkçe rol karşılaştırması için tek katlama.
+  ///
+  /// Noktalı/noktasız I-i ve ş, ğ, ç, ö, ü (büyük/küçük) ASCII karşılığına iner.
+  /// Unicode varsayılan küçük harfin eklediği birleşik nokta da düşer; böylece
+  /// `Yargıç` → `yargic` olur.
+  static String foldTurkish(String input) {
+    final String source = input.replaceAll('\u0307', '');
+    final StringBuffer out = StringBuffer();
+    for (final int rune in source.runes) {
+      switch (rune) {
+        case 0x49: // I
+        case 0x69: // i
+        case 0x130: // İ
+        case 0x131: // ı
+          out.write('i');
+        case 0x53: // S
+        case 0x73: // s
+        case 0x15E: // Ş
+        case 0x15F: // ş
+          out.write('s');
+        case 0x47: // G
+        case 0x67: // g
+        case 0x11E: // Ğ
+        case 0x11F: // ğ
+          out.write('g');
+        case 0x43: // C
+        case 0x63: // c
+        case 0xC7: // Ç
+        case 0xE7: // ç
+          out.write('c');
+        case 0x4F: // O
+        case 0x6F: // o
+        case 0xD6: // Ö
+        case 0xF6: // ö
+          out.write('o');
+        case 0x55: // U
+        case 0x75: // u
+        case 0xDC: // Ü
+        case 0xFC: // ü
+          out.write('u');
+        default:
+          out.write(String.fromCharCode(rune).toLowerCase());
+      }
+    }
+    return out.toString();
+  }
+
+  static String _compactKey(String s) => foldTurkish(s)
+      .replaceAll(RegExp(r'\s+'), '')
+      .replaceAll(RegExp(r'[^a-z0-9]'), '');
 
   static Map<String, dynamic>? _pickHukum(
     Map<String, Map<String, dynamic>> byRole,
@@ -103,6 +152,11 @@ class DavaHukumEligibilityService {
     return now.difference(openedAt) >= DavaTimerService.mainTrialWindow;
   }
 
+  static HukumSentiment? _sentimentOf(Map<String, dynamic>? hukum) {
+    if (hukum == null) return null;
+    return hukumSentimentFromStorage(hukum['hukumSentiment']?.toString());
+  }
+
   /// Temyiz süresi doldu; hüküm yoksa yargıç ile aynı yönde sayılır (çifte oy yok).
   static Future<void> ensureAppealJudgeFallback(String davaId) async {
     if (davaId.isEmpty) return;
@@ -120,20 +174,116 @@ class DavaHukumEligibilityService {
 
     if (await hasTemyizHukumFinalized(davaId)) return;
 
+    final byRole =
+        await HiveDatabaseService.getHukumlerByDavaIdGrouped(davaId);
+    final HukumSentiment? yargic =
+        _sentimentOf(_pickHukum(byRole, yargicAliases));
+
     await HiveDatabaseService.updateOpenedDava(davaId, {
       'appealJudgeFallbackApplied': true,
       'appealJudgeFallbackAt': DateTime.now().toIso8601String(),
       'appealJudgeAssignmentPending': false,
+      if (yargic != null) 'appealJudgeFallbackSentiment': yargic.storageValue,
     });
   }
 
+  /// Süre dolunca yazılan yansıma. Temyiz kaydı yoksa yargıç yönüdür; ek oy değildir.
+  static HukumSentiment? mirroredAppealSentiment(Map<String, dynamic>? opened) {
+    if (opened == null || opened['appealJudgeFallbackApplied'] != true) {
+      return null;
+    }
+    return hukumSentimentFromStorage(
+      opened['appealJudgeFallbackSentiment']?.toString(),
+    );
+  }
+
+  /// Nihai yön: gerçek temyiz, yoksa yansıyan yargıç yönü, o da yoksa yargıç.
+  static HukumSentiment? appealOrYargicDirection({
+    required String? davaId,
+    HukumSentiment? temyiz,
+    HukumSentiment? yargic,
+  }) {
+    if (temyiz != null) return temyiz;
+    final String id = davaId?.trim() ?? '';
+    if (id.isNotEmpty) {
+      final HukumSentiment? mirrored = mirroredAppealSentiment(
+        HiveDatabaseService.getOpenedDavaById(id),
+      );
+      if (mirrored != null) return mirrored;
+    }
+    return yargic;
+  }
+
   static bool roleLabelIsTemyiz(String davaGorev) {
-    final t = davaGorev.toLowerCase();
+    final String t = foldTurkish(davaGorev);
     return t.contains('temyiz') && t.contains('hakim');
   }
 
   static bool roleLabelIsYargic(String davaGorev) {
-    final t = davaGorev.toLowerCase().replaceAll('ı', 'i');
-    return t.contains('yargic') || t.contains('yargıç');
+    final String t = foldTurkish(davaGorev);
+    return t.contains('yargic');
   }
+
+  /// 8-Hüküm düzenleme kilidi. Açılış tarihi yoksa süre kuralları atlanmaz.
+  static HukumRoleEditLock evaluateRoleEditLock({
+    required String gorev,
+    required DateTime? openedAt,
+    required DateTime now,
+    required bool appealWindowActive,
+    required bool sixPanelFinalized,
+  }) {
+    if (openedAt == null) {
+      return const HukumRoleEditLock.locked(
+        'Dava açılış tarihi bulunamadı. Süre doğrulanamadığı için düzenleme kilitli.',
+      );
+    }
+
+    final bool mainEnded = isMainTrialEnded(openedAt, now);
+    final bool appealEditingAllowed = appealWindowActive && mainEnded;
+    final bool isTemyiz = roleLabelIsTemyiz(gorev);
+    final bool isYargic = roleLabelIsYargic(gorev);
+
+    if (appealEditingAllowed) {
+      if (!isTemyiz) {
+        return const HukumRoleEditLock.locked(
+          'Temyiz süreci aktif: yalnızca Temyiz Hakimi hüküm düzenleyebilir.',
+        );
+      }
+      return const HukumRoleEditLock.unlocked();
+    }
+
+    if (isTemyiz) {
+      return const HukumRoleEditLock.locked(
+        'Temyiz hükmü; 7 gün sonrası temyiz talebinden sonra 72 saatlik süre içinde açılır.',
+      );
+    }
+
+    if (isYargic) {
+      final bool past144 =
+          now.difference(openedAt) >= const Duration(hours: 144);
+      if (!past144 && !sixPanelFinalized) {
+        return const HukumRoleEditLock.locked(
+          'Yargıç: Altı rol (jüri, avukatlar, şahitler) hükmünü tamamlayana veya 144. saat dolana kadar bekleyin.',
+        );
+      }
+    } else if (mainEnded) {
+      return const HukumRoleEditLock.locked(
+        'Ana dava süresi (168 saat) tamamlandı; hüküm metni artık güncellenemez.',
+      );
+    }
+
+    return const HukumRoleEditLock.unlocked();
+  }
+}
+
+/// Rol düzenleme kilidinin sonucu.
+class HukumRoleEditLock {
+  const HukumRoleEditLock.unlocked()
+      : locked = false,
+        reason = null;
+
+  const HukumRoleEditLock.locked(this.reason) : locked = true;
+
+  final bool locked;
+  final String? reason;
 }

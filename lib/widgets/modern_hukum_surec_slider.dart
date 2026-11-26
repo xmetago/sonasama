@@ -195,22 +195,15 @@ class _HukukiSurecSliderState extends State<_HukukiSurecSlider> {
             Text(
               'Hüküm onayı',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: SeyirTokens.typeCaption,
-                fontWeight: FontWeight.w800,
+              style: SeyirPalette.of(context).caption(weight: FontWeight.w800).copyWith(
                 letterSpacing: 0.6,
-                color: Colors.grey.shade700,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: SeyirTokens.space1),
             Text(
               'Hükmü kesinleştirmek için sürükleyin',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey.shade600,
-              ),
+              style: SeyirPalette.of(context).caption(),
             ),
             const SizedBox(height: 8),
             SizedBox(
@@ -360,7 +353,7 @@ class _SurecTickRow extends StatelessWidget {
                 fontWeight: FontWeight.w800,
                 color: m == 0
                     ? _HukukiSurecSlider.accentForProgress(0)
-                    : Colors.grey.shade500,
+                    : SeyirPalette.of(context).textMuted,
               ),
             ),
           ),

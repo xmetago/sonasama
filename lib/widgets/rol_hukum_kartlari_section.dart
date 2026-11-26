@@ -6,6 +6,7 @@ import 'package:flutter_material_design_icons/flutter_material_design_icons.dart
 
 import '../models/hukum_sentiment.dart';
 import '../services/dava_consensus_service.dart';
+import '../services/dava_hukum_eligibility_service.dart';
 import '../services/hive_database_service.dart';
 import '../services/user_privacy_service.dart';
 import 'halk_karari_tab_view.dart';
@@ -20,21 +21,8 @@ String normalizeRolKarari(String rolAdi) {
   if (trimmed.isEmpty) {
     return 'Görev Kararı';
   }
-  final String compact = trimmed
-      .toLowerCase()
-      .replaceAll(RegExp(r'\s+'), '')
-      .replaceAll('ı', 'i')
-      .replaceAll('İ', 'i')
-      .replaceAll('ş', 's')
-      .replaceAll('Ş', 's')
-      .replaceAll('ç', 'c')
-      .replaceAll('Ç', 'c')
-      .replaceAll('ğ', 'g')
-      .replaceAll('Ğ', 'g')
-      .replaceAll('ö', 'o')
-      .replaceAll('Ö', 'o')
-      .replaceAll('ü', 'u')
-      .replaceAll('Ü', 'u');
+  final String compact = DavaHukumEligibilityService.foldTurkish(trimmed)
+      .replaceAll(RegExp(r'\s+'), '');
   final String compactNormalized =
       compact.replaceAll(RegExp(r'[^a-z0-9]'), '');
 

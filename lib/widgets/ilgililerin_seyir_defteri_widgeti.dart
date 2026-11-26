@@ -8,6 +8,7 @@ import '../models/hukum_sentiment.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dava_provider.dart';
 import '../services/dava_appeal_judge_assign_service.dart';
+import '../services/dava_hukum_eligibility_service.dart';
 import '../services/ceza_consensus_service.dart';
 import '../services/hediye_consensus_service.dart';
 import '../services/dava_consensus_service.dart';
@@ -1716,18 +1717,18 @@ class _IlgililerinSeyirDefteriWidgetiState
   }
 
   /// Davacı tarafının nihai sonucu: true = davacı haklı, false = davalı haklı, null = belirsiz.
-  /// Öncelik: Temyiz Hakimi Kararı → Yargıç Kararı → Konsensus (çoğunluk).
+  /// Öncelik: Temyiz Hakimi Kararı → süresi dolmuş yansıma → Yargıç Kararı → Konsensus.
   bool? _getFinalDavaciVerdict() {
     final normalizedTemyiz = normalizeRolKarari('Temyiz Hakimi Kararı');
-    final HukumSentiment? temyizSent = _rolSentimentleri[normalizedTemyiz];
-    if (temyizSent != null) {
-      return temyizSent == HukumSentiment.positive;
-    }
-
     final normalizedYargic = normalizeRolKarari('Yargıç Kararı');
-    final HukumSentiment? yargicSent = _rolSentimentleri[normalizedYargic];
-    if (yargicSent != null) {
-      return yargicSent == HukumSentiment.positive;
+    final HukumSentiment? direction =
+        DavaHukumEligibilityService.appealOrYargicDirection(
+      davaId: widget.davaId,
+      temyiz: _rolSentimentleri[normalizedTemyiz],
+      yargic: _rolSentimentleri[normalizedYargic],
+    );
+    if (direction != null) {
+      return direction == HukumSentiment.positive;
     }
 
     final DavaConsensusEvaluation? consensus = _rolConsensusEvaluation;

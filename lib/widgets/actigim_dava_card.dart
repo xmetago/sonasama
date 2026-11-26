@@ -10,6 +10,7 @@ import '../providers/dava_provider.dart';
 import '../screens/delil_listesi_ekrani.dart';
 import '../services/ceza_consensus_service.dart';
 import '../services/dava_consensus_service.dart';
+import '../services/dava_hukum_eligibility_service.dart';
 import '../services/evidence_service.dart';
 import '../services/hediye_consensus_service.dart';
 import '../services/hive_database_service.dart';
@@ -375,6 +376,24 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
       }
     }
     
+    if (!hasYargicKarari && !hasTemyizHakimiKarari) {
+      final HukumSentiment? mirrored =
+          DavaHukumEligibilityService.mirroredAppealSentiment(
+        widget.dava.id.isEmpty
+            ? null
+            : HiveDatabaseService.getOpenedDavaById(widget.dava.id),
+      );
+      if (mirrored == HukumSentiment.positive) {
+        if (_shouldShowUzlasma()) {
+          return 'UZLAŞMA';
+        }
+        return 'Haklı Davacı';
+      }
+      if (mirrored == HukumSentiment.negative) {
+        return 'Haksız Davacı';
+      }
+    }
+
     // 3. Consensus (Çoğunluğun verdiği ortak karar)
     if (_consensusEvaluation == null) return 'Beklemede';
 
