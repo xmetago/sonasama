@@ -273,11 +273,27 @@ void main() {
     if (_after && page == 'page') {
       expectTapHeight(tester, find.widgetWithText(ElevatedButton, 'Deliller'));
       expectTapHeight(tester, find.widgetWithText(ElevatedButton, '8-HÜKÜM'));
+      // Diğer sayfalar AppExpandableIconMenu düğmesini kullanır:
+      // MdiIcons.menuOpen, 34 px, Colors.red, varsayılan IconButton.
       final Finder yargilaMenu = find.byWidgetPredicate((Widget widget) {
         if (widget is! IconButton) return false;
         final Widget icon = widget.icon;
-        return icon is Icon && icon.icon == MdiIcons.menuOpen && icon.size == 19;
+        return icon is Icon &&
+            icon.icon == MdiIcons.menuOpen &&
+            icon.size == 34 &&
+            icon.color == Colors.red;
       });
+      expect(yargilaMenu, findsOneWidget);
+      expect(tester.widget<IconButton>(yargilaMenu).style, isNull);
+      expect(
+        find.byWidgetPredicate(
+          (Widget widget) =>
+              widget is Icon &&
+              widget.icon == MdiIcons.menuOpen &&
+              widget.size == 19,
+        ),
+        findsNothing,
+      );
       await tester.ensureVisible(yargilaMenu);
       await tester.tap(yargilaMenu);
       await tester.pump();
