@@ -16,6 +16,7 @@ import '../utils/constants.dart';
 import '../utils/proximity_category_rules.dart';
 import 'verified_users_service.dart';
 import '../utils/comment_utils.dart';
+import 'ceza_muhur.dart';
 
 class HiveDatabaseService {
   static const String _davaBoxName = 'dava_box';
@@ -37,7 +38,7 @@ class HiveDatabaseService {
   static const String _hukumBoxName = 'hukum_box'; // key: davaId_userRole, value: Map<String, dynamic> (hukum text, createdAt, etc.)
   static const String _davaParticipantBoxName = 'dava_participant_box'; // key: davaId, value: List<Map<String,dynamic>> (participant status list)
   static const String _cezaBegeniBoxName = 'ceza_begeni_box'; // key: cezaName, value: Map<String, dynamic> (likeCount, likedBy: List<String>)
-  static const String _cezaBoxName = 'ceza_box'; // key: davaId_userEmail, value: String (ceza metni)
+  static const String _cezaBoxName = 'ceza_box'; // key: davaId_userEmail, value: String veya {text, sealedAt}
   static const String _cezaOyBoxName = 'ceza_oy_box'; // key: davaId, value: Map (votesByEmail)
   static const String _hediyeOyBoxName = 'hediye_oy_box'; // key: davaId, value: Map (votesByEmail)
   static const String _masrafBoxName = 'masraf_box'; // key: davaId_userEmail, value: List<String> (masraf isimleri listesi)
@@ -74,7 +75,7 @@ class HiveDatabaseService {
   static Box? _hukumBox; // key: davaId_userRole, value: Map<String, dynamic>
   static Box? _davaParticipantBox; // key: davaId, value: List<Map<String, dynamic>>
   static Box? _cezaBegeniBox; // key: cezaName, value: Map<String, dynamic> (likeCount, likedBy: List<String>)
-  static Box? _cezaBox; // key: davaId_userEmail, value: String (ceza metni)
+  static Box? _cezaBox; // key: davaId_userEmail, value: String veya CezaKaydi haritası
   static Box? _cezaOyBox; // key: davaId, value: Map<String, dynamic> (votesByEmail)
   static Box? _hediyeOyBox; // key: davaId, value: Map<String, dynamic> (votesByEmail)
   static Box? _masrafBox; // key: davaId_userEmail, value: List<String> (masraf isimleri listesi)
@@ -3220,20 +3221,25 @@ class HiveDatabaseService {
     }
   }
 
-  /// Cezayı kaydet
-  /// key: davaId_userEmail, value: String (ceza metni)
+  /// Cezayı kaydet.
+  /// key: davaId_userEmail.
+  /// [sealedAt] yoksa eski düz metin yazılır; varsa `{v, text, sealedAt}`.
   static Future<void> saveCeza({
     required String davaId,
     required String userEmail,
     required String cezaText,
+    DateTime? sealedAt,
   }) async {
     try {
       await _ensureCezaBoxOpen();
-      
+
       final key = '${davaId}_$userEmail';
-      
-      await _cezaBox!.put(key, cezaText);
-      
+      final Object value = sealedAt == null
+          ? cezaText
+          : CezaKaydi(text: cezaText, sealedAt: sealedAt).toPersisted();
+
+      await _cezaBox!.put(key, value);
+
       print('✅ Ceza kaydedildi: $key');
     } catch (e) {
       print('❌ Ceza kaydedilirken hata: $e');
@@ -3264,15 +3270,11 @@ class HiveDatabaseService {
         if (email.isEmpty) {
           continue;
         }
-        final Object? raw = box.get(key);
-        if (raw == null) {
+        final CezaKaydi? kayit = CezaKaydi.parse(box.get(key));
+        if (kayit == null) {
           continue;
         }
-        final String text = raw.toString().trim();
-        if (text.isEmpty) {
-          continue;
-        }
-        out[email.toLowerCase()] = text;
+        out[email.toLowerCase()] = kayit.text;
       }
     } catch (e) {
       print('❌ Ceza haritası okunurken hata: $e');
@@ -3280,26 +3282,35 @@ class HiveDatabaseService {
     return out;
   }
 
-  /// Cezayı getir
-  /// key: davaId_userEmail, value: String (ceza metni)
+  /// Cezayı getir. Eski düz metin ve tarihli harita aynı metne çözülür.
+  /// key: davaId_userEmail
   static Future<String?> getCeza({
+    required String davaId,
+    required String userEmail,
+  }) async {
+    final CezaKaydi? kayit = await getCezaKaydi(
+      davaId: davaId,
+      userEmail: userEmail,
+    );
+    return kayit?.text;
+  }
+
+  /// Metin ve varsa mühür zamanı. Eski düz metin kayıtlarında [CezaKaydi.sealedAt] boştur.
+  static Future<CezaKaydi?> getCezaKaydi({
     required String davaId,
     required String userEmail,
   }) async {
     try {
       await _ensureCezaBoxOpen();
-      
+
       final key = '${davaId}_$userEmail';
-      final persisted = _cezaBox!.get(key);
-      
-      if (persisted == null) {
+      final CezaKaydi? kayit = CezaKaydi.parse(_cezaBox!.get(key));
+      if (kayit == null) {
         return null;
       }
-      
-      final String cezaText = persisted.toString();
-      
+
       print('✅ Ceza getirildi: $key');
-      return cezaText;
+      return kayit;
     } catch (e) {
       print('❌ Ceza getirilirken hata: $e');
       return null;

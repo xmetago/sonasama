@@ -1,12 +1,20 @@
-import 'dart:math' show pi, sin;
+import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-
-import '../theme/seyir_tokens.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import '../services/hive_database_service.dart';
+import 'package:share_plus/share_plus.dart';
+
 import '../providers/dava_provider.dart';
+import '../services/ceza_muhur.dart';
+import '../services/dava_hukum_eligibility_service.dart';
+import '../services/hive_database_service.dart';
+import '../theme/seyir_tokens.dart';
 import 'cezalar_unified_dava.dart';
 import 'countdown_timer_widget.dart';
 
@@ -26,6 +34,8 @@ class CezalarCezaUnifiedPanel extends StatefulWidget {
   final VoidCallback? onPenaltyApplied;
   /// Üstte kapat düğmeli başlık (DraggableSheet vb.).
   final bool showSheetCloseHeader;
+  /// Testlerde kayıt hatasını taklit etmek için. Boşsa [DavaProvider] yazılır.
+  final CezaKaydedici? cezaKaydedici;
 
   const CezalarCezaUnifiedPanel({
     super.key,
@@ -36,6 +46,7 @@ class CezalarCezaUnifiedPanel extends StatefulWidget {
     this.davaOpenedAt,
     this.onPenaltyApplied,
     this.showSheetCloseHeader = false,
+    this.cezaKaydedici,
   });
 
   @override
@@ -59,42 +70,19 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
   /// Görev hükümü kısa önizleme metni.
   String? _gorevHukumOnizleme;
 
-  String activeCategory = 'Hazır Ceza';
-  final List<String> categories = ['Hazır Ceza', 'Üyelerden'];
-
   int? selectedReadyIndex;
-  String? selectedMember;
-  int? selectedMemberPenaltyIndex;
   String? selectedPenaltyText;
-  int? expandedReadyIndex;
-  String? expandedMember;
-  int? expandedMemberPenaltyIndex;
 
-  int _commentCount = 0;
-  int _retweetCount = 0;
-  int _likeCount = 0;
-  int _dislikeCount = 0;
-
-  final TextEditingController _customTitleCtrl = TextEditingController();
-  final TextEditingController _customDescriptionCtrl = TextEditingController();
-  final FocusNode _customTitleFocus = FocusNode();
-  final FocusNode _customDescriptionFocus = FocusNode();
-  bool _isCustomPenaltyValid = false;
-  bool _isCustomPenaltySelected = false;
   bool _isPenaltyApplied = false;
   bool _isMahkemeKarariVisible = false;
+  DateTime? _sealedAt;
+  String? _sealError;
 
-  TabController? _tabController;
   AnimationController? _coffinAnimationController;
-  AnimationController? _gavelAnimController;   // Çekiç sallama animasyonu
-  late Animation<double> _gavelAnimation;
-  AnimationController? _shakeController;
-  /// Aynı ceza metni için titremeyi yalnızca seçim değişince tetiklemek.
-  String? _lastShookPenaltyKey;
+  late final AnimationController _stampController;
+  late final Animation<double> _stampScale;
   bool _isSealTapInProgress = false;
-
-  Map<String, int> _cezaBegenileri = <String, int>{};
-  Map<String, bool> _userLikedCezalar = <String, bool>{};
+  final GlobalKey _kararBoundaryKey = GlobalKey();
 
   // ─── Ceza listesi (aynı içerik, zenginleştirilmiş emoji ile) ───
   final List<Map<String, String>> readyPenalties = <Map<String, String>>[
@@ -260,56 +248,6 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
     {'name': '❤️ Pozitif Enerji Bombası', 'description': '15 kişiye “Pozitif enerji gönderiyorum” mesajı at.'},
   ];
 
-  final Map<String, Map<String, dynamic>> _staticMemberPenalties = <String, Map<String, dynamic>>{
-    'whodoom': {
-      'avatar': 'W',
-      'hashtag': '#whoBOOM',
-      'penalties': <String>[
-        '🎭 Küçük emrah kaderi yaşasın',
-        '📖 Kuranı baştan sona okusun',
-        '🗡️ Ya ölüm ya istiklal desin',
-      ],
-    },
-    'nasrullah_keskin': {
-      'avatar': 'N',
-      'hashtag': '#nasrullahBOOM',
-      'penalties': <String>[
-        '🤝 100 kişiye iyilik etsin',
-        '🐕 Yaşlanınca sokak köpekleri gibi sokakta ölsün',
-        '💍 Evlenmek nasip olmasın',
-        '🏝️ Kendini devredışı bıraksın',
-      ],
-    },
-    'cheguevera_del': {
-      'avatar': 'C',
-      'hashtag': '#chegueveraBOOM',
-      'penalties': <String>[
-        '💪 Öldürülesiye dövme',
-        '😅 Küçük Emrah gibi sürüne',
-        '🏛️ İktidardan sopa yiye',
-        '🐱 30 kedi besleme',
-        '🍚 40 yetimi doyurma',
-      ],
-    },
-  };
-
-  final Map<String, Map<String, dynamic>> _customMemberPenalties = <String, Map<String, dynamic>>{};
-
-  Map<String, Map<String, dynamic>> get memberPenalties {
-    final Map<String, Map<String, dynamic>> combined = <String, Map<String, dynamic>>{};
-    combined.addAll(_staticMemberPenalties);
-    for (final entry in _customMemberPenalties.entries) {
-      if (combined.containsKey(entry.key)) {
-        final existingPenalties = combined[entry.key]!['penalties'] as List<String>;
-        final newPenalties = entry.value['penalties'] as List<String>;
-        combined[entry.key]!['penalties'] = <String>[...existingPenalties, ...newPenalties];
-      } else {
-        combined[entry.key] = entry.value;
-      }
-    }
-    return combined;
-  }
-
   void _applyDefaultHazirCezaSelection() {
     final int idx = readyPenalties.indexWhere(
       (Map<String, String> penalty) => penalty['name'] == _defaultHazirCezaName,
@@ -318,14 +256,12 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       return;
     }
     selectedReadyIndex = idx;
-    expandedReadyIndex = idx;
     selectedPenaltyText = readyPenalties[idx]['name'];
   }
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _applyDefaultHazirCezaSelection();
 
     _coffinAnimationController = AnimationController(
@@ -333,25 +269,37 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       vsync: this,
     )..repeat();
 
-    _gavelAnimController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+    _stampController = AnimationController(
       vsync: this,
+      duration: SeyirTokens.motion,
     );
-    _gavelAnimation = Tween<double>(begin: 0, end: 0.12).animate(
-      CurvedAnimation(parent: _gavelAnimController!, curve: Curves.easeInOut),
-    );
+    _stampScale = TweenSequence<double>(<TweenSequenceItem<double>>[
+      TweenSequenceItem<double>(
+        tween: Tween<double>(begin: 1.18, end: 0.84)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 42,
+      ),
+      TweenSequenceItem<double>(
+        tween: Tween<double>(begin: 0.84, end: 1)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 58,
+      ),
+    ]).animate(_stampController);
+    _stampController.value = 1;
 
-    _ensureShakeController();
-
-    _customTitleCtrl.addListener(_onCustomPenaltyChanged);
-    _customDescriptionCtrl.addListener(_onCustomPenaltyChanged);
-    _loadCezaBegenileri();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadGorevHukumOnizleme());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSavedCeza();
+      _loadGorevHukumOnizleme();
+    });
   }
 
   @override
   void didUpdateWidget(covariant CezalarCezaUnifiedPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.davaId != widget.davaId ||
+        oldWidget.userEmail != widget.userEmail) {
+      _loadSavedCeza();
+    }
     if (oldWidget.davaId != widget.davaId ||
         oldWidget.dava.mevkii != widget.dava.mevkii ||
         oldWidget.dava.adi != widget.dava.adi) {
@@ -359,80 +307,55 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
     }
   }
 
-  Future<void> _loadCezaBegenileri() async {
-    try {
-      final begeniler = await HiveDatabaseService.getAllCezaBegenileri();
-      final userEmail = widget.userEmail ?? '';
-      final userLiked = <String, bool>{};
-      for (final cezaName in begeniler.keys) {
-        final isLiked = await HiveDatabaseService.isCezaLikedByUser(cezaName, userEmail);
-        userLiked[cezaName] = isLiked;
-      }
-      setState(() {
-        _cezaBegenileri = begeniler;
-        _userLikedCezalar = userLiked;
-      });
-    } catch (e) {
-      debugPrint('❌ Ceza beğenileri yüklenirken hata: $e');
+  Future<void> _loadSavedCeza() async {
+    final String davaId = widget.davaId?.trim() ?? '';
+    final String email = widget.userEmail?.trim() ?? '';
+    if (davaId.isEmpty || email.isEmpty) {
+      return;
     }
+    final CezaKaydi? kayit = await HiveDatabaseService.getCezaKaydi(
+      davaId: davaId,
+      userEmail: email,
+    );
+    if (!mounted || kayit == null || !kayit.isSealed) {
+      return;
+    }
+    setState(() => _applySealedKayit(kayit));
+  }
+
+  void _applySealedKayit(CezaKaydi kayit) {
+    selectedPenaltyText = kayit.text;
+    _sealedAt = kayit.sealedAt;
+    _isPenaltyApplied = true;
+    _isMahkemeKarariVisible = true;
+    _sealError = null;
+    final int idx = readyPenalties.indexWhere(
+      (Map<String, String> penalty) => penalty['name'] == kayit.text,
+    );
+    selectedReadyIndex = idx == -1 ? null : idx;
   }
 
   @override
   void dispose() {
-    _tabController?.dispose();
     _coffinAnimationController?.dispose();
-    _gavelAnimController?.dispose();
-    _shakeController?.dispose();
-    _customTitleCtrl.dispose();
-    _customDescriptionCtrl.dispose();
-    _customTitleFocus.dispose();
-    _customDescriptionFocus.dispose();
+    _stampController.dispose();
     super.dispose();
   }
 
-  void _onCustomPenaltyChanged() {
-    final titleLength = _customTitleCtrl.text.trim().length;
-    final descriptionLength = _customDescriptionCtrl.text.trim().length;
-    setState(() {
-      _isCustomPenaltyValid =
-          titleLength >= 3 && titleLength <= 100 && descriptionLength >= 15 && descriptionLength <= 400;
-    });
-  }
-
-  void _selectReady(int index) {
-    final penalty = readyPenalties[index];
-    final cezaName = penalty['name']!;
-    setState(() {
-      expandedReadyIndex = (expandedReadyIndex == index) ? null : index;
-      selectedReadyIndex = index;
-      selectedMemberPenaltyIndex = null;
-      selectedMember = null;
-      selectedPenaltyText = cezaName;
-      expandedMember = null;
-      expandedMemberPenaltyIndex = null;
-      _isCustomPenaltySelected = false;
-      _isMahkemeKarariVisible = false;
-    });
-  }
-
   void _navigateReadyPenalty(int delta) {
-    if (readyPenalties.isEmpty) return;
+    if (_isPenaltyApplied || readyPenalties.isEmpty) {
+      return;
+    }
     final int currentIndex = selectedReadyIndex ?? (delta < 0 ? readyPenalties.length - 1 : 0);
     final int nextIndex = (currentIndex + delta + readyPenalties.length) % readyPenalties.length;
     final Map<String, String> penalty = readyPenalties[nextIndex];
     final String cezaName = penalty['name']!;
 
     setState(() {
-      activeCategory = 'Hazır Ceza';
       selectedReadyIndex = nextIndex;
-      expandedReadyIndex = nextIndex;
       selectedPenaltyText = cezaName;
-      selectedMemberPenaltyIndex = null;
-      selectedMember = null;
-      expandedMember = null;
-      expandedMemberPenaltyIndex = null;
-      _isCustomPenaltySelected = false;
       _isMahkemeKarariVisible = false;
+      _sealError = null;
     });
   }
 
@@ -481,114 +404,34 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
     return first.runes.length <= 4 ? first : null;
   }
 
-  void _selectMemberPenalty(String member, int idx) {
-    final penaltyText = memberPenalties[member]!['penalties'][idx] as String;
-    setState(() {
-      if (expandedMember == member && expandedMemberPenaltyIndex == idx) {
-        expandedMember = null;
-        expandedMemberPenaltyIndex = null;
-      } else {
-        expandedMember = member;
-        expandedMemberPenaltyIndex = idx;
-      }
-      selectedMember = member;
-      selectedMemberPenaltyIndex = idx;
-      selectedReadyIndex = null;
-      selectedPenaltyText = penaltyText;
-      expandedReadyIndex = null;
-      _isMahkemeKarariVisible = false;
-    });
-  }
-
-  void _saveCustomPenalty() {
-    final title = _customTitleCtrl.text.trim();
-    if (_isCustomPenaltyValid) {
-      final userEmail = widget.userEmail ?? 'guest';
-      final userName = userEmail.split('@').first;
-      setState(() {
-        selectedPenaltyText = title;
-        selectedReadyIndex = null;
-        selectedMemberPenaltyIndex = null;
-        selectedMember = null;
-        _isCustomPenaltySelected = true;
-        if (_customMemberPenalties.containsKey(userEmail)) {
-          final existingPenalties = _customMemberPenalties[userEmail]!['penalties'] as List<String>;
-          if (!existingPenalties.contains(title)) {
-            existingPenalties.add(title);
-          }
-        } else {
-          final avatar = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
-          _customMemberPenalties[userEmail] = {
-            'avatar': avatar,
-            'hashtag': '#${userName}BOOM',
-            'penalties': <String>[title],
-          };
-        }
-        _isMahkemeKarariVisible = false;
-      });
-      _showMahkemeSnackBar(
-        context,
-        '⚖️ Cezanız mahkeme arşivine işlendi ve "Üyelerden" bölümüne nakledildi!',
-        Colors.green.shade700,
-      );
-    }
-  }
-
-  void _updateCustomPenalty() {
-    final title = _customTitleCtrl.text.trim();
-    final oldTitle = selectedPenaltyText;
-    if (_isCustomPenaltyValid && _isCustomPenaltySelected && !_isPenaltyApplied) {
-      final userEmail = widget.userEmail ?? 'guest';
-      setState(() {
-        selectedPenaltyText = title;
-        if (_customMemberPenalties.containsKey(userEmail)) {
-          final penalties = _customMemberPenalties[userEmail]!['penalties'] as List<String>;
-          final index = penalties.indexOf(oldTitle ?? '');
-          if (index != -1) penalties[index] = title;
-        }
-      });
-      _showMahkemeSnackBar(
-        context,
-        '📜 Ceza metni yeniden kaleme alındı. Arşiv güncellendi!',
-        Colors.blue.shade700,
-      );
-    }
-  }
-
-  Future<void> _toggleCezaBegeni(String cezaName) async {
-    if (widget.userEmail == null || widget.userEmail!.isEmpty) {
-      _showMahkemeSnackBar(context, '🔑 Beğeni için giriş yapmanız gerekiyor!', Colors.orange.shade700);
-      return;
-    }
-    try {
-      await HiveDatabaseService.toggleCezaBegeni(cezaName, widget.userEmail!);
-      await _loadCezaBegenileri();
-    } catch (e) {
-      _showMahkemeSnackBar(context, '❌ Beğeni güncellenirken hata oluştu.', _MahkemeRenkler.kirmizi);
-    }
-  }
-
   /// Mahkeme temalı SnackBar
   void _showMahkemeSnackBar(BuildContext ctx, String mesaj, Color renk) {
     ScaffoldMessenger.of(ctx).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.gavel, color: Colors.white, size: 18),
-            const SizedBox(width: 10),
+            Icon(Icons.gavel, color: SeyirPalette.of(ctx).onSolid(renk), size: 18),
+            const SizedBox(width: SeyirTokens.space2),
             Expanded(
               child: Text(
                 mesaj,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  fontSize: SeyirTokens.typeBody,
+                  fontWeight: FontWeight.w500,
+                  color: SeyirPalette.of(ctx).onSolid(renk),
+                ),
               ),
             ),
           ],
         ),
         backgroundColor: renk,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: const RoundedRectangleBorder(borderRadius: SeyirTokens.radiusMdAll),
         duration: const Duration(seconds: 3),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.symmetric(
+          horizontal: SeyirTokens.space4,
+          vertical: SeyirTokens.space2,
+        ),
       ),
     );
   }
@@ -666,7 +509,9 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
 
   /// [ModernHukumCard._buildRoleDialogButton] ile aynı ikon; metin kadar kompakt satır sonu.
   Widget _buildKunyeSekizHukumTrailing() {
-    final Color iconColor = _gorevHukumVar ? Colors.green.shade700 : Colors.brown;
+    final Color iconColor = _gorevHukumVar
+        ? _MahkemeRenkler.accent(context)
+        : SeyirPalette.of(context).textSecondary;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -684,7 +529,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: Colors.green.shade800,
+                  color: _MahkemeRenkler.accent(context),
                   letterSpacing: 0.2,
                 ),
               ),
@@ -789,7 +634,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
     final String normalizedRole = widget.dava.mevkii.trim();
     if (normalizedRole.isEmpty) {
       if (!mounted) return;
-      _showMahkemeSnackBar(context, 'Görev bilgisi bulunamadı.', Colors.orange.shade700);
+      _showMahkemeSnackBar(context, 'Görev bilgisi bulunamadı.', _MahkemeRenkler.warning(context));
       return;
     }
 
@@ -824,7 +669,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
     } catch (e) {
       debugPrint('❌ Hükümler yüklenirken hata: $e');
       if (mounted) {
-        _showMahkemeSnackBar(context, 'Hükümler yüklenirken hata oluştu.', _MahkemeRenkler.kirmizi);
+        _showMahkemeSnackBar(context, 'Hükümler yüklenirken hata oluştu.', _MahkemeRenkler.danger(context));
       }
     }
   }
@@ -843,7 +688,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       ScaffoldMessenger.of(dialogContext).showSnackBar(
         SnackBar(
           content: Text('Hüküm bulunamadı: $normalizedRole'),
-          backgroundColor: Colors.orange.shade700,
+          backgroundColor: _MahkemeRenkler.warning(dialogContext),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -919,7 +764,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                       Expanded(
                         child: Row(
                           children: <Widget>[
-                            Icon(MdiIcons.fileCheck, color: Colors.green.shade700, size: 24),
+                            Icon(MdiIcons.fileCheck, color: _MahkemeRenkler.accent(ctx), size: 24),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Column(
@@ -930,7 +775,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                                     style: TextStyle(
                                       fontSize: SeyirTokens.typeTitle,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.green.shade700,
+                                      color: _MahkemeRenkler.accent(ctx),
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -990,185 +835,6 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
     );
   }
 
-  void _applyPenalty() {
-    if (selectedPenaltyText == null) {
-      _showMahkemeSnackBar(context, '⚖️ Sayın yargıç, lütfen önce bir ceza seçiniz!', _MahkemeRenkler.kirmizi);
-      return;
-    }
-
-    // Çekiç animasyonu
-    _gavelAnimController?.forward(from: 0).then((_) => _gavelAnimController?.reverse());
-
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            color: SeyirPalette.of(context).surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _MahkemeRenkler.altin, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: _MahkemeRenkler.koyu.withOpacity(0.5),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Başlık şeridi (koyu mor)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                decoration: const BoxDecoration(
-                  color: _MahkemeRenkler.koyu,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-                ),
-                child: Row(
-                  children: [
-                    RotationTransition(
-                      turns: _gavelAnimation,
-                      child: const Text('🔨', style: TextStyle(fontSize: 24)),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'MAHKEMENİN KARARI',
-                        style: TextStyle(
-                          color: _MahkemeRenkler.altin,
-                          fontSize: SeyirTokens.typeTitle,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // İçerik
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Text(
-                      '"Mahkeme-i Kübra"nın tarafsız kararı:',
-                      style: TextStyle(
-                        fontSize: SeyirTokens.typeCaption,
-                        color: SeyirPalette.of(context).textSecondary,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: SeyirPalette.of(context).surfaceMuted,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.5)),
-                      ),
-                      child: Text(
-                        '"$selectedPenaltyText"',
-                        textAlign: TextAlign.center,
-                        softWrap: true,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: _MahkemeRenkler.ortaKahve,
-                          fontStyle: FontStyle.italic,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '...cezasının uygulanmasına oy birliğiyle karar verilmiştir.\nBu karar kesindir, temyize gidilmez! 🔨',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: SeyirTokens.typeCaption,
-                        color: SeyirPalette.of(context).textSecondary,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Butonlar
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: _MahkemeRenkler.gri,
-                          side: BorderSide(color: _MahkemeRenkler.gri),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text('İtiraz Et'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          Navigator.of(ctx).pop();
-                          if (widget.davaId != null && widget.davaId!.isNotEmpty &&
-                              widget.userEmail != null && widget.userEmail!.isNotEmpty &&
-                              selectedPenaltyText != null) {
-                            try {
-                              final davaProvider = Provider.of<DavaProvider>(context, listen: false);
-                              await davaProvider.updateCezaForDava(
-                                davaId: widget.davaId!,
-                                userEmail: widget.userEmail!,
-                                cezaText: selectedPenaltyText!,
-                              );
-                            } catch (e) {
-                              debugPrint('❌ Ceza kaydedilirken hata: $e');
-                            }
-                          }
-                          if (!context.mounted) {
-                            return;
-                          }
-                          setState(() => _isPenaltyApplied = true);
-                          _showMahkemeSnackBar(
-                            context,
-                            '🔨 KARAR TESCIL EDİLDİ! Ceza mahkeme arşivine işlendi.',
-                            _MahkemeRenkler.kirmizi,
-                          );
-                          widget.onPenaltyApplied?.call();
-                          if (widget.onPenaltyApplied == null) {
-                            Navigator.of(context).pop(true);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _MahkemeRenkler.kirmizi,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          elevation: 4,
-                        ),
-                        child: const Text(
-                          '⚖️ Onayla!',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (widget.embeddedMiddlePane) {
@@ -1195,23 +861,27 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       ),
       child: Column(
         children: <Widget>[
-          AnimatedSize(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeInOutCubic,
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                _buildDavaSummaryCard(),
-                _buildCoffinWhoBoomRow(),
-                _buildSelectedPenaltyDetailActionCard(),
-                _buildMahkemeKarariPreviewCard(),
-                if (widget.showSheetCloseHeader) _buildHeader(),
-              ],
+          Expanded(
+            child: SingleChildScrollView(
+              controller: scrollController,
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeInOutCubic,
+                alignment: Alignment.topCenter,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    _buildDavaSummaryCard(),
+                    _buildCoffinWhoBoomRow(),
+                    _buildSelectedPenaltyDetailActionCard(),
+                    _buildMahkemeKarariPreviewCard(),
+                    if (widget.showSheetCloseHeader) _buildHeader(),
+                  ],
+                ),
+              ),
             ),
           ),
-          const Spacer(),
           _buildSimpleInfoFooter(),
           _buildSocialCountersRow(),
         ],
@@ -1222,10 +892,15 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
   /// [ModernHukumCard._buildDavaInfo] ile aynı künye davranışı (profil / beğeni satırı yok).
   Widget _buildDavaSummaryCard() {
     final CezalarUnifiedDava d = widget.dava;
-    final Color accentGreen = Colors.green.shade700;
+    final Color accentGreen = _MahkemeRenkler.accent(context);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 6, 4, 4),
+      padding: const EdgeInsets.fromLTRB(
+        SeyirTokens.space1,
+        SeyirTokens.space2,
+        SeyirTokens.space1,
+        SeyirTokens.space1,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -1352,7 +1027,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Icon(MdiIcons.timerAlertOutline, size: 20, color: Colors.orange.shade600),
+            Icon(MdiIcons.timerAlertOutline, size: 20, color: _MahkemeRenkler.warning(context)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -1382,7 +1057,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
                       style: TextStyle(
                         fontSize: SeyirTokens.typeCaption,
                         fontWeight: FontWeight.w600,
-                        color: Colors.blue.shade700,
+                        color: SeyirPalette.of(context).foreground(SeyirTokens.sectionPeople),
                       ),
                     ),
                   ],
@@ -1401,217 +1076,142 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
     );
   }
 
-  Widget _buildCezaTitleCodeRow() {
-    final Map<String, String>? selectedReadyPenalty = _selectedReadyPenalty;
-    final int? selectedCode = _selectedReadyPenaltyCode;
-    final String? selectedTitle = selectedReadyPenalty?['name'] ?? selectedPenaltyText;
-    final String? selectedDescription = selectedReadyPenalty?['description'];
-    final bool hasSelection = selectedTitle != null && selectedTitle.trim().isNotEmpty;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        decoration: BoxDecoration(
-          color: SeyirPalette.of(context).card,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: hasSelection ? _MahkemeRenkler.yesil.withValues(alpha: 0.35) : SeyirPalette.of(context).border,
-            width: 1.2,
-          ),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                const Expanded(
-                  child: Text(
-                    'Seçtiğin Ceza',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: SeyirTokens.typeBody,
-                      color: _MahkemeRenkler.ortaKahve,
-                      letterSpacing: .2,
-                    ),
-                  ),
-                ),
-                if (selectedCode != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _MahkemeRenkler.yesil.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'CezaNo: $selectedCode',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                        color: SeyirPalette.of(context).textPrimary,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              hasSelection ? selectedTitle! : '— henüz ceza seçilmedi —',
-              softWrap: true,
-              style: TextStyle(
-                fontSize: hasSelection ? 17 : 13,
-                fontWeight: hasSelection ? FontWeight.w800 : FontWeight.w500,
-                color: hasSelection ? SeyirPalette.of(context).textPrimary : SeyirPalette.of(context).textSecondary,
-                height: 1.32,
-              ),
-            ),
-            if (selectedDescription != null && selectedDescription.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 8),
-              Text(
-                selectedDescription,
-                softWrap: true,
-                style: TextStyle(
-                  fontSize: SeyirTokens.typeCaption,
-                  color: SeyirPalette.of(context).textPrimary,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildCoffinWhoBoomRow() {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color accent = _MahkemeRenkler.accent(context);
     final IconData selectedIcon = _resolveSelectedPenaltyIcon();
     final String? selectedEmoji = _resolveSelectedPenaltyEmoji();
     final int? selectedCode = _selectedReadyPenaltyCode;
-    final String selectedDisplayName = _selectedReadyPenalty?['name'] ?? '#whoBOOM';
-    final bool hasSelection = _selectedReadyPenalty != null || selectedPenaltyText != null;
+    final String selectedDisplayName =
+        _selectedReadyPenalty?['name'] ?? selectedPenaltyText ?? '#whoBOOM';
+    final bool hasSelection = selectedDisplayName.trim().isNotEmpty &&
+        selectedDisplayName != '#whoBOOM';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space4,
+        vertical: SeyirTokens.space1,
+      ),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(SeyirTokens.space3),
         decoration: BoxDecoration(
-          color: SeyirPalette.of(context).card,
-          borderRadius: BorderRadius.circular(14),
+          color: palette.card,
+          borderRadius: SeyirTokens.radiusMdAll,
           border: Border.all(
-            color: hasSelection ? _MahkemeRenkler.yesil.withValues(alpha: 0.35) : SeyirPalette.of(context).border,
-            width: 1.2,
+            color: hasSelection ? palette.tintBorder(SeyirTokens.brand) : palette.border,
           ),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x14000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
+          boxShadow: palette.cardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Row(
               children: <Widget>[
-                const Expanded(
+                Expanded(
                   child: Text(
                     '📜 Seçtiğin Ceza',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: SeyirTokens.typeBody,
-                      color: _MahkemeRenkler.ortaKahve,
-                      letterSpacing: .2,
-                    ),
+                    style: palette.body(weight: FontWeight.w800, color: accent),
                   ),
                 ),
                 if (selectedCode != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SeyirTokens.space2,
+                      vertical: SeyirTokens.space1,
+                    ),
                     decoration: BoxDecoration(
-                      color: _MahkemeRenkler.yesil.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(20),
+                      color: palette.brandSoft,
+                      borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
                     ),
                     child: Text(
                       'CezaNo: $selectedCode',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                        color: SeyirPalette.of(context).textPrimary,
+                      style: palette.caption(
+                        weight: FontWeight.w700,
+                        color: palette.textPrimary,
                       ),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: SeyirTokens.space2),
             Row(
               children: <Widget>[
                 Container(
                   width: 74,
                   height: 74,
                   decoration: BoxDecoration(
-                    color: SeyirPalette.of(context).surfaceMuted,
-                    borderRadius: BorderRadius.circular(12),
+                    color: palette.surfaceMuted,
+                    borderRadius: SeyirTokens.radiusMdAll,
                   ),
                   child: Center(
                     child: _coffinAnimationController != null
                         ? RotationTransition(
                             turns: _coffinAnimationController!,
                             child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 220),
+                              duration: SeyirTokens.motion,
                               child: selectedEmoji != null
                                   ? Text(
                                       selectedEmoji,
                                       key: ValueKey<String>(selectedEmoji),
-                                      style: TextStyle(fontSize: 46),
+                                      style: const TextStyle(fontSize: 46),
                                     )
                                   : Icon(
                                       selectedIcon,
                                       key: ValueKey<IconData>(selectedIcon),
                                       size: 52,
-                                      color: _MahkemeRenkler.ortaKahve,
+                                      color: accent,
                                     ),
                             ),
                           )
                         : selectedEmoji != null
-                            ? Text(selectedEmoji, style: TextStyle(fontSize: 46))
-                            : Icon(selectedIcon, size: 52, color: _MahkemeRenkler.ortaKahve),
+                            ? Text(
+                                selectedEmoji,
+                                style: const TextStyle(fontSize: 46),
+                              )
+                            : Icon(selectedIcon, size: 52, color: accent),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: SeyirTokens.space3),
                 Expanded(
                   child: Container(
                     height: 74,
                     decoration: BoxDecoration(
-                      color: SeyirPalette.of(context).surfaceMuted,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: SeyirPalette.of(context).border),
+                      color: palette.surfaceMuted,
+                      borderRadius: SeyirTokens.radiusMdAll,
+                      border: Border.all(color: palette.border),
                     ),
                     child: Row(
                       children: <Widget>[
                         IconButton(
-                          icon: const Icon(Icons.arrow_left, color: Colors.green, size: 28),
-                          onPressed: () => _navigateReadyPenalty(-1),
+                          tooltip: 'Önceki ceza',
+                          icon: Icon(
+                            Icons.arrow_left,
+                            color: _isPenaltyApplied ? palette.textMuted : accent,
+                            size: 28,
+                          ),
+                          onPressed: _isPenaltyApplied
+                              ? null
+                              : () => _navigateReadyPenalty(-1),
                         ),
                         Expanded(
                           child: Center(
                             child: Text(
                               selectedDisplayName,
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                              style: palette.title(),
                             ),
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.arrow_right, color: Colors.green, size: 28),
-                          onPressed: () => _navigateReadyPenalty(1),
+                          tooltip: 'Sonraki ceza',
+                          icon: Icon(
+                            Icons.arrow_right,
+                            color: _isPenaltyApplied ? palette.textMuted : accent,
+                            size: 28,
+                          ),
+                          onPressed: _isPenaltyApplied
+                              ? null
+                              : () => _navigateReadyPenalty(1),
                         ),
                       ],
                     ),
@@ -1626,43 +1226,107 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
   }
 
   void _goToSelectedTab() {
-    if (selectedPenaltyText == null || selectedPenaltyText!.trim().isEmpty) {
-      _showMahkemeSnackBar(context, 'Önce bir ceza seçmelisiniz.', _MahkemeRenkler.kirmizi);
+    if (_isPenaltyApplied) {
       return;
     }
-    setState(() => _isMahkemeKarariVisible = true);
-    _showMahkemeSnackBar(context, 'Mahkeme kararı açıldı. Resmi mühür ile cezayı kesinleştirin.', Colors.green.shade700);
-  }
-
-  void _cancelSelectedPenalty() {
+    if (selectedPenaltyText == null || selectedPenaltyText!.trim().isEmpty) {
+      _showMahkemeSnackBar(
+        context,
+        'Önce bir ceza seçmelisiniz.',
+        _MahkemeRenkler.danger(context),
+      );
+      return;
+    }
     setState(() {
-      selectedPenaltyText = null;
-      selectedReadyIndex = null;
-      expandedReadyIndex = null;
-      selectedMemberPenaltyIndex = null;
-      selectedMember = null;
-      expandedMember = null;
-      expandedMemberPenaltyIndex = null;
-      _isCustomPenaltySelected = false;
-      _isMahkemeKarariVisible = false;
-      _isPenaltyApplied = false;
+      _isMahkemeKarariVisible = true;
+      _sealError = null;
     });
-    _showMahkemeSnackBar(context, 'Seçili ceza iptal edildi.', _MahkemeRenkler.kirmizi);
-  }
-
-  void _ensureShakeController() {
-    _shakeController ??= AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
+    _showMahkemeSnackBar(
+      context,
+      'Mahkeme kararı açıldı. Resmi mühür ile cezayı kesinleştirin.',
+      _MahkemeRenkler.accent(context),
     );
   }
 
-  void _triggerShake() {
-    if (_isSealTapInProgress) {
+  void _cancelSelectedPenalty() {
+    if (_isPenaltyApplied) {
       return;
     }
-    _ensureShakeController();
-    _shakeController!.forward(from: 0.0);
+    setState(() {
+      selectedPenaltyText = null;
+      selectedReadyIndex = null;
+      _isMahkemeKarariVisible = false;
+      _sealError = null;
+    });
+    _showMahkemeSnackBar(
+      context,
+      'Seçili ceza iptal edildi.',
+      _MahkemeRenkler.danger(context),
+    );
+  }
+
+  Future<CezaMuhurKilit> _readSealLock() async {
+    bool altiRolTamam = false;
+    bool temyizPenceresiAcik = false;
+    final String davaId = widget.davaId?.trim() ?? '';
+    if (davaId.isNotEmpty) {
+      try {
+        altiRolTamam =
+            await DavaHukumEligibilityService.hasSixPanelFinalized(davaId);
+        final Map<String, dynamic>? opened =
+            HiveDatabaseService.getOpenedDavaById(davaId);
+        temyizPenceresiAcik =
+            DavaHukumEligibilityService.isAppealJudgeWindowActive(opened);
+      } catch (e) {
+        debugPrint('Mühür kilidi okunamadı: $e');
+      }
+    }
+    return CezaMuhurKilit.degerlendir(
+      gorev: widget.dava.mevkii,
+      openedAt: widget.davaOpenedAt,
+      now: DateTime.now(),
+      altiRolTamam: altiRolTamam,
+      temyizPenceresiAcik: temyizPenceresiAcik,
+    );
+  }
+
+  Future<bool> _confirmSeal() async {
+    final bool? onay = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) {
+        final SeyirPalette palette = SeyirPalette.of(ctx);
+        return AlertDialog(
+          title: Text('Emin misin?', style: palette.headline()),
+          content: Text(
+            'Bu cezayı mühürlersen karar kesinleşir.',
+            style: palette.body(),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Vazgeç'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Mühürle'),
+            ),
+          ],
+        );
+      },
+    );
+    return onay == true;
+  }
+
+  void _markSealFailed(String mesaj) {
+    setState(() {
+      _isPenaltyApplied = false;
+      _sealError = mesaj;
+    });
+    _showMahkemeSnackBar(
+      context,
+      '$mesaj Tekrar dene.',
+      _MahkemeRenkler.danger(context),
+    );
   }
 
   Future<void> _handleSealTap() async {
@@ -1670,93 +1334,179 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       return;
     }
     if (selectedPenaltyText == null || selectedPenaltyText!.trim().isEmpty) {
-      _showMahkemeSnackBar(context, 'Önce bir ceza seçmelisiniz.', _MahkemeRenkler.kirmizi);
+      _showMahkemeSnackBar(
+        context,
+        'Önce bir ceza seçmelisiniz.',
+        _MahkemeRenkler.danger(context),
+      );
       return;
     }
 
-    _ensureShakeController();
-    setState(() => _isSealTapInProgress = true);
-    _shakeController!.repeat(period: const Duration(milliseconds: 120));
+    final CezaMuhurKilit kilit = await _readSealLock();
+    if (!mounted) {
+      return;
+    }
+    if (kilit.kilitli) {
+      _showMahkemeSnackBar(
+        context,
+        kilit.neden ?? 'Mühür henüz açılamaz.',
+        _MahkemeRenkler.warning(context),
+      );
+      return;
+    }
 
+    final bool onay = await _confirmSeal();
+    if (!onay || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSealTapInProgress = true;
+      _sealError = null;
+    });
+    await HapticFeedback.lightImpact();
+    unawaited(_stampController.forward(from: 0));
+    if (!mounted) {
+      return;
+    }
     try {
-      await Future<void>.delayed(const Duration(seconds: 3));
-      if (!mounted) {
-        return;
-      }
-      _shakeController!
-        ..stop()
-        ..value = 0.0;
       await _finalizePenaltyWithSeal();
     } finally {
       if (mounted) {
-        _shakeController!
-          ..stop()
-          ..value = 0.0;
         setState(() => _isSealTapInProgress = false);
       }
     }
   }
 
-  /// Mahkeme önizlemesi görünürken ceza seçimi değişince mühür ikonunu bir kez titretir.
-  void _scheduleSealShakeIfNeeded(String? selected, bool hasSelection) {
-    if (!hasSelection || _isPenaltyApplied) {
-      _lastShookPenaltyKey = null;
-      return;
-    }
-    final String key = selected!.trim();
-    if (_lastShookPenaltyKey == key) {
-      return;
-    }
-    _lastShookPenaltyKey = key;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      final String? current = selectedPenaltyText?.trim();
-      if (current == null || current.isEmpty || _isPenaltyApplied) {
-        return;
-      }
-      if (current != key) {
-        return;
-      }
-      _triggerShake();
-    });
-  }
-
   Future<void> _finalizePenaltyWithSeal() async {
-    if (selectedPenaltyText == null || selectedPenaltyText!.trim().isEmpty) {
-      _showMahkemeSnackBar(context, 'Önce bir ceza seçmelisiniz.', _MahkemeRenkler.kirmizi);
+    final String text = selectedPenaltyText?.trim() ?? '';
+    if (text.isEmpty) {
+      _showMahkemeSnackBar(
+        context,
+        'Önce bir ceza seçmelisiniz.',
+        _MahkemeRenkler.danger(context),
+      );
       return;
     }
     if (_isPenaltyApplied) {
-      _showMahkemeSnackBar(context, 'Ceza zaten resmi mühür ile kesinleştirildi.', Colors.green.shade700);
       return;
     }
 
-    if (widget.davaId != null && widget.davaId!.isNotEmpty &&
-        widget.userEmail != null && widget.userEmail!.isNotEmpty) {
-      try {
-        final davaProvider = Provider.of<DavaProvider>(context, listen: false);
-        await davaProvider.updateCezaForDava(
-          davaId: widget.davaId!,
-          userEmail: widget.userEmail!,
-          cezaText: selectedPenaltyText!,
-        );
-      } catch (e) {
-        debugPrint('❌ Ceza kaydedilirken hata: $e');
-      }
+    final String davaId = widget.davaId?.trim() ?? '';
+    final String email = widget.userEmail?.trim() ?? '';
+    if (davaId.isEmpty || email.isEmpty) {
+      _markSealFailed('Dava veya kullanıcı bilgisi eksik. Mühür kaydedilemedi.');
+      return;
     }
 
-    if (!mounted) return;
-    setState(() => _isPenaltyApplied = true);
-    _showMahkemeSnackBar(context, '🔴 Resmi mühür vuruldu. Ceza verilmiş olarak kaydedildi.', _MahkemeRenkler.kirmizi);
+    final DateTime sealedAt = DateTime.now();
+    bool saved = false;
+    try {
+      final CezaKaydedici? kaydedici = widget.cezaKaydedici;
+      if (kaydedici != null) {
+        saved = await kaydedici(
+          davaId: davaId,
+          userEmail: email,
+          cezaText: text,
+          sealedAt: sealedAt,
+        );
+      } else {
+        final DavaProvider davaProvider =
+            Provider.of<DavaProvider>(context, listen: false);
+        saved = await davaProvider.updateCezaForDava(
+          davaId: davaId,
+          userEmail: email,
+          cezaText: text,
+          sealedAt: sealedAt,
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Ceza kaydedilirken hata: $e');
+      saved = false;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    if (!saved) {
+      _markSealFailed('Mühür kaydedilemedi.');
+      return;
+    }
+
+    setState(() {
+      _isPenaltyApplied = true;
+      _sealedAt = sealedAt;
+      _sealError = null;
+      _isMahkemeKarariVisible = true;
+    });
+    _showMahkemeSnackBar(
+      context,
+      'Resmi mühür vuruldu. Ceza kaydedildi.',
+      _MahkemeRenkler.accent(context),
+    );
     widget.onPenaltyApplied?.call();
-    if (widget.onPenaltyApplied == null) {
-      Navigator.of(context).pop(true);
+  }
+
+  Future<void> _shareSealedDecision() async {
+    try {
+      final RenderObject? object =
+          _kararBoundaryKey.currentContext?.findRenderObject();
+      if (object is! RenderRepaintBoundary) {
+        throw StateError('Karar görüntüsü hazır değil');
+      }
+      final ui.Image image = await object.toImage(pixelRatio: 3);
+      final ByteData? data =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (data == null) {
+        throw StateError('PNG üretilemedi');
+      }
+      final Directory dir = await getApplicationDocumentsDirectory();
+      final String safeId = (widget.davaId ?? 'karar')
+          .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+      final File file = File('${dir.path}/mahkeme_karari_$safeId.png');
+      await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
+      if (!mounted) {
+        return;
+      }
+      try {
+        await Share.shareXFiles(
+          <XFile>[
+            XFile(
+              file.path,
+              mimeType: 'image/png',
+              name: 'mahkeme_karari.png',
+            ),
+          ],
+          text: 'Mahkeme kararı: ${selectedPenaltyText ?? ''}',
+        );
+      } catch (shareError) {
+        debugPrint('Paylaşım açılamadı, dosya kaydedildi: $shareError');
+        if (!mounted) {
+          return;
+        }
+        _showMahkemeSnackBar(
+          context,
+          'Karar görüntüsü belgelere kaydedildi.',
+          _MahkemeRenkler.accent(context),
+        );
+      }
+    } catch (e) {
+      debugPrint('Karar görüntüsü oluşturulamadı: $e');
+      if (!mounted) {
+        return;
+      }
+      _showMahkemeSnackBar(
+        context,
+        'Görüntü kaydedilemedi. Tekrar dene.',
+        _MahkemeRenkler.danger(context),
+      );
     }
   }
 
   Widget _buildSelectedPenaltyDetailActionCard() {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color accent = _MahkemeRenkler.accent(context);
     final Map<String, String>? selectedReadyPenalty = _selectedReadyPenalty;
     final String? selectedTitle = selectedReadyPenalty?['name'] ?? selectedPenaltyText;
     final String? selectedDescription = selectedReadyPenalty?['description'];
@@ -1771,73 +1521,69 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space4,
+        vertical: SeyirTokens.space2,
+      ),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(SeyirTokens.space3),
         decoration: BoxDecoration(
-          color: SeyirPalette.of(context).card,
-          borderRadius: BorderRadius.circular(14),
+          color: palette.card,
+          borderRadius: SeyirTokens.radiusMdAll,
           border: Border.all(
-            color: hasSelection ? _MahkemeRenkler.altin.withValues(alpha: 0.45) : SeyirPalette.of(context).border,
-            width: 1.2,
+            color: hasSelection ? palette.tintBorder(SeyirTokens.brand) : palette.border,
           ),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x14000000),
-              blurRadius: 8,
-              offset: Offset(0, 3),
-            ),
-          ],
+          boxShadow: palette.cardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Text(
               'Seçilen Ceza Ayrıntılı Açıklama',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-                color: hasSelection ? SeyirPalette.of(context).textPrimary : SeyirPalette.of(context).textSecondary,
+              style: palette.body(
+                weight: FontWeight.w800,
+                color: hasSelection ? palette.textPrimary : palette.textSecondary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: SeyirTokens.space2),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(SeyirTokens.space2),
               decoration: BoxDecoration(
-                color: SeyirPalette.of(context).surfaceMuted,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: SeyirPalette.of(context).border),
+                color: palette.surfaceMuted,
+                borderRadius: SeyirTokens.radiusSmAll,
+                border: Border.all(color: palette.border),
               ),
               child: Text(
                 detailText,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.45,
-                  color: hasSelection ? SeyirPalette.of(context).textPrimary : SeyirPalette.of(context).textSecondary,
+                style: palette.body(
+                  color: hasSelection ? palette.textPrimary : palette.textSecondary,
+                ).copyWith(
                   fontStyle: hasSelection ? FontStyle.normal : FontStyle.italic,
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: hasSelection ? _goToSelectedTab : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.greenAccent,
-                      foregroundColor: Colors.red,
-                      disabledBackgroundColor: Colors.green.shade200,
-                      padding: const EdgeInsets.symmetric(vertical: 5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text(
-                      'OK',
-                      style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.5),
-                    ),
-                  ),
+            const SizedBox(height: SeyirTokens.space2),
+            ElevatedButton(
+              onPressed: hasSelection && !_isPenaltyApplied ? _goToSelectedTab : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accent,
+                foregroundColor: _MahkemeRenkler.onAccent(context),
+                disabledBackgroundColor: palette.surfaceMuted,
+                disabledForegroundColor: palette.textMuted,
+                minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                padding: const EdgeInsets.symmetric(vertical: SeyirTokens.space2),
+                shape: const RoundedRectangleBorder(borderRadius: SeyirTokens.radiusMdAll),
+                elevation: 0,
+              ),
+              child: Text(
+                'OK',
+                style: palette.title(
+                  weight: FontWeight.w800,
+                  color: hasSelection && !_isPenaltyApplied
+                      ? _MahkemeRenkler.onAccent(context)
+                      : palette.textMuted,
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -1850,179 +1596,226 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
       return const SizedBox.shrink();
     }
 
-    _ensureShakeController();
-
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color accent = _MahkemeRenkler.accent(context);
+    final Color header = _MahkemeRenkler.header(context);
+    final Color onHeader = _MahkemeRenkler.onHeader(context);
     final String? selected = selectedPenaltyText;
     final bool hasSelection = selected != null && selected.trim().isNotEmpty;
-    _scheduleSealShakeIfNeeded(selected, hasSelection);
+    final String? description = _selectedReadyPenalty?['description']?.trim();
+    final bool canSeal = hasSelection && !_isPenaltyApplied && !_isSealTapInProgress;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: SeyirPalette.of(context).surfaceMuted,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: SeyirPalette.of(context).border, width: 1.2),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x12000000),
-              blurRadius: 8,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: const BoxDecoration(
-                // Kırmızı yerine ciddi bir koyu mavi/lacivert tonu eklendi
-                color: Color(0xFF0D1B2A),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      padding: const EdgeInsets.fromLTRB(
+        SeyirTokens.space4,
+        0,
+        SeyirTokens.space4,
+        SeyirTokens.space2,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          RepaintBoundary(
+            key: _kararBoundaryKey,
+            child: Container(
+              decoration: BoxDecoration(
+                color: palette.surfaceMuted,
+                borderRadius: SeyirTokens.radiusMdAll,
+                border: Border.all(color: palette.border),
+                boxShadow: palette.cardShadow,
               ),
-              child: const Text(
-                '📜 MAHKEME KARARI',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-
-                  color: _MahkemeRenkler.altin, // Altın rengi bu koyu mavi üzerinde çok şık duracaktır
-                  fontSize: SeyirTokens.typeHeadline,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.7,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Text(
-                    hasSelection
-                        ? '"$selected"\ncezasının uygulanmasına karar verilmiştir.'
-                        : '— henüz bir ceza seçilmedi —',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: hasSelection ? 14 : 12.5,
-                      fontWeight: hasSelection ? FontWeight.w700 : FontWeight.w500,
-                      color: hasSelection ? _MahkemeRenkler.ortaKahve : SeyirPalette.of(context).textSecondary,
-                      fontStyle: FontStyle.italic,
-                      height: 1.4,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SeyirTokens.space3,
+                      vertical: SeyirTokens.space2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: header,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(SeyirTokens.radiusMd),
+                      ),
+                    ),
+                    child: Text(
+                      '📜 MAHKEME KARARI',
+                      textAlign: TextAlign.center,
+                      style: palette.headline(color: onHeader),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  GestureDetector(
-                    onTap: hasSelection && !_isPenaltyApplied && !_isSealTapInProgress
-                        ? _handleSealTap
-                        : null,
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                      child: Opacity(
-                        opacity: hasSelection ? 1 : 0.5,
-                        child: MouseRegion(
-                          onEnter: (_) {
-                            if (!mounted) {
-                              return;
-                            }
-                            if (hasSelection && !_isPenaltyApplied && !_isSealTapInProgress) {
-                              _triggerShake();
-                            }
-                          },
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: <Widget>[
-                              Text(
-                                _isPenaltyApplied
-                                    ? 'Mühürlendi'
-                                    : (_isSealTapInProgress ? 'Mühürleniyor...' : 'Mühürle'),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: SeyirTokens.typeBody,
-                                  fontWeight: FontWeight.w900,
-                                  color: hasSelection
-                                      ? const Color(0xFF8B0000)
-                                      : SeyirPalette.of(context).textMuted,
-                                  letterSpacing: 0.8,
+                  Padding(
+                    padding: const EdgeInsets.all(SeyirTokens.space3),
+                    child: Column(
+                      children: <Widget>[
+                        Text(
+                          'Seçilen ceza',
+                          style: palette.caption(weight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: SeyirTokens.space2),
+                        Text(
+                          hasSelection
+                              ? '"$selected"\ncezasının uygulanmasına karar verilmiştir.'
+                              : '— henüz bir ceza seçilmedi —',
+                          textAlign: TextAlign.center,
+                          style: palette.body(
+                            weight: hasSelection ? FontWeight.w700 : FontWeight.w500,
+                            color: hasSelection ? accent : palette.textSecondary,
+                          ).copyWith(fontStyle: FontStyle.italic),
+                        ),
+                        if (description != null && description.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: SeyirTokens.space2),
+                          Text(
+                            description,
+                            textAlign: TextAlign.center,
+                            style: palette.body(),
+                          ),
+                        ],
+                        if (_isPenaltyApplied) ...<Widget>[
+                          const SizedBox(height: SeyirTokens.space3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: SeyirTokens.space3,
+                              vertical: SeyirTokens.space2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: palette.brandSoft,
+                              borderRadius: BorderRadius.circular(SeyirTokens.radiusXl),
+                              border: Border.all(color: accent),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                Image.asset(
+                                  'assets/images/muhur_icon.png',
+                                  width: 22,
+                                  height: 22,
+                                  fit: BoxFit.contain,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              AnimatedBuilder(
-                                animation: _shakeController!,
-                                builder: (BuildContext context, Widget? child) {
-                                  final double offset =
-                                      sin(_shakeController!.value * pi * 4) * 3;
-                                  return Transform.translate(
-                                    offset: Offset(
-                                      hasSelection && !_isPenaltyApplied
-                                          ? offset
-                                          : 0,
-                                      0,
+                                const SizedBox(width: SeyirTokens.space2),
+                                Text(
+                                  'Mühürlendi',
+                                  style: palette.title(color: accent),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: SeyirTokens.space2),
+                          Text(
+                            _sealedAt == null
+                                ? 'Mühür tarihi kayıtlı değil'
+                                : 'Mühür: ${_formatCezaKunyeDateTime(_sealedAt!)}',
+                            textAlign: TextAlign.center,
+                            style: palette.caption(),
+                          ),
+                        ],
+                        const SizedBox(height: SeyirTokens.space4),
+                        GestureDetector(
+                          key: const Key('ceza-muhurle'),
+                          onTap: canSeal ? _handleSealTap : null,
+                          behavior: HitTestBehavior.opaque,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              minWidth: SeyirTokens.tapTarget,
+                              minHeight: SeyirTokens.tapTarget,
+                            ),
+                            child: Opacity(
+                              opacity: hasSelection ? 1 : 0.5,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  Text(
+                                    _isPenaltyApplied
+                                        ? 'Mühürlendi'
+                                        : (_isSealTapInProgress ? 'Mühürleniyor...' : 'Mühürle'),
+                                    textAlign: TextAlign.center,
+                                    style: palette.body(
+                                      weight: FontWeight.w800,
+                                      color: hasSelection ? accent : palette.textMuted,
                                     ),
-                                    child: child,
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: SeyirPalette.of(context).surfaceMuted,
-                                    boxShadow: const <BoxShadow>[
-                                      BoxShadow(
-                                        color: Color(0x18000000),
-                                        blurRadius: 10,
-                                        spreadRadius: 1,
-                                        offset: Offset(0, 0),
-                                      ),
-                                      BoxShadow(
-                                        color: Color(0x30000000),
-                                        blurRadius: 8,
-                                        spreadRadius: 0,
-                                        offset: Offset(0, 5),
-                                      ),
-                                    ],
                                   ),
-                                  child: Image.asset(
-                                    'assets/images/muhur_icon.png',
-                                    width: 36,
-                                    height: 36,
-                                    fit: BoxFit.contain,
-                                    color: hasSelection
-                                        ? null
-                                        : Colors.grey.withOpacity(0.5),
-                                    colorBlendMode: hasSelection
-                                        ? null
-                                        : BlendMode.modulate,
+                                  const SizedBox(height: SeyirTokens.space2),
+                                  ScaleTransition(
+                                    scale: _stampScale,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(SeyirTokens.space2),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: palette.surfaceMuted,
+                                        boxShadow: palette.cardShadow,
+                                      ),
+                                      child: Image.asset(
+                                        'assets/images/muhur_icon.png',
+                                        width: 36,
+                                        height: 36,
+                                        fit: BoxFit.contain,
+                                        color: hasSelection
+                                            ? null
+                                            : palette.textMuted.withValues(alpha: 0.5),
+                                        colorBlendMode: hasSelection
+                                            ? null
+                                            : BlendMode.modulate,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: GestureDetector(
-                      onTap: hasSelection ? _cancelSelectedPenalty : null,
-                      child: Icon(
-                        Icons.close,
-                        size: 20,
-                        color: hasSelection
-                            ? const Color(0xFF7D2A34)
-                            : SeyirPalette.of(context).textMuted,
-                      ),
+                        if (_sealError != null && !_isPenaltyApplied) ...<Widget>[
+                          const SizedBox(height: SeyirTokens.space2),
+                          Text(
+                            _sealError!,
+                            textAlign: TextAlign.center,
+                            style: palette.body(color: SeyirTokens.reject),
+                          ),
+                          TextButton(
+                            onPressed: _isSealTapInProgress ? null : _finalizePenaltyWithSeal,
+                            child: const Text('Tekrar dene'),
+                          ),
+                        ],
+                        if (!_isPenaltyApplied) ...<Widget>[
+                          const SizedBox(height: SeyirTokens.space1),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: IconButton(
+                              tooltip: 'Seçimi kapat',
+                              onPressed: hasSelection ? _cancelSelectedPenalty : null,
+                              icon: Icon(
+                                Icons.close,
+                                color: hasSelection ? accent : palette.textMuted,
+                              ),
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size(
+                                  SeyirTokens.tapTarget,
+                                  SeyirTokens.tapTarget,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          if (_isPenaltyApplied)
+            Align(
+              alignment: Alignment.center,
+              child: TextButton.icon(
+                onPressed: _shareSealedDecision,
+                icon: const Icon(Icons.ios_share),
+                label: const Text('Paylaş'),
+                style: TextButton.styleFrom(
+                  foregroundColor: accent,
+                  minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -2032,1015 +1825,83 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
   }
 
   Widget _buildSimpleInfoFooter() {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final String metin;
+    if (_isMahkemeKarariVisible && _isPenaltyApplied) {
+      metin = 'Karar mühürlendi. Seçim kilitli; görüntüyü paylaşabilirsin.';
+    } else if (_isMahkemeKarariVisible) {
+      metin = 'İnsanlar arasında hükmettiğinizde adâletle hükmedin. Kesinleştirmek için mühre dokun.';
+    } else {
+      metin = 'Mahkeme kararı alanı, sadece OK ile açılır.';
+    }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+      padding: const EdgeInsets.fromLTRB(
+        SeyirTokens.space4,
+        SeyirTokens.space1,
+        SeyirTokens.space4,
+        SeyirTokens.space3,
+      ),
       child: Text(
-        _isMahkemeKarariVisible
-            ? (_isPenaltyApplied
-                ? 'Karar resmi olarak mühürlendi. Bu kullanıcı artık ceza veremez.'
-                : 'İnsanlar arasında hükmettiğinizde adâletle hükmedin. Kesinleştirmek için mühre dokun.')
-            : 'Mahkeme kararı alanı, sadece "SEÇ" butonuna bastıktan sonra görünür.',
+        metin,
         textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 11.5,
-          color: SeyirPalette.of(context).textSecondary.withValues(alpha: 0.9),
-          fontStyle: FontStyle.italic,
-        ),
+        style: palette.caption().copyWith(fontStyle: FontStyle.italic),
       ),
     );
   }
 
-  Widget _socialCounter(IconData icon, int count, VoidCallback onTap) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        IconButton(icon: Icon(icon, color: Colors.green, size: 20), onPressed: onTap),
-        Text('$count', style: TextStyle(color: Colors.green, fontSize: 13)),
-      ],
-    );
-  }
-
-  // ─── BAŞLIK (yalnızca sheet modunda) ─────────────────────────
   Widget _buildHeader() {
+    final SeyirPalette palette = SeyirPalette.of(context);
+    final Color header = _MahkemeRenkler.header(context);
+    final Color onHeader = _MahkemeRenkler.onHeader(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SeyirTokens.space4,
+        vertical: SeyirTokens.space3,
+      ),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [_MahkemeRenkler.koyu, _MahkemeRenkler.ortaKahve],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: header,
         borderRadius: widget.embeddedMiddlePane
             ? BorderRadius.zero
-            : const BorderRadius.vertical(top: Radius.circular(24)),
-        border: const Border(bottom: BorderSide(color: _MahkemeRenkler.altin, width: 1.5)),
+            : const BorderRadius.vertical(top: Radius.circular(SeyirTokens.radiusXl)),
+        border: Border(bottom: BorderSide(color: palette.tintBorder(SeyirTokens.brand))),
       ),
       child: Row(
-        children: [
-          // Çekiç + rozet
+        children: <Widget>[
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(SeyirTokens.space2),
             decoration: BoxDecoration(
-              color: _MahkemeRenkler.altin.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.4)),
+              color: palette.brandSoft,
+              borderRadius: SeyirTokens.radiusMdAll,
+              border: Border.all(color: palette.tintBorder(SeyirTokens.brand)),
             ),
-            child: const Text('⚖️', style: TextStyle(fontSize: 18)),
+            child: Text('⚖️', style: palette.headline()),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: SeyirTokens.space3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              children: <Widget>[
                 Text(
                   'Ceza Yönetimi',
-                  style: TextStyle(
-                    color: _MahkemeRenkler.altin,
-                    fontSize: SeyirTokens.typeHeadline,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
+                  style: palette.headline(color: onHeader),
                 ),
                 Text(
                   'Mahkeme-i Kübra — Adalet hâkim!',
-                  style: TextStyle(
-                    color: _MahkemeRenkler.altin.withValues(alpha: 0.82),
-                    fontSize: 11,
-                    fontStyle: FontStyle.italic,
-                  ),
+                  style: palette.caption(color: onHeader).copyWith(fontStyle: FontStyle.italic),
                 ),
               ],
             ),
           ),
-          // Kapat butonu
-          InkWell(
-            onTap: () => Navigator.of(context).pop(false),
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: _MahkemeRenkler.ortaKahve.withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.close, color: Colors.white, size: 20),
+          IconButton(
+            tooltip: 'Kapat',
+            onPressed: () => Navigator.of(context).pop(_isPenaltyApplied),
+            icon: Icon(Icons.close, color: onHeader),
+            style: IconButton.styleFrom(
+              backgroundColor: palette.brandSoft,
+              minimumSize: const Size(SeyirTokens.tapTarget, SeyirTokens.tapTarget),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ─── TAB BAR ─────────────────────────────────────────────────
-  Widget _buildTabBar() {
-    if (_tabController == null) return const SizedBox.shrink();
-    return Container(
-      decoration: BoxDecoration(
-        color: _MahkemeRenkler.koyu,
-        border: const Border(bottom: BorderSide(color: _MahkemeRenkler.altin, width: 1)),
-      ),
-      child: TabBar(
-        controller: _tabController!,
-        labelColor: _MahkemeRenkler.altin,
-        unselectedLabelColor: Color(0xFF8B87B0),
-        indicatorColor: _MahkemeRenkler.altin,
-        indicatorWeight: 3,
-        labelStyle: TextStyle(fontSize: SeyirTokens.typeCaption, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-        tabs: const <Widget>[
-          Tab(icon: Text('⚖️', style: TextStyle(fontSize: SeyirTokens.typeTitle)), text: 'Ceza Seç'),
-          Tab(icon: Text('✍️', style: TextStyle(fontSize: SeyirTokens.typeTitle)), text: 'Özel Ceza'),
-          Tab(icon: Text('📜', style: TextStyle(fontSize: SeyirTokens.typeTitle)), text: 'Seçilen'),
-        ],
-      ),
-    );
-  }
-
-  // ─── CEZA SEÇİMİ TAB ─────────────────────────────────────────
-  Widget _buildCezaSecimiTab(ScrollController? scrollController) {
-    return SingleChildScrollView(
-      controller: scrollController,
-      padding: const EdgeInsets.all(44),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          // Kategori seçici — levha görünümü
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: SeyirPalette.of(context).surfaceMuted,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.5)),
-              boxShadow: [
-                BoxShadow(color: _MahkemeRenkler.koyu.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2)),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(child: _buildCategoryButton('Hazır Ceza', 0)),
-                const SizedBox(width: 8),
-                Expanded(child: _buildCategoryButton('Üyelerden', 1)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Ceza listesi — parşömen tarzı kağıt
-          Container(
-            decoration: BoxDecoration(
-              color: SeyirPalette.of(context).surfaceMuted,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.4)),
-              boxShadow: [
-                BoxShadow(color: _MahkemeRenkler.koyu.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2)),
-              ],
-            ),
-            // Küçük başlık şeridi
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: const BoxDecoration(
-                    color: _MahkemeRenkler.koyu,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          activeCategory == 'Hazır Ceza' ? '📋 Resmi Ceza Listesi' : '👥 Üye Kararları',
-                          softWrap: true,
-                          style: TextStyle(
-                            color: _MahkemeRenkler.altin,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                activeCategory == 'Hazır Ceza' ? _buildReadyList() : _buildMembersList(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryButton(String label, int index) {
-    final bool isActive = activeCategory == label;
-    return GestureDetector(
-      onTap: () {
-        if (activeCategory == label) {
-          return;
-        }
-        setState(() {
-          activeCategory = label;
-          if (label == 'Üyelerden') {
-            selectedReadyIndex = null;
-            expandedReadyIndex = null;
-            selectedMemberPenaltyIndex = null;
-            selectedMember = null;
-            expandedMember = null;
-            expandedMemberPenaltyIndex = null;
-          } else {
-            selectedMemberPenaltyIndex = null;
-            selectedMember = null;
-            expandedMember = null;
-            expandedMemberPenaltyIndex = null;
-            _applyDefaultHazirCezaSelection();
-          }
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isActive ? _MahkemeRenkler.ortaKahve : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isActive ? _MahkemeRenkler.altin : _MahkemeRenkler.altin.withOpacity(0.3),
-          ),
-        ),
-        child: Text(
-          isActive ? '● $label' : label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: isActive ? _MahkemeRenkler.altin : _MahkemeRenkler.ortaKahve,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-            fontSize: 13,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReadyList() {
-    final List<Map<String, String>> sortedPenalties = List<Map<String, String>>.from(readyPenalties);
-    sortedPenalties.sort((a, b) {
-      final aLikes = _cezaBegenileri[a['name']!] ?? 0;
-      final bLikes = _cezaBegenileri[b['name']!] ?? 0;
-      if (aLikes != bLikes) return bLikes.compareTo(aLikes);
-      return readyPenalties.indexOf(a).compareTo(readyPenalties.indexOf(b));
-    });
-
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: sortedPenalties.length,
-      separatorBuilder: (_, __) => Divider(height: 1, color: _MahkemeRenkler.altin.withOpacity(0.2)),
-      itemBuilder: (BuildContext context, int index) {
-        final penalty = sortedPenalties[index];
-        final cezaName = penalty['name']!;
-        final originalIndex = readyPenalties.indexOf(penalty);
-        final bool selected = selectedReadyIndex == originalIndex;
-        final int likeCount = _cezaBegenileri[cezaName] ?? 0;
-        final bool isLiked = _userLikedCezalar[cezaName] ?? false;
-        final bool isExpanded = expandedReadyIndex == originalIndex;
-        final String? description = penalty['description'];
-
-        return Column(
-          children: <Widget>[
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _selectReady(originalIndex),
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: selected ? _MahkemeRenkler.ortaKahve.withValues(alpha: 0.12) : Colors.transparent,
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      // Sıra numarası — mühür görünümü
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: selected ? _MahkemeRenkler.ortaKahve : _MahkemeRenkler.altin.withOpacity(0.15),
-                          border: Border.all(
-                            color: selected ? _MahkemeRenkler.ortaKahve : _MahkemeRenkler.altin.withOpacity(0.4),
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            (index + 1).toString(),
-                            style: TextStyle(
-                              color: selected ? Colors.white : _MahkemeRenkler.ortaKahve,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          cezaName,
-                          softWrap: true,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                            color: selected ? _MahkemeRenkler.ortaKahve : SeyirPalette.of(context).textPrimary,
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                      // Beğeni butonu
-                      GestureDetector(
-                        onTap: () => _toggleCezaBegeni(cezaName),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isLiked ? _MahkemeRenkler.ortaKahve.withValues(alpha: 0.12) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isLiked ? _MahkemeRenkler.ortaKahve : _MahkemeRenkler.altin.withOpacity(0.3),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(isLiked ? '❤️' : '🤍', style: TextStyle(fontSize: SeyirTokens.typeCaption)),
-                              const SizedBox(width: 3),
-                              Text(
-                                likeCount.toString(),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: isLiked ? _MahkemeRenkler.ortaKahve : SeyirPalette.of(context).textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Icon(
-                        isExpanded ? Icons.expand_less : Icons.expand_more,
-                        color: _MahkemeRenkler.altin.withOpacity(0.7),
-                        size: 18,
-                      ),
-                      if (selected) ...[
-                        const SizedBox(width: 4),
-                        Text(
-                          _isPenaltyApplied ? '🔒' : '🔓',
-                          style: TextStyle(fontSize: SeyirTokens.typeTitle),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Açılır açıklama — parşömen altına yazılmış gibi
-            if (isExpanded && description != null && description.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(left: 52, right: 14, bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: SeyirPalette.of(context).surfaceMuted,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.4)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('📜', style: TextStyle(fontSize: SeyirTokens.typeBody)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        description,
-                        softWrap: true,
-                        style: TextStyle(
-                          fontSize: SeyirTokens.typeCaption,
-                          color: _MahkemeRenkler.ortaKahve,
-                          height: 1.5,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildMembersList() {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: memberPenalties.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 6),
-      itemBuilder: (BuildContext context, int index) {
-        final String member = memberPenalties.keys.elementAt(index);
-        final Map<String, dynamic> memberData = memberPenalties[member]!;
-        final List<String> penalties = memberData['penalties'] as List<String>;
-
-        return Container(
-          decoration: BoxDecoration(
-            color: SeyirPalette.of(context).surfaceMuted,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.4)),
-          ),
-          child: ExpansionTile(
-            leading: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _MahkemeRenkler.ortaKahve,
-                border: Border.all(color: _MahkemeRenkler.altin, width: 1.5),
-              ),
-              child: Center(
-                child: Text(
-                  memberData['avatar'] as String,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: _MahkemeRenkler.altin, fontSize: 15),
-                ),
-              ),
-            ),
-            title: Text(
-              member,
-              softWrap: true,
-              style: TextStyle(fontSize: SeyirTokens.typeBody, fontWeight: FontWeight.bold, color: SeyirPalette.of(context).textPrimary),
-            ),
-            subtitle: Text(
-              memberData['hashtag'] as String,
-              softWrap: true,
-              style: TextStyle(fontSize: 11, color: SeyirPalette.of(context).textSecondary),
-            ),
-            iconColor: _MahkemeRenkler.altin,
-            collapsedIconColor: _MahkemeRenkler.altin,
-            children: <Widget>[
-              ...penalties.asMap().entries.map((MapEntry<int, String> entry) {
-                final int idx = entry.key;
-                final String txt = entry.value;
-                final bool selected = (selectedMember == member && selectedMemberPenaltyIndex == idx);
-                final bool isExpanded = (expandedMember == member && expandedMemberPenaltyIndex == idx);
-
-                return Column(
-                  children: [
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => _selectMemberPenalty(member, idx),
-                        child: Container(
-                          constraints: const BoxConstraints(minHeight: SeyirTokens.tapTarget),
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: selected ? _MahkemeRenkler.ortaKahve.withValues(alpha: 0.12) : Colors.transparent,
-                          ),
-                          child: Row(
-                            children: [
-                              if (_coffinAnimationController != null)
-                                RotationTransition(
-                                  turns: _coffinAnimationController!,
-                                  child: const Text('⚰️', style: TextStyle(fontSize: SeyirTokens.typeTitle)),
-                                )
-                              else
-                                const Text('⚰️', style: TextStyle(fontSize: SeyirTokens.typeTitle)),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  txt,
-                                  softWrap: true,
-                                  style: TextStyle(
-                                    fontSize: SeyirTokens.typeCaption,
-                                    fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                                    color: selected ? _MahkemeRenkler.ortaKahve : SeyirPalette.of(context).textPrimary,
-                                    height: 1.3,
-                                  ),
-                                ),
-                              ),
-                              Icon(
-                                isExpanded ? Icons.expand_less : Icons.expand_more,
-                                color: _MahkemeRenkler.altin.withOpacity(0.7),
-                                size: 16,
-                              ),
-                              if (selected)
-                                Text(
-                                  _isPenaltyApplied ? '🔒' : '🔓',
-                                  style: TextStyle(fontSize: SeyirTokens.typeBody),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (isExpanded)
-                      Container(
-                        margin: const EdgeInsets.only(left: 42, right: 14, bottom: 8),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: SeyirPalette.of(context).surfaceMuted,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.4)),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('🪶', style: TextStyle(fontSize: 13)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '$txt — Bu ceza üye tarafından mahkemeye sunulmuştur. Karar üyeye aittir!',
-                                softWrap: true,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: _MahkemeRenkler.ortaKahve,
-                                  fontStyle: FontStyle.italic,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                );
-              }),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // ─── ÖZEL CEZA TAB ───────────────────────────────────────────
-  Widget _buildOzelCezaTab(ScrollController? scrollController) {
-    return SingleChildScrollView(
-      controller: scrollController,
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          // Hikayeveri giriş banner'ı
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: SeyirPalette.of(context).surfaceMuted,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.5)),
-            ),
-            child: Column(
-              children: [
-                const Text('✍️', style: TextStyle(fontSize: 28)),
-                const SizedBox(height: 6),
-                const Text(
-                  'Kalemin Gücü Seninle!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: _MahkemeRenkler.ortaKahve,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Mahkeme listesinde bulamazsanız, kendi cezanızı yaratan büyük hâkim sizsiniz.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: SeyirPalette.of(context).textSecondary, height: 1.5),
-                ),
-                if (_isCustomPenaltySelected && !_isPenaltyApplied) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.green.shade400),
-                    ),
-                    child: const Text(
-                      '✏️ Ceza seçildi — düzenlenebilir',
-                      style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Başlık girişi
-          _buildOzelCezaLabel('1. Ceza Başlığını Yaz', '🏷️'),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _customTitleCtrl,
-            focusNode: _customTitleFocus,
-            maxLines: 4,
-            maxLength: 100,
-            hint: _isPenaltyApplied ? 'Ceza mühürlendi, artık değişmez!' : 'Ör: Mahkûmu Serinletme Cezası',
-          ),
-          const SizedBox(height: 14),
-
-          // Açıklama girişi
-          _buildOzelCezaLabel('2. Ceza Açıklamasını Yaz', '📝'),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _customDescriptionCtrl,
-            focusNode: _customDescriptionFocus,
-            maxLines: 6,
-            maxLength: 400,
-            hint: _isPenaltyApplied
-                ? 'Ceza mühürlendi, artık değişmez!'
-                : 'Mahkeme kaydına geçmesi için detaylı açıklama yazın (en az 15 karakter)...',
-          ),
-          const SizedBox(height: 14),
-
-          // Sayaç + buton satırı
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: <Widget>[
-              // Sayaçlar
-              Wrap(
-                spacing: 6,
-                children: [
-                  _buildSayac('Başlık', _customTitleCtrl.text.length, 3, 100),
-                  _buildSayac('Açıklama', _customDescriptionCtrl.text.length, 15, 400),
-                ],
-              ),
-              // Buton
-              if (_isCustomPenaltySelected && !_isPenaltyApplied)
-                _buildMahkemeButton(
-                  label: '🔄 Güncelle',
-                  onPressed: _isCustomPenaltyValid ? _updateCustomPenalty : null,
-                  color: Colors.blue.shade700,
-                )
-              else
-                _buildMahkemeButton(
-                  label: '📋 Kaydet',
-                  onPressed: _isCustomPenaltyValid && !_isPenaltyApplied ? _saveCustomPenalty : null,
-                  color: _MahkemeRenkler.ortaKahve,
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOzelCezaLabel(String text, String emoji) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(emoji, style: TextStyle(fontSize: SeyirTokens.typeTitle)),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            softWrap: true,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: _MahkemeRenkler.ortaKahve,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required FocusNode focusNode,
-    required int maxLines,
-    required int maxLength,
-    required String hint,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _isPenaltyApplied ? SeyirPalette.of(context).surfaceMuted.withOpacity(0.5) : _MahkemeRenkler.kemik,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _MahkemeRenkler.altin.withOpacity(0.5)),
-      ),
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        maxLines: maxLines,
-        minLines: maxLines > 4 ? 4 : 1,
-        maxLength: maxLength,
-        enabled: !_isPenaltyApplied,
-        readOnly: _isPenaltyApplied,
-        style: TextStyle(fontSize: 13, color: SeyirPalette.of(context).textPrimary, height: 1.5),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: SeyirPalette.of(context).textSecondary, fontSize: SeyirTokens.typeCaption),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.all(14),
-          counterText: '',
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSayac(String label, int current, int min, int max) {
-    final bool ok = current >= min && current <= max;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: ok ? Colors.green.withOpacity(0.08) : _MahkemeRenkler.kemik,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ok ? Colors.green.shade400 : _MahkemeRenkler.altin.withOpacity(0.4)),
-      ),
-      child: Text(
-        '$label: $current/$max',
-        style: TextStyle(
-          fontSize: SeyirTokens.typeCaption,
-          fontWeight: FontWeight.bold,
-          color: ok ? Colors.green.shade700 : SeyirPalette.of(context).textSecondary,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMahkemeButton({
-    required String label,
-    required VoidCallback? onPressed,
-    required Color color,
-  }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: onPressed != null ? color : _MahkemeRenkler.gri.withOpacity(0.3),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        elevation: onPressed != null ? 3 : 0,
-      ),
-      child: Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: SeyirTokens.typeCaption)),
-    );
-  }
-
-  // ─── SEÇİLEN CEZA TAB ────────────────────────────────────────
-  Widget _buildSecilenCezaTab(ScrollController? scrollController) {
-    return SingleChildScrollView(
-      controller: scrollController,
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          // Parşömen efektli ceza belgesi
-          Container(
-            decoration: BoxDecoration(
-              color: SeyirPalette.of(context).surfaceMuted,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _MahkemeRenkler.altin, width: 2),
-              boxShadow: [
-                BoxShadow(color: _MahkemeRenkler.koyu.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4)),
-              ],
-            ),
-            child: Column(
-              children: [
-                // Üst başlık şeridi
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: const BoxDecoration(
-                    color: _MahkemeRenkler.koyu,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('⚖️ ', style: TextStyle(fontSize: 18)),
-                      Text(
-                        'MAHKEME KARARI',
-                        style: TextStyle(
-                          color: _MahkemeRenkler.altin,
-                          fontSize: SeyirTokens.typeBody,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Tarih satırı
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Mahkeme-i Kübra',
-                        style: TextStyle(fontSize: 11, color: SeyirPalette.of(context).textSecondary, fontStyle: FontStyle.italic),
-                      ),
-                      Text(
-                        _formatDate(),
-                        style: TextStyle(fontSize: 11, color: SeyirPalette.of(context).textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                Divider(color: _MahkemeRenkler.altin.withOpacity(0.4), thickness: 1),
-                // Ceza metni
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      Text(
-                        'İşbu belge ile,',
-                        style: TextStyle(fontSize: SeyirTokens.typeCaption, color: SeyirPalette.of(context).textSecondary, fontStyle: FontStyle.italic),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        selectedPenaltyText != null
-                            ? '"$selectedPenaltyText"'
-                            : '— henüz bir ceza seçilmedi —',
-                        textAlign: TextAlign.center,
-                        softWrap: true,
-                        style: TextStyle(
-                          fontSize: selectedPenaltyText != null ? 16 : 13,
-                          fontWeight: selectedPenaltyText != null ? FontWeight.bold : FontWeight.normal,
-                          color: selectedPenaltyText != null ? _MahkemeRenkler.ortaKahve : SeyirPalette.of(context).textSecondary,
-                          fontStyle: FontStyle.italic,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (selectedPenaltyText != null)
-                        Text(
-                          'cezasının uygulanmasına karar verilmiştir.\nBu karar kesin ve değiştirilemez!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11, color: SeyirPalette.of(context).textSecondary, fontStyle: FontStyle.italic, height: 1.5),
-                        ),
-                    ],
-                  ),
-                ),
-                Divider(color: _MahkemeRenkler.altin.withOpacity(0.4), thickness: 1),
-                // Mühür
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: _MahkemeRenkler.ortaKahve, width: 1.5),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          '🔴 RESMİ MÜHÜR',
-                          style: TextStyle(
-                            fontSize: SeyirTokens.typeCaption,
-                            fontWeight: FontWeight.bold,
-                            color: _MahkemeRenkler.ortaKahve,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          // Durum bilgisi
-          if (selectedPenaltyText == null)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange.shade400),
-              ),
-              child: const Row(
-                children: [
-                  Text('⚠️', style: TextStyle(fontSize: SeyirTokens.typeTitle)),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '"Ceza Seç" veya "Özel Ceza" sekmesinden bir ceza belirleyiniz.',
-                      style: TextStyle(fontSize: SeyirTokens.typeCaption, color: _MahkemeRenkler.ortaKahve, height: 1.4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate() {
-    final now = DateTime.now();
-    return '${now.day}.${now.month}.${now.year}';
-  }
-
-  // ─── ALT AKSİYON BUTONLARI ───────────────────────────────────
-  Widget _buildBottomActions() {
-    final bool hasSelection = selectedPenaltyText != null && selectedPenaltyText!.trim().isNotEmpty;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      decoration: BoxDecoration(
-        color: SeyirPalette.of(context).surfaceMuted,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _MahkemeRenkler.altin.withValues(alpha: 0.55), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: _MahkemeRenkler.koyu.withValues(alpha: 0.12),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: const BoxDecoration(
-                color: _MahkemeRenkler.koyu,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              child: const Text(
-                '⚖️ KARAR İŞLEMLERİ',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: _MahkemeRenkler.altin,
-                  fontSize: SeyirTokens.typeCaption,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.0,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.close, size: 16),
-                      label: const Text('Vazgeç'),
-                      onPressed: () => Navigator.of(context).pop(false),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _MahkemeRenkler.gri,
-                        side: BorderSide(color: _MahkemeRenkler.gri.withValues(alpha: 0.8)),
-                        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: hasSelection ? _applyPenalty : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _MahkemeRenkler.kirmizi,
-                        disabledBackgroundColor: _MahkemeRenkler.kirmizi.withValues(alpha: 0.35),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        elevation: hasSelection ? 6 : 0,
-                        shadowColor: _MahkemeRenkler.kirmizi.withValues(alpha: 0.35),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Text('🔨', style: TextStyle(fontSize: 18)),
-                          SizedBox(width: 8),
-                          Text(
-                            'CEZA UYGULA!',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: SeyirTokens.typeBody,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (!hasSelection)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                child: Text(
-                  'Karar işlemi için önce bir ceza seçiniz.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: SeyirPalette.of(context).textSecondary.withValues(alpha: 0.92),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }

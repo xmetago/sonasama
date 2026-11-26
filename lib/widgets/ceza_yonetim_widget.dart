@@ -41,6 +41,8 @@ class CezaYonetimPage extends StatefulWidget {
 
 class _CezaYonetimPageState extends State<CezaYonetimPage> {
   bool _isHeaderCollapsed = true;
+  bool _muhurledi = false;
+  bool _allowPop = false;
 
   /// Hot reload / yanlış element eşleşmesinde `late` patlamasını önlemek için her build'da türetilir.
   CezalarUnifiedDava get _panelDava => CezalarUnifiedDava(
@@ -54,7 +56,21 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop || _allowPop) {
+          return;
+        }
+        setState(() => _allowPop = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          Navigator.of(context).pop(_muhurledi);
+        });
+      },
+      child: Scaffold(
       body: SafeArea(
         child: AppExpandableIconMenu(
           expandBody: true,
@@ -174,6 +190,11 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
                           userEmail: widget.userEmail,
                           embeddedMiddlePane: true,
                           showSheetCloseHeader: false,
+                          onPenaltyApplied: () {
+                            if (mounted && !_muhurledi) {
+                              setState(() => _muhurledi = true);
+                            }
+                          },
                         ),
                       ),
                     ),
@@ -181,6 +202,7 @@ class _CezaYonetimPageState extends State<CezaYonetimPage> {
           ),
         ),
       ),
+    ),
     );
   }
 }
@@ -228,13 +250,6 @@ class CezaYonetimWidget extends StatelessWidget {
       userEmail: userEmail,
       embeddedMiddlePane: embeddedMiddlePane,
       showSheetCloseHeader: !embeddedMiddlePane,
-      onPenaltyApplied: embeddedMiddlePane
-          ? null
-          : () {
-              if (context.mounted) {
-                Navigator.of(context).pop(true);
-              }
-            },
     );
   }
 }
