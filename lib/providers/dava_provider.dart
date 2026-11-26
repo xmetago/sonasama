@@ -666,6 +666,7 @@ class DavaProvider extends BaseProvider {
     required String davaId,
     required String userEmail,
     required String cezaText,
+    DateTime? sealedAt,
   }) async {
     return await executeAsync(
       () async {
@@ -673,6 +674,7 @@ class DavaProvider extends BaseProvider {
           davaId: davaId,
           userEmail: userEmail,
           cezaText: cezaText,
+          sealedAt: sealedAt,
         );
         print('✅ [DavaProvider] Ceza kaydedildi ve dinleyicilere bildirildi');
         // Ceza kaydedildikten sonra tüm dinleyicilere bildir
