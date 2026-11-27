@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 // ignore: depend_on_referenced_packages
@@ -12,6 +13,7 @@ import 'package:its19/services/dava_consensus_service.dart';
 import 'package:its19/services/dava_hukum_eligibility_service.dart';
 import 'package:its19/services/hive_database_service.dart';
 import 'package:its19/theme/app_theme.dart';
+import 'package:its19/theme/seyir_tokens.dart';
 import 'package:its19/widgets/modern_hukum_card.dart';
 import 'package:its19/widgets/rol_hukum_kartlari_section.dart';
 
@@ -49,7 +51,20 @@ void main() {
       expect(normalizeRolKarari('Yargic'), 'Yargıç Kararı');
       expect(normalizeRolKarari('Yargic Karari'), 'Yargıç Kararı');
       expect(normalizeRolKarari('YARGİÇ KARARI'), 'Yargıç Kararı');
+      expect(normalizeRolKarari('Hakim'), 'Yargıç Kararı');
       expect(normalizeRolKarari('1. Juri'), '1. Jüri Kararı');
+      expect(normalizeRolKarari('1.Jüri'), '1. Jüri Kararı');
+      expect(normalizeRolKarari('2.Jüri'), '2. Jüri Kararı');
+      expect(normalizeRolKarari('Temyiz hakimi'), 'Temyiz Hakimi Kararı');
+      expect(normalizeRolKarari('İstinaf Hakimi'), 'Temyiz Hakimi Kararı');
+      expect(normalizeRolKarari('Davacı avukatı'), 'Davacı Avukatı Kararı');
+      expect(normalizeRolKarari('Davacı Vekili'), 'Davacı Avukatı Kararı');
+      expect(normalizeRolKarari('Davalı avukatı'), 'Davalı Avukatı Kararı');
+      expect(normalizeRolKarari('Davalı Vekili'), 'Davalı Avukatı Kararı');
+      expect(normalizeRolKarari('Davacı Şahidi'), 'Davacı Şahidi Kararı');
+      expect(normalizeRolKarari('Davacı Tanığı'), 'Davacı Şahidi Kararı');
+      expect(normalizeRolKarari('Davalı Şahidi'), 'Davalı Şahidi Kararı');
+      expect(normalizeRolKarari('Davalı Tanığı'), 'Davalı Şahidi Kararı');
     });
   });
 
@@ -129,6 +144,36 @@ void main() {
         ),
         isFalse,
       );
+    });
+
+    test('sekiz rolün hükmü Hive’a yazılır', () async {
+      const String davaId = 'icon-tap-all-roles';
+      const List<(String, String)> roles = <(String, String)>[
+        ('Temyiz hakimi', 'Temyiz hükmü metni.'),
+        ('Yargıç', 'Yargıç hükmü metni.'),
+        ('1.Jüri', 'Birinci jüri hükmü.'),
+        ('2.Jüri', 'İkinci jüri hükmü.'),
+        ('Davacı avukatı', 'Davacı tarafı hükmü.'),
+        ('Davalı avukatı', 'Davalı tarafı hükmü.'),
+        ('Davacı Şahidi', 'Davacı şahit hükmü.'),
+        ('Davalı Şahidi', 'Davalı şahit hükmü.'),
+      ];
+      for (final (String stored, String text) in roles) {
+        expect(
+          await HiveDatabaseService.saveHukum(
+            davaId: davaId,
+            userRole: stored,
+            hukumText: text,
+            userEmail: 'rol@test',
+            hukumSentiment: HukumSentiment.positive.storageValue,
+            isFinalized: false,
+          ),
+          isTrue,
+        );
+      }
+      final Map<String, Map<String, dynamic>> grouped =
+          await HiveDatabaseService.getHukumlerByDavaIdGrouped(davaId);
+      expect(grouped.length, roles.length);
     });
   });
 
@@ -451,6 +496,133 @@ void main() {
       expect(stored?['isFinalized'], isTrue);
       expect(find.textContaining('Yön: Olumlu'), findsWidgets);
       expect(find.textContaining('BERAAT'), findsWidgets);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    const String iconDavaId = 'icon-tap-all-roles';
+    const List<(String, String, String)> iconRoles = <(String, String, String)>[
+      ('Temyiz hakimi', 'Temyiz Hakimi Kararı', 'Temyiz hükmü metni.'),
+      ('Yargıç', 'Yargıç Kararı', 'Yargıç hükmü metni.'),
+      ('1.Jüri', '1. Jüri Kararı', 'Birinci jüri hükmü.'),
+      ('2.Jüri', '2. Jüri Kararı', 'İkinci jüri hükmü.'),
+      ('Davacı avukatı', 'Davacı Avukatı Kararı', 'Davacı tarafı hükmü.'),
+      ('Davalı avukatı', 'Davalı Avukatı Kararı', 'Davalı tarafı hükmü.'),
+      ('Davacı Şahidi', 'Davacı Şahidi Kararı', 'Davacı şahit hükmü.'),
+      ('Davalı Şahidi', 'Davalı Şahidi Kararı', 'Davalı şahit hükmü.'),
+    ];
+
+    testWidgets('dosya ikonu hüküm metnini açar ve Hive sonrası durur', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(400, 2400);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      Future<void> pumpCard() async {
+        await tester.pumpWidget(host(ModernHukumCard(
+          userEmail: 'viewer@test',
+          davaId: iconDavaId,
+          openedAt: DateTime(2026, 11, 1, 9),
+          davaAdi: 'Rol İkon Davası',
+          davaDavali: 'Davalı',
+          davaDavaci: 'Davacı',
+          davaGorev: 'Davacı',
+          kalanSure: '',
+        )));
+        await flushIo(tester);
+        await tester.pump();
+        await flushIo(tester);
+        await tester.pump(const Duration(milliseconds: 600));
+        await flushIo(tester);
+        await tester.pump();
+      }
+
+      Future<void> openRole(String title, String text) async {
+        final Finder titleFinder = find.text(title);
+        expect(titleFinder, findsOneWidget);
+        await tester.ensureVisible(titleFinder);
+        await tester.pump();
+        final Finder row = find
+            .ancestor(of: titleFinder, matching: find.byType(Row))
+            .first;
+        final Finder icon = find.descendant(
+          of: row,
+          matching: find.byIcon(MdiIcons.fileCheckOutline),
+        );
+        expect(icon, findsOneWidget);
+        final Icon iconWidget = tester.widget<Icon>(icon);
+        expect(iconWidget.size, 30);
+        expect(iconWidget.color, Colors.green.shade700);
+        final Size hit = tester.getSize(
+          find.ancestor(of: icon, matching: find.byType(InkWell)).first,
+        );
+        expect(hit.width, greaterThanOrEqualTo(SeyirTokens.tapTarget));
+        expect(hit.height, greaterThanOrEqualTo(SeyirTokens.tapTarget));
+        expect(tester.getSize(icon), const Size(30, 30));
+
+        await tester.tap(icon);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.textContaining(text), findsOneWidget);
+
+        await tester.tap(find.byIcon(Icons.close_rounded));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.textContaining(text), findsNothing);
+      }
+
+      await pumpCard();
+      for (final (String _, String title, String text) in iconRoles) {
+        await openRole(title, text);
+      }
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 2));
+      await pumpCard();
+      await openRole('Yargıç Kararı', 'Yargıç hükmü metni.');
+      await openRole('Davacı Avukatı Kararı', 'Davacı tarafı hükmü.');
+      await openRole('Davalı Avukatı Kararı', 'Davalı tarafı hükmü.');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('hüküm yoksa dosya ikonu kısa Türkçe mesaj gösterir', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(400, 2400);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(host(ModernHukumCard(
+        userEmail: 'bos@test',
+        davaId: 'icon-tap-empty',
+        openedAt: DateTime(2026, 11, 1, 9),
+        davaAdi: 'Boş Hüküm',
+        davaDavali: 'Davalı',
+        davaDavaci: 'Davacı',
+        davaGorev: '1. Jüri',
+        kalanSure: '',
+      )));
+      await tester.pump();
+
+      final Finder title = find.text('1. Jüri Kararı');
+      await tester.ensureVisible(title);
+      await tester.pump();
+      final Finder row =
+          find.ancestor(of: title, matching: find.byType(Row)).first;
+      final Finder icon = find.descendant(
+        of: row,
+        matching: find.byIcon(MdiIcons.fileCheckOutline),
+      );
+      expect(tester.widget<Icon>(icon).color, Colors.brown);
+      expect(tester.widget<Icon>(icon).size, 30);
+
+      await tester.tap(icon);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Bu rol için kayıtlı bir hüküm yok.'), findsOneWidget);
+      expect(find.text('RESMİ HÜKÜM'), findsNothing);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(seconds: 2));
