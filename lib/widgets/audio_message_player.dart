@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import '../theme/seyir_tokens.dart';
 import 'delil_surface.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Sesli mesaj oynatıcı widget'ı
 /// Sesli mesajları oynatmak için kullanılır
@@ -66,7 +67,7 @@ class _AudioMessagePlayerState extends State<AudioMessagePlayer> {
         }
       });
     } catch (e) {
-      print('❌ Ses oynatıcı başlatılamadı: $e');
+      appLog('❌ Ses oynatıcı başlatılamadı: $e');
     }
   }
 
@@ -78,7 +79,7 @@ class _AudioMessagePlayerState extends State<AudioMessagePlayer> {
         await _player.play();
       }
     } catch (e) {
-      print('❌ Oynat/Duraklat hatası: $e');
+      appLog('❌ Oynat/Duraklat hatası: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

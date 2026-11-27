@@ -27,6 +27,7 @@ import '../utils/app_local_date_format.dart';
 import '../utils/dava_map_utils.dart';
 import '../utils/verified_party_utils.dart';
 import '../services/verified_users_service.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class DavaAcPage extends StatefulWidget {
   final String? userEmail; // Kullanıcı e-posta adresi
@@ -182,9 +183,9 @@ class _DavaAcPageState extends State<DavaAcPage> {
           'savedAt': DateTime.now().toIso8601String(),
         }, beklemedeDava.kategori));
 
-        print('✅ Beklemede dava otomatik kaydedildi: ${beklemedeDava.id}');
+        appLog('✅ Beklemede dava otomatik kaydedildi: ${beklemedeDava.id}');
       } catch (e) {
-        print('❌ Beklemede dava kaydedilirken hata: $e');
+        appLog('❌ Beklemede dava kaydedilirken hata: $e');
       }
     }
   }
@@ -219,8 +220,8 @@ class _DavaAcPageState extends State<DavaAcPage> {
   /// Düzenleme modu için form alanlarını doldur
   void _populateFormForEditing(dava_model.Dava editDava) {
     // Debug: Düzenleme modunun başladığını göster
-    print('🔄 Düzenleme modu başlatıldı: ${editDava.davaAdi}');
-    print('📝 Dava konusu: ${editDava.davaKonusu}');
+    appLog('🔄 Düzenleme modu başlatıldı: ${editDava.davaAdi}');
+    appLog('📝 Dava konusu: ${editDava.davaKonusu}');
 
     setState(() {
       // Form controller'larını doldur
@@ -626,7 +627,7 @@ class _DavaAcPageState extends State<DavaAcPage> {
   // Dava kaydet
   void _saveDava() async {
     // Debug: Kaydetme işleminin başladığını göster
-    print('💾 Dava kaydetme işlemi başlatıldı');
+    appLog('💾 Dava kaydetme işlemi başlatıldı');
 
     // Güncel dava adını ve davalıyı doğrudan input'lardan al
     final rawDavaAdi = _davaAdiController.text.trim();
@@ -911,7 +912,7 @@ class _DavaAcPageState extends State<DavaAcPage> {
           await HiveDatabaseService.shareDava(davaId, targetEmail);
         } catch (e) {
           // Kullanıcı bazında hata alırsak diğer hedefler çalışmaya devam etsin.
-          print('⚠️ Seyir defterine paylaşım hatası: $targetEmail - $e');
+          appLog('⚠️ Seyir defterine paylaşım hatası: $targetEmail - $e');
         }
       }),
     );
@@ -1157,7 +1158,7 @@ class _DavaAcPageState extends State<DavaAcPage> {
       ),
     ).then((selectedGroups) {
       if (selectedGroups != null && selectedGroups.isNotEmpty) {
-        print('Seçilen gruplar: $selectedGroups');
+        appLog('Seçilen gruplar: $selectedGroups');
         _processDavetGonderme(selectedGroups);
         _showDavetGonderildiDialog(selectedGroups);
         _loadSavedDavalarFromDatabase();
@@ -1228,12 +1229,7 @@ class _DavaAcPageState extends State<DavaAcPage> {
           HiveDatabaseService.addInvitation(recipient.email, invitation);
         }
 
-        print('DEBUG: Grup "$groupName" için ${invitationRecipients.length} kişiye davet gönderildi');
-
-        // Debug: Davet gönderilen kişileri listele
-        for (final recipient in invitationRecipients) {
-          print('  - Davet gönderildi: ${recipient.email} (${recipient.judgeName})');
-        }
+        appLog('DEBUG: Grup "$groupName" için ${invitationRecipients.length} kişiye davet gönderildi');
       }
 
       // Dava açan ve davalıya da davet gönder
@@ -1282,9 +1278,9 @@ class _DavaAcPageState extends State<DavaAcPage> {
         }
       }
 
-      print('Dava açan ve davalıya da davet gönderildi');
+      appLog('Dava açan ve davalıya da davet gönderildi');
     } catch (e) {
-      print('Davet gönderme hatası: $e');
+      appLog('Davet gönderme hatası: $e');
     }
   }
 
@@ -1477,8 +1473,7 @@ class _DavaAcPageState extends State<DavaAcPage> {
             'isOpened': false,
           });
         }
-        // ignore: avoid_print
-        print('Grup "$selectedGroup" alicilar: ${recipientEmails.join(', ')}');
+        appLog('Grup "$selectedGroup" alıcı sayısı: ${recipientEmails.length}');
       }
     } catch (e) {
       // Hata durumunda kullanıcıya bilgi ver

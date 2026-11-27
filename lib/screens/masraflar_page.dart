@@ -7,6 +7,7 @@ import 'cezalar_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/masraflar_case_card.dart';
+import 'package:its19/utils/app_logger.dart';
 export '../widgets/masraflar_case_card.dart' show Dava, FiveCardCaseInformation;
 
 // Masraflar Sayfası
@@ -230,7 +231,7 @@ class _MasraflarPageState extends State<MasraflarPage> {
                                   title: FiveCardCaseInformation(
                                     dava: davaList[index],
                                     onTap: () {
-                                      print("Tapped on ${davaList[index].adi}");
+                                      appLog("Tapped on ${davaList[index].adi}");
                                     },
                                     userEmail: widget.userEmail,
                                   ),

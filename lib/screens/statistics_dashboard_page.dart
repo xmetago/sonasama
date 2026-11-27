@@ -508,7 +508,7 @@ class _StatisticsDashboardPageState extends State<StatisticsDashboardPage> {
           ),
         ],
       ),
-    );
+    ).whenComplete(controller.dispose);
   }
 
   /// Kategori arama dialog'u gösterir.

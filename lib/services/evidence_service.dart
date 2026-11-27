@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import '../models/evidence_model.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class EvidenceService {
   static const String _boxName = 'evidence_box';
@@ -22,52 +23,52 @@ class EvidenceService {
   // Delil ekleme (geliştirilmiş doğrulama ile)
   Future<Map<String, dynamic>> addEvidence(EvidenceModel evidence) async {
     try {
-      print('🔍 EvidenceService.addEvidence başlatılıyor...');
-      print('📋 Delil bilgileri: ID=${evidence.id}, DavaID=${evidence.davaId}, Tip=${evidence.type}, Başlık=${evidence.title}');
+      appLog('🔍 EvidenceService.addEvidence başlatılıyor...');
+      appLog('📋 Delil bilgileri: ID=${evidence.id}, DavaID=${evidence.davaId}, Tip=${evidence.type}, Başlık=${evidence.title}');
       
       // Doğrulama kontrolleri
-      print('🔍 Doğrulama kontrolleri yapılıyor...');
+      appLog('🔍 Doğrulama kontrolleri yapılıyor...');
       final validationResult = _validateEvidence(evidence);
-      print('🔍 Doğrulama sonucu: $validationResult');
+      appLog('🔍 Doğrulama sonucu: $validationResult');
       
       if (!validationResult['isValid']) {
-        print('❌ Doğrulama başarısız: ${validationResult['error']}');
+        appLog('❌ Doğrulama başarısız: ${validationResult['error']}');
         return validationResult;
       }
 
       // Özel ID oluşturma
-      print('🔍 Özel ID oluşturuluyor...');
+      appLog('🔍 Özel ID oluşturuluyor...');
       final existingEvidences = getEvidenceByDavaId(evidence.davaId);
-      print('🔍 Mevcut delil sayısı: ${existingEvidences.length}');
+      appLog('🔍 Mevcut delil sayısı: ${existingEvidences.length}');
       
       final newId = EvidenceModel.generateEvidenceId(evidence.davaId, existingEvidences.length);
-      print('🔍 Yeni ID oluşturuldu: $newId');
+      appLog('🔍 Yeni ID oluşturuldu: $newId');
       
       evidence = evidence.copyWith(id: newId);
-      print('🔍 EvidenceModel güncellendi, yeni ID: ${evidence.id}');
-      print('🔍 Delil detayları: DavaId=${evidence.davaId}, Type=${evidence.type}, Title=${evidence.title}');
+      appLog('🔍 EvidenceModel güncellendi, yeni ID: ${evidence.id}');
+      appLog('🔍 Delil detayları: DavaId=${evidence.davaId}, Type=${evidence.type}, Title=${evidence.title}');
 
-      print('🔍 Hive box\'a kaydediliyor...');
+      appLog('🔍 Hive box\'a kaydediliyor...');
       await _evidenceBox.put(evidence.id, evidence);
       
-      print('✅ Veritabanına kaydediliyor: ${evidence.title}');
-      print('✅ Kalıcı olarak saklanıyor: ${evidence.type} delili');
-      print('✅ Uygulama yeniden başlatıldığında korunuyor');
+      appLog('✅ Veritabanına kaydediliyor: ${evidence.title}');
+      appLog('✅ Kalıcı olarak saklanıyor: ${evidence.type} delili');
+      appLog('✅ Uygulama yeniden başlatıldığında korunuyor');
       
       // Kaydedilen delili doğrulama için tekrar oku
       final savedEvidence = _evidenceBox.get(evidence.id);
       if (savedEvidence != null) {
-        print('✅ Kaydedilen delil doğrulandı: ID=${savedEvidence.id}, DavaId=${savedEvidence.davaId}, Type=${savedEvidence.type}');
+        appLog('✅ Kaydedilen delil doğrulandı: ID=${savedEvidence.id}, DavaId=${savedEvidence.davaId}, Type=${savedEvidence.type}');
       } else {
-        print('❌ Delil kaydedilemedi!');
+        appLog('❌ Delil kaydedilemedi!');
       }
       
       final result = {'isValid': true, 'evidence': evidence};
-      print('✅ İşlem tamamlandı: $result');
+      appLog('✅ İşlem tamamlandı: $result');
       return result;
     } catch (e) {
-      print('❌ Delil eklenirken hata: $e');
-      print('❌ Hata detayı: ${e.toString()}');
+      appLog('❌ Delil eklenirken hata: $e');
+      appLog('❌ Hata detayı: ${e.toString()}');
       return {'isValid': false, 'error': 'Delil eklenirken hata oluştu: $e'};
     }
   }
@@ -181,15 +182,15 @@ class EvidenceService {
       
       // Debug: Eğer delil bulunamadıysa log yaz
       if (filtered.isEmpty && allEvidences.isNotEmpty) {
-        print('⚠️ DavaId için delil bulunamadı: $davaId (normalized: $normalizedDavaId)');
-        print('🔍 Mevcut delil davaId\'leri: ${allEvidences.map((e) => e.davaId).toSet().take(5).join(", ")}');
+        appLog('⚠️ DavaId için delil bulunamadı: $davaId (normalized: $normalizedDavaId)');
+        appLog('🔍 Mevcut delil davaId\'leri: ${allEvidences.map((e) => e.davaId).toSet().take(5).join(", ")}');
       } else if (filtered.isNotEmpty) {
-        print('✅ DavaId için ${filtered.length} delil bulundu: $davaId');
+        appLog('✅ DavaId için ${filtered.length} delil bulundu: $davaId');
       }
       
       return filtered;
     } catch (e) {
-      print('❌ Deliller getirilirken hata: $e');
+      appLog('❌ Deliller getirilirken hata: $e');
       return [];
     }
   }
@@ -222,9 +223,9 @@ class EvidenceService {
   Future<void> deleteEvidence(String evidenceId) async {
     try {
       await _evidenceBox.delete(evidenceId);
-      print('✅ Delil silindi: $evidenceId');
+      appLog('✅ Delil silindi: $evidenceId');
     } catch (e) {
-      print('❌ Delil silinirken hata: $e');
+      appLog('❌ Delil silinirken hata: $e');
       rethrow;
     }
   }
@@ -240,7 +241,7 @@ class EvidenceService {
       final allEvidence = _evidenceBox.values.toList();
       return allEvidence;
     } catch (e) {
-      print('❌ Tüm deliller getirilirken hata: $e');
+      appLog('❌ Tüm deliller getirilirken hata: $e');
       return [];
     }
   }
@@ -318,13 +319,13 @@ class EvidenceService {
     try {
       final evidence = mutateUserToggle(evidenceId, userEmail, vote);
       if (evidence == null) {
-        print('❌ Delil bulunamadı: $evidenceId');
+        appLog('❌ Delil bulunamadı: $evidenceId');
         return;
       }
       await _saveEvidence(evidence);
-      print(successLog(evidence));
+      appLog(successLog(evidence));
     } catch (e) {
-      print('❌ Oy güncellenirken hata: $e');
+      appLog('❌ Oy güncellenirken hata: $e');
       rethrow;
     }
   }
@@ -397,7 +398,7 @@ class EvidenceService {
 
       await _saveEvidence(evidence);
     } catch (e) {
-      print('❌ Delil oyu ayarlanırken hata: $e');
+      appLog('❌ Delil oyu ayarlanırken hata: $e');
       rethrow;
     }
   }
@@ -449,7 +450,7 @@ class EvidenceService {
         await _saveEvidence(evidence);
       }
     } catch (e) {
-      print('❌ Zorunlu delil oyu uygulanırken hata: $e');
+      appLog('❌ Zorunlu delil oyu uygulanırken hata: $e');
     }
   }
 
@@ -498,7 +499,7 @@ class EvidenceService {
         }
       }
     } catch (e) {
-      print('❌ Varsayılan delil beğenileri uygulanırken hata: $e');
+      appLog('❌ Varsayılan delil beğenileri uygulanırken hata: $e');
     }
   }
 
@@ -506,9 +507,9 @@ class EvidenceService {
   Future<void> updateEvidence(EvidenceModel evidence) async {
     try {
       await _evidenceBox.put(evidence.id, evidence);
-      print('✅ Delil güncellendi: ${evidence.title}');
+      appLog('✅ Delil güncellendi: ${evidence.title}');
     } catch (e) {
-      print('❌ Delil güncellenirken hata: $e');
+      appLog('❌ Delil güncellenirken hata: $e');
       rethrow;
     }
   }
@@ -518,7 +519,7 @@ class EvidenceService {
     try {
       return _evidenceBox.get(evidenceId);
     } catch (e) {
-      print('❌ Delil getirilirken hata: $e');
+      appLog('❌ Delil getirilirken hata: $e');
       return null;
     }
   }

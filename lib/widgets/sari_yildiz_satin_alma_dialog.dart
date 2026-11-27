@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/play_billing_service.dart';
-import '../services/user_star_balance_store.dart';
+import '../services/star_purchase_credit.dart';
 
 /// KURAL 4: Sarı yıldız satın alma süreci.
 ///
@@ -66,50 +68,80 @@ class _SariYildizSatinAlmaDialogState extends State<SariYildizSatinAlmaDialog> {
   int _seciliPaketIndex = 1;
   bool _islemDevamEdiyor = false;
 
+  void _showPurchaseMessage(String message, {required bool success}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor:
+            success ? Colors.green.shade700 : Colors.orange.shade700,
+      ),
+    );
+  }
+
   Future<void> _satinAl() async {
     if (_islemDevamEdiyor) return;
     setState(() => _islemDevamEdiyor = true);
     final paket = _paketler[_seciliPaketIndex];
+    final String? productId =
+        PlayBillingService.productIdForStarAmount(paket.stars);
+    if (productId == null) {
+      _showPurchaseMessage('Ödeme şu anda kullanılamıyor.', success: false);
+      if (mounted) setState(() => _islemDevamEdiyor = false);
+      return;
+    }
+
+    StreamSubscription<PurchaseCreditOutcome>? subscription;
+    final Completer<PurchaseCreditOutcome> completer =
+        Completer<PurchaseCreditOutcome>();
     try {
-      bool billingOk = false;
-      final String? productId =
-          PlayBillingService.productIdForStarAmount(paket.stars);
-      if (productId != null) {
-        try {
-          billingOk = await globalPlayBilling.buyConsumable(productId);
-        } catch (_) {
-          billingOk = false;
-        }
+      final bool ready = await globalPlayBilling.ensureReady(
+        creditEmail: widget.userEmail,
+      );
+      if (!ready) {
+        _showPurchaseMessage('Ödeme şu anda kullanılamıyor.', success: false);
+        if (mounted) setState(() => _islemDevamEdiyor = false);
+        return;
       }
 
-      // Billing başarısız olsa bile lokal bakiyeyi artırırız (test/sandbox).
-      await UserStarBalanceStore.addYellowStars(
-        widget.userEmail,
-        paket.stars,
-      );
+      subscription = globalPlayBilling.purchaseOutcomes.listen((outcome) {
+        if (outcome.productId != productId || completer.isCompleted) return;
+        completer.complete(outcome);
+      });
 
+      final bool started = await globalPlayBilling.buyConsumable(
+        productId,
+        creditEmail: widget.userEmail,
+      );
+      if (!started) {
+        _showPurchaseMessage('Ödeme şu anda kullanılamıyor.', success: false);
+        if (mounted) setState(() => _islemDevamEdiyor = false);
+        return;
+      }
+
+      final PurchaseCreditOutcome outcome = await completer.future.timeout(
+        const Duration(minutes: 5),
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            billingOk
-                ? '✅ ${paket.stars} sarı yıldız satın alındı.'
-                : '⚠️ Billing onaylanmadı, yerel bakiye güncellendi (+${paket.stars} ⭐).',
-          ),
-          backgroundColor:
-              billingOk ? Colors.green.shade700 : Colors.orange.shade700,
-        ),
+      if (!outcome.credited) {
+        _showPurchaseMessage('Satın alma tamamlanmadı.', success: false);
+        setState(() => _islemDevamEdiyor = false);
+        return;
+      }
+
+      _showPurchaseMessage(
+        '✅ ${outcome.stars} sarı yıldız satın alındı.',
+        success: true,
       );
       Navigator.of(context).pop(true);
+    } on TimeoutException {
+      _showPurchaseMessage('Satın alma tamamlanmadı.', success: false);
+      if (mounted) setState(() => _islemDevamEdiyor = false);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Satın alma sırasında hata: $e'),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-      setState(() => _islemDevamEdiyor = false);
+      _showPurchaseMessage('Satın alma sırasında hata oluştu.', success: false);
+      if (mounted) setState(() => _islemDevamEdiyor = false);
+    } finally {
+      await subscription?.cancel();
     }
   }
 

@@ -7,6 +7,7 @@ import '../models/evidence_model.dart';
 import '../services/evidence_comment_service.dart';
 import '../services/evidence_service.dart';
 import '../theme/seyir_tokens.dart';
+import 'package:its19/utils/app_logger.dart';
 
 String _criticismFromEvidenceVote(String? vote) {
   switch (vote) {
@@ -105,7 +106,7 @@ class _EvidenceCommentWidgetState extends State<EvidenceCommentWidget> {
         _isLoading = false;
       });
     } catch (e) {
-      print('❌ Yorumlar yüklenirken hata: $e');
+      appLog('❌ Yorumlar yüklenirken hata: $e');
       setState(() => _isLoading = false);
     }
   }

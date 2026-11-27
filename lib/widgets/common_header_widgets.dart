@@ -16,6 +16,7 @@ import '../theme/seyir_tokens.dart';
 import '../widgets/durt_wheel_sheet.dart';
 import '../widgets/timed_action_buttons.dart';
 import '../widgets/verified_users_management_dialog.dart';
+import 'package:its19/utils/app_logger.dart';
 
 // WhoBoom, Arama Iconu, Chat Iconu
 class ZeroWhoboomSearchMessage extends StatelessWidget {
@@ -478,7 +479,7 @@ class _SecondProfileJudgenameIconknifeEnergyPicturePokeSueChantState extends Sta
         return MemoryImage(bytes) as ImageProvider<Object>;
       } catch (e) {
         // Base64 decode hatası durumunda null döndür
-        print('⚠️ Base64 decode hatası: $e');
+        appLog('⚠️ Base64 decode hatası: $e');
         return null;
       }
     }

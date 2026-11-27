@@ -8,6 +8,7 @@ import '../services/friend_category_service.dart';
 import '../services/hive_database_service.dart';
 import '../services/itibar_endeksi_service.dart';
 import '../utils/proximity_category_rules.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Kullanıcıların oyunlaştırılmış puan kartını hesaplayan servis katmanı.
 class UserGamifiedScoreService {
@@ -28,7 +29,7 @@ class UserGamifiedScoreService {
     await FriendCategoryService.initialize();
 
     // ✅ Her kullanıcı için özelleştirilmiş veri hesaplama
-    print('📊 Puan kartı hesaplanıyor: ${targetUser.judgeName} (${targetUser.email})');
+    appLog('📊 Puan kartı hesaplanıyor: ${targetUser.judgeName}');
 
     final itibar = await ItibarEndeksiService.compute(targetUser);
 
@@ -70,21 +71,21 @@ class UserGamifiedScoreService {
         HiveDatabaseService.getIncomingDavalar(targetUser.email);
 
     // ✅ Debug: Her kullanıcı için özelleştirilmiş veriler
-    print('✅ ${targetUser.judgeName} için özelleştirilmiş veriler:');
-    print('   - Kabul edilen arkadaşlıklar: $acceptedFriendships');
-    print('   - Bekleyen gelen istekler: $pendingIncoming');
-    print('   - Bekleyen giden istekler: $pendingOutgoing');
-    print('   - Takipçi sayısı: $followerCount');
-    print('   - Takip edilen sayısı: $followingCount');
-    print('   - Kategori kayıtları: ${ownCategoryRecords.length}');
-    print('   - Legacy kategoriler: ${legacyCategories.length}');
-    print('   - Gelen davalar: ${incomingCases.length}');
+    appLog('✅ ${targetUser.judgeName} için özelleştirilmiş veriler:');
+    appLog('   - Kabul edilen arkadaşlıklar: $acceptedFriendships');
+    appLog('   - Bekleyen gelen istekler: $pendingIncoming');
+    appLog('   - Bekleyen giden istekler: $pendingOutgoing');
+    appLog('   - Takipçi sayısı: $followerCount');
+    appLog('   - Takip edilen sayısı: $followingCount');
+    appLog('   - Kategori kayıtları: ${ownCategoryRecords.length}');
+    appLog('   - Legacy kategoriler: ${legacyCategories.length}');
+    appLog('   - Gelen davalar: ${incomingCases.length}');
 
     final totalScore = (itibar.itibarEndeksi * 541)
         .round()
         .clamp(0, 10279);
 
-    print(
+    appLog(
       '   - İtibar Endeksi: ${itibar.itibarEndeksi.toStringAsFixed(2)} '
       '(Sosyal ${itibar.sosyalLig}, Dava ${itibar.davaEnerjisi}, '
       'Hediye ${itibar.hediyeSadakati}, Levh ${itibar.levhMahfuz}, '
@@ -92,7 +93,7 @@ class UserGamifiedScoreService {
     );
 
     final levelInfo = _resolveLevel(totalScore);
-    print('   - Seviye: ${levelInfo.level} (${levelInfo.title})');
+    appLog('   - Seviye: ${levelInfo.level} (${levelInfo.title})');
     final nextLevel = _nextLevel(levelInfo.level);
     final nextLevelThreshold = nextLevel?.minScore ?? levelInfo.minScore;
     final progressToNext = nextLevel == null

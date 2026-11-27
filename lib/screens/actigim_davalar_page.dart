@@ -20,6 +20,7 @@ import '../widgets/actigim_dava_sayilari_section.dart';
 import '../services/actigim_dava_istatistik_service.dart';
 import '../utils/dava_map_utils.dart';
 import '../theme/seyir_tokens.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class ActigimDavalarPage extends StatefulWidget {
   final String? userEmail;
@@ -71,9 +72,9 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
       try {
         final davaProvider = Provider.of<DavaProvider>(context, listen: false);
         _lastHukumUpdateVersion = davaProvider.hukumUpdateVersion;
-        print('🔍 [ActigimDavalarPage] initState: Provider versiyonu = $_lastHukumUpdateVersion');
+        appLog('🔍 [ActigimDavalarPage] initState: Provider versiyonu = $_lastHukumUpdateVersion');
       } catch (e) {
-        print('⚠️ [ActigimDavalarPage] initState: Provider bulunamadı: $e');
+        appLog('⚠️ [ActigimDavalarPage] initState: Provider bulunamadı: $e');
       }
     });
   }
@@ -96,12 +97,12 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
       final DateTime now = DateTime.now();
       if (_lastListRefreshTime == null ||
           now.difference(_lastListRefreshTime!) >= _listRefreshCooldown) {
-        print('🔄 [ActigimDavalarPage] Provider versiyonu değişti: $_lastHukumUpdateVersion -> $currentVersion');
+        appLog('🔄 [ActigimDavalarPage] Provider versiyonu değişti: $_lastHukumUpdateVersion -> $currentVersion');
         _lastHukumUpdateVersion = currentVersion;
         _lastListRefreshTime = now;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            print('✅ [ActigimDavalarPage] Liste yeniden yüklenecek (versiyon: $currentVersion)');
+            appLog('✅ [ActigimDavalarPage] Liste yeniden yüklenecek (versiyon: $currentVersion)');
             _loadOpenedDavalar();
             _calculateStatistics();
           }
@@ -278,7 +279,7 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
         _banaAcilanSayisi = stats.banaAcilan;
       });
     } catch (e) {
-      print('❌ [ActigimDavalarPage] İstatistik hesaplama hatası: $e');
+      appLog('❌ [ActigimDavalarPage] İstatistik hesaplama hatası: $e');
     }
   }
 
@@ -392,7 +393,7 @@ class _ActigimDavalarPageState extends State<ActigimDavalarPage> {
         )).toList();
       });
     } catch (e) {
-      print('Red edilen davalar yüklenirken hata: $e');
+      appLog('Red edilen davalar yüklenirken hata: $e');
     }
   }
 

@@ -6,6 +6,7 @@ import '../models/album_image_model.dart';
 import '../services/hive_database_service.dart';
 import '../theme/seyir_tokens.dart';
 import '../widgets/delil_surface.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// ✅ Step-3: Albüm görüntüleme sayfası (galeri modu, tam ekran)
 /// ✅ Veritabanına kaydediliyor
@@ -76,7 +77,7 @@ class _AlbumGoruntulePageState extends State<AlbumGoruntulePage> {
         );
         images = HiveDatabaseService.getAlbumImages(widget.albumId);
       } catch (e) {
-        print('❌ Albüm yüklenirken hata: $e');
+        appLog('❌ Albüm yüklenirken hata: $e');
         loadError = 'Albüm yüklenemedi';
       }
     }
@@ -108,7 +109,7 @@ class _AlbumGoruntulePageState extends State<AlbumGoruntulePage> {
         if (bytes.isEmpty) return null;
         return MemoryImage(bytes) as ImageProvider<Object>;
       } catch (e) {
-        print('⚠️ Base64 decode hatası: $e');
+        appLog('⚠️ Base64 decode hatası: $e');
         return null;
       }
     }

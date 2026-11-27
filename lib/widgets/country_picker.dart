@@ -76,7 +76,7 @@ class _CountryPickerState extends State<CountryPicker> {
           );
         },
       ),
-    );
+    ).whenComplete(searchController.dispose);
   }
 
   @override

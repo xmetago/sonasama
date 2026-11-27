@@ -9,6 +9,7 @@ import '../services/dava_timer_service.dart';
 import '../services/hive_database_service.dart';
 import '../theme/seyir_tokens.dart';
 import '../utils/dialog_utils.dart';
+import 'package:its19/utils/app_logger.dart';
 
 export '../widgets/delil_case_card.dart' show Dava, FiveCardCaseInformation;
 
@@ -94,7 +95,7 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
             // Dropdown için benzersiz değer oluştur
             _selectedDropdownValue = (matchingDava['id'] as String?) ?? 
                                     '${matchingDava['davaId'] as String? ?? 'dava'}_$matchingIndex';
-            print('🔍 Widget davaId ile eşleşen dava bulundu: $_selectedDavaId');
+            appLog('🔍 Widget davaId ile eşleşen dava bulundu: $_selectedDavaId');
           }
         }
         
@@ -108,16 +109,16 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
           // Dropdown için benzersiz değer oluştur
           _selectedDropdownValue = (firstDava['id'] as String?) ?? 
                                   '${firstDava['davaId'] as String? ?? 'dava'}_$firstIndex';
-          print('🔍 İlk dava seçildi: $_selectedDavaId');
+          appLog('🔍 İlk dava seçildi: $_selectedDavaId');
         }
       });
       
-      print('✅ ${_acceptedDavalar.length} kabul edilmiş dava yüklendi');
+      appLog('✅ ${_acceptedDavalar.length} kabul edilmiş dava yüklendi');
       if (_selectedDavaId != null) {
-        print('🔍 Seçili dava ID: $_selectedDavaId');
+        appLog('🔍 Seçili dava ID: $_selectedDavaId');
       }
     } catch (e) {
-      print('❌ Davalar yüklenirken hata: $e');
+      appLog('❌ Davalar yüklenirken hata: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -334,7 +335,7 @@ class _DelilleriIncelePageState extends State<DelilleriIncelePage> {
                             _selectedDavaId = (selectedDava['davaId'] as String?) ??
                                 (selectedDava['id'] as String?);
                             _davaKonusuExpanded = false;
-                            print('🔍 Dava seçildi - Dropdown: $newValue, DavaId: $_selectedDavaId');
+                            appLog('🔍 Dava seçildi - Dropdown: $newValue, DavaId: $_selectedDavaId');
                           }
                         });
                       },

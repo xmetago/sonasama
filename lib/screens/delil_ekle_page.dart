@@ -11,6 +11,7 @@ import '../theme/seyir_tokens.dart';
 import '../utils/dialog_utils.dart';
 import '../widgets/delil_surface.dart';
 import '../widgets/shared/app_snack.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class DelilEklePage extends StatefulWidget {
   final String? userEmail;
@@ -70,7 +71,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
       _loadEvidenceData();
       _checkDavaStatus(); // Dava durumunu kontrol et
     } catch (e) {
-      print('❌ Veri başlatılırken hata: $e');
+      appLog('❌ Veri başlatılırken hata: $e');
       if (mounted) {
         setState(() => _loadError = 'Delil sayıları yüklenemedi');
       }
@@ -101,7 +102,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
         });
       }
     } catch (e) {
-      print('❌ Dava durumu kontrol edilirken hata: $e');
+      appLog('❌ Dava durumu kontrol edilirken hata: $e');
       // Hata durumunda açılmamış kabul et
       setState(() {
         _isDavaOpened = false;
@@ -680,7 +681,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
 
   Widget _buildExistingEvidence() {
     final palette = SeyirPalette.of(context);
-    print('🔍 _buildExistingEvidence çağrıldı, delil sayısı: ${_evidences.length}');
+    appLog('🔍 _buildExistingEvidence çağrıldı, delil sayısı: ${_evidences.length}');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1425,7 +1426,7 @@ class _DelilEklePageState extends State<DelilEklePage> {
   // Resim seçme (gerçek implementasyon)
   void _pickImage(ImageSource source) async {
     try {
-      print('📸 Resim seçme başlatılıyor... Source: $source');
+      appLog('📸 Resim seçme başlatılıyor... Source: $source');
       
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
@@ -1436,23 +1437,23 @@ class _DelilEklePageState extends State<DelilEklePage> {
       );
 
       if (image != null) {
-        print('📸 Resim seçildi: ${image.path}');
+        appLog('📸 Resim seçildi: ${image.path}');
         
         final file = File(image.path);
         
         // Dosyanın var olup olmadığını kontrol et
         if (!await file.exists()) {
-          print('❌ Dosya bulunamadı: ${image.path}');
+          appLog('❌ Dosya bulunamadı: ${image.path}');
           showAppSnack(context, '❌ Seçilen dosya bulunamadı');
           return;
         }
         
         final fileSize = await file.length();
-        print('📸 Dosya boyutu: $fileSize bytes (${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB)');
+        appLog('📸 Dosya boyutu: $fileSize bytes (${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB)');
 
         // Dosya boyutu kontrolü
         if (fileSize > EvidenceLimits.maxImageSize) {
-          print('❌ Dosya boyutu çok büyük: $fileSize > ${EvidenceLimits.maxImageSize}');
+          appLog('❌ Dosya boyutu çok büyük: $fileSize > ${EvidenceLimits.maxImageSize}');
           showAppSnack(context, '❌ Resim dosyası ${EvidenceLimits.maxImageSize ~/ (1024 * 1024)}MB\'dan büyük olamaz');
           return;
         }
@@ -1460,20 +1461,20 @@ class _DelilEklePageState extends State<DelilEklePage> {
         // Dosya uzantısını kontrol et
         final extension = image.path.split('.').last.toLowerCase();
         if (!EvidenceLimits.allowedImageExtensions.contains(extension)) {
-          print('❌ Geçersiz dosya uzantısı: $extension');
+          appLog('❌ Geçersiz dosya uzantısı: $extension');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('❌ Geçersiz dosya formatı. İzin verilen formatlar: ${EvidenceLimits.allowedImageExtensions.join(', ')}')),
           );
           return;
         }
 
-        print('✅ Resim doğrulandı, delil ekleniyor...');
+        appLog('✅ Resim doğrulandı, delil ekleniyor...');
         await _addEvidence('image', image.path, fileSize);
       } else {
-        print('📸 Resim seçimi iptal edildi');
+        appLog('📸 Resim seçimi iptal edildi');
       }
     } catch (e) {
-      print('❌ Resim seçilirken hata: $e');
+      appLog('❌ Resim seçilirken hata: $e');
       showAppSnack(context, '❌ Resim seçilirken hata: $e');
     }
   }
@@ -1549,17 +1550,17 @@ class _DelilEklePageState extends State<DelilEklePage> {
 
   // Delil ekleme (geliştirilmiş doğrulama ile)
   Future<void> _addEvidence(String type, String content, int fileSize) async {
-    print('🔍 Delil ekleme başlatılıyor...');
-    print('📋 Tip: $type, İçerik: $content, Boyut: $fileSize');
+    appLog('🔍 Delil ekleme başlatılıyor...');
+    appLog('📋 Tip: $type, İçerik: $content, Boyut: $fileSize');
     
     if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      print('❌ Başlık veya açıklama boş');
+      appLog('❌ Başlık veya açıklama boş');
       showAppSnack(context, 'Lütfen başlık ve açıklama alanlarını doldurun');
       return;
     }
 
     try {
-      print('🔍 EvidenceModel oluşturuluyor...');
+      appLog('🔍 EvidenceModel oluşturuluyor...');
       final evidence = EvidenceModel(
         id: '', // ID otomatik oluşturulacak
         davaId: widget.davaId,
@@ -1574,13 +1575,13 @@ class _DelilEklePageState extends State<DelilEklePage> {
         userId: widget.userEmail ?? 'unknown',
       );
 
-      print('🔍 EvidenceService.addEvidence çağrılıyor...');
+      appLog('🔍 EvidenceService.addEvidence çağrılıyor...');
       final result = await _evidenceService.addEvidence(evidence);
 
-      print('🔍 Sonuç: $result');
+      appLog('🔍 Sonuç: $result');
 
       if (result['isValid']) {
-        print('✅ Delil başarıyla eklendi');
+        appLog('✅ Delil başarıyla eklendi');
         
         // Form temizleme
         _titleController.clear();
@@ -1591,11 +1592,11 @@ class _DelilEklePageState extends State<DelilEklePage> {
 
         showAppSnack(context, '✅ ${result['evidence'].title} başarıyla eklendi', backgroundColor: Colors.green, duration: const Duration(seconds: 3));
       } else {
-        print('❌ Delil eklenemedi: ${result['error']}');
+        appLog('❌ Delil eklenemedi: ${result['error']}');
         showAppSnack(context, '❌ ${result['error']}', backgroundColor: Colors.red, duration: const Duration(seconds: 5));
       }
     } catch (e) {
-      print('❌ Delil eklenirken hata: $e');
+      appLog('❌ Delil eklenirken hata: $e');
       showAppSnack(context, '❌ Delil eklenirken hata: $e', backgroundColor: Colors.red, duration: const Duration(seconds: 5));
     }
   }

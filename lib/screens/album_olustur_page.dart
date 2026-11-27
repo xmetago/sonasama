@@ -10,6 +10,7 @@ import '../services/hive_database_service.dart';
 import '../models/album_model.dart';
 import '../models/album_image_model.dart';
 import 'album_goruntule_page.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// ✅ Step-4: Albüm oluşturma ve yönetim sayfası
 /// ✅ Veritabanına kaydediliyor
@@ -126,7 +127,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
       _albumDescriptionController.text = album.description ?? '';
       _images = HiveDatabaseService.getAlbumImages(album.id);
     } catch (e) {
-      print('❌ Albüm yüklenirken hata: $e');
+      appLog('❌ Albüm yüklenirken hata: $e');
       if (mounted) {
         setState(() => _loadError = 'Albüm yüklenemedi');
       }
@@ -211,7 +212,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
         await _addImageToAlbum(image);
       }
     } catch (e) {
-      print('❌ Resim seçilirken hata: $e');
+      appLog('❌ Resim seçilirken hata: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Resim seçilirken hata: $e')),
       );
@@ -260,7 +261,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
 
       // ✅ Veritabanına kaydediliyor
       // ✅ Kalıcı olarak saklanıyor
-      print('✅ Resim albüme eklendi: $imageId');
+      appLog('✅ Resim albüme eklendi: $imageId');
 
       // Resimleri yeniden yükle
       _images = HiveDatabaseService.getAlbumImages(_currentAlbumId!);
@@ -287,7 +288,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
         ),
       );
     } catch (e) {
-      print('❌ Resim eklenirken hata: $e');
+      appLog('❌ Resim eklenirken hata: $e');
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -335,7 +336,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
           ),
         );
       } catch (e) {
-        print('❌ Resim silinirken hata: $e');
+        appLog('❌ Resim silinirken hata: $e');
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -415,7 +416,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
 
       // Sayfada kal - kullanıcı albümü düzenlemeye devam edebilir
     } catch (e) {
-      print('❌ Albüm kaydedilirken hata: $e');
+      appLog('❌ Albüm kaydedilirken hata: $e');
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -665,7 +666,7 @@ class _AlbumOlusturPageState extends State<AlbumOlusturPage> {
         if (bytes.isEmpty) return null;
         return MemoryImage(bytes) as ImageProvider<Object>;
       } catch (e) {
-        print('⚠️ Base64 decode hatası: $e');
+        appLog('⚠️ Base64 decode hatası: $e');
         return null;
       }
     }

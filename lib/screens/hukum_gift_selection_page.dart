@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' show min;
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:provider/provider.dart';
@@ -136,10 +136,6 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
     bool ok = false;
     try {
       ok = await globalPlayBilling.init((int stars) async {
-      final String? email = widget.userEmail;
-      if (email != null && email.isNotEmpty) {
-        await UserStarBalanceStore.addYellowStars(email, stars);
-      }
       if (!mounted) return;
       await _reloadYellowBalance();
       if (!mounted) return;
@@ -152,7 +148,7 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
-    });
+    }, creditEmail: widget.userEmail);
     } catch (_) {
       ok = false;
     }
@@ -182,7 +178,10 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
       if (productId != null) {
         bool started = false;
         try {
-          started = await globalPlayBilling.buyConsumable(productId);
+          started = await globalPlayBilling.buyConsumable(
+            productId,
+            creditEmail: email,
+          );
         } catch (e) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -206,14 +205,28 @@ class _HukumGiftSelectionPageState extends State<HukumGiftSelectionPage> {
       }
     }
 
-    await UserStarBalanceStore.addYellowStars(email, amount);
-    await _reloadYellowBalance();
+    if (kDebugMode) {
+      await UserStarBalanceStore.addYellowStars(email, amount);
+      await _reloadYellowBalance();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$amount yıldız hesaba eklendi (yerel / test).'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$amount yıldız hesaba eklendi (yerel / test).'),
+        content: const Text('Ödeme şu anda kullanılamıyor.'),
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );

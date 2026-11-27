@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'dart:io';
+import 'package:its19/utils/app_logger.dart';
 
 class CustomPdfViewer extends StatefulWidget {
   final String pdfPath;
@@ -31,11 +32,11 @@ class _CustomPdfViewerState extends State<CustomPdfViewer> {
 
   void _checkPdfFile() {
     try {
-      print('📄 PDF dosyası kontrol ediliyor: ${widget.pdfPath}');
+      appLog('📄 PDF dosyası kontrol ediliyor: ${widget.pdfPath}');
       
       final pdfFile = File(widget.pdfPath);
       if (!pdfFile.existsSync()) {
-        print('❌ PDF dosyası bulunamadı: ${widget.pdfPath}');
+        appLog('❌ PDF dosyası bulunamadı: ${widget.pdfPath}');
         setState(() {
           _hasError = true;
           _errorMessage = 'PDF dosyası bulunamadı';
@@ -45,10 +46,10 @@ class _CustomPdfViewerState extends State<CustomPdfViewer> {
       }
 
       final fileSize = pdfFile.lengthSync();
-      print('📄 PDF dosya boyutu: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB');
+      appLog('📄 PDF dosya boyutu: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB');
 
       if (fileSize == 0) {
-        print('❌ PDF dosyası boş');
+        appLog('❌ PDF dosyası boş');
         setState(() {
           _hasError = true;
           _errorMessage = 'PDF dosyası boş';
@@ -61,9 +62,9 @@ class _CustomPdfViewerState extends State<CustomPdfViewer> {
         _isLoading = false;
       });
       
-      print('✅ PDF dosyası hazır');
+      appLog('✅ PDF dosyası hazır');
     } catch (e) {
-      print('❌ PDF dosyası kontrol edilirken hata: $e');
+      appLog('❌ PDF dosyası kontrol edilirken hata: $e');
       setState(() {
         _hasError = true;
         _errorMessage = 'PDF dosyası açılırken hata: $e';
@@ -174,25 +175,25 @@ class _CustomPdfViewerState extends State<CustomPdfViewer> {
           child: PDFView(
             filePath: widget.pdfPath,
                          onRender: (pages) {
-               print('✅ PDF başarıyla yüklendi');
-               print('📄 Sayfa sayısı: $pages');
+               appLog('✅ PDF başarıyla yüklendi');
+               appLog('📄 Sayfa sayısı: $pages');
                setState(() {
                  _totalPages = pages ?? 0;
                  _isLoading = false;
                });
              },
             onError: (error) {
-              print('❌ PDF yüklenirken hata: $error');
+              appLog('❌ PDF yüklenirken hata: $error');
               setState(() {
                 _hasError = true;
                 _errorMessage = 'PDF yüklenirken hata: $error';
               });
             },
             onPageError: (page, error) {
-              print('❌ Sayfa $page yüklenirken hata: $error');
+              appLog('❌ Sayfa $page yüklenirken hata: $error');
             },
                          onPageChanged: (page, total) {
-               print('📄 Sayfa değişti: $page / $total');
+               appLog('📄 Sayfa değişti: $page / $total');
                setState(() {
                  _currentPage = page ?? 1;
                });

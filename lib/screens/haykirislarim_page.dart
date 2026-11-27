@@ -23,6 +23,42 @@ class HaykirislarimPage extends StatefulWidget {
 
 class _HaykirislarimPageState extends State<HaykirislarimPage> {
   bool isHaykirislarim = true;
+  List<Map<String, dynamic>> _haykirPostsToShow = [];
+  List<Map<String, dynamic>> _haykirDataList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _reloadHaykirLists();
+  }
+
+  @override
+  void didUpdateWidget(covariant HaykirislarimPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userEmail != widget.userEmail) {
+      _reloadHaykirLists();
+    }
+  }
+
+  void _reloadHaykirLists() {
+    if (isHaykirislarim && widget.userEmail != null) {
+      final allFeedPosts =
+          HiveDatabaseService.getHomeFeedPosts(userEmail: widget.userEmail);
+      _haykirPostsToShow = allFeedPosts.where((post) {
+        final type = post['type']?.toString() ?? '';
+        return type == 'haykir';
+      }).toList();
+      _haykirDataList = HiveDatabaseService.getUserHaykirislar(widget.userEmail!);
+      return;
+    }
+    _haykirPostsToShow = [];
+    if (!isHaykirislarim && widget.userEmail != null) {
+      _haykirDataList =
+          HiveDatabaseService.getKatildigimHaykirler(widget.userEmail!);
+    } else {
+      _haykirDataList = [];
+    }
+  }
 
   /// KatÄ±ldÄ±ÄŸÄ±m haykÄ±r verisini seyir defteri post formatÄ±na dÃ¶nÃ¼ÅŸtÃ¼rÃ¼r
   Map<String, dynamic> _katildigimHaykirToPost(Map<String, dynamic> haykir) {
@@ -68,7 +104,10 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
           initialShowForm: true,
         ),
       ),
-    );
+    ).then((_) {
+      if (!mounted) return;
+      setState(_reloadHaykirLists);
+    });
   }
 
   @override
@@ -77,43 +116,8 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 600;
     final davaProvider = Provider.of<DavaProvider>(context, listen: false);
-
-    // âœ… AdÄ±m 2: Seyir defterindeki haykÄ±r postlarÄ±nÄ± getir
-    List<Map<String, dynamic>> haykirPostsFromFeed = [];
-    if (isHaykirislarim && widget.userEmail != null) {
-      // Seyir defterindeki haykÄ±r postlarÄ±nÄ± getir
-      final allFeedPosts = HiveDatabaseService.getHomeFeedPosts(userEmail: widget.userEmail);
-      haykirPostsFromFeed = allFeedPosts.where((post) {
-        final type = post['type']?.toString() ?? '';
-        return type == 'haykir';
-      }).toList();
-    }
-
-    // âœ… VeritabanÄ±ndan gerÃ§ek haykÄ±rÄ±ÅŸlarÄ± Ã§ek (eski sistem iÃ§in geriye dÃ¶nÃ¼k uyumluluk)
-    List<Map<String, dynamic>> haykirDataList;
-    if (isHaykirislarim) {
-      // HaykÄ±rÄ±ÅŸlarÄ±m sekmesi - kullanÄ±cÄ±nÄ±n kendi haykÄ±rÄ±ÅŸlarÄ±
-      if (widget.userEmail != null) {
-        haykirDataList = HiveDatabaseService.getUserHaykirislar(widget.userEmail!);
-      } else {
-        haykirDataList = [];
-      }
-    } else {
-      // âœ… KatÄ±ldÄ±ÄŸÄ±m sekmesi - katÄ±ldÄ±ÄŸÄ±m haykÄ±rlarÄ± gÃ¶ster
-      if (widget.userEmail != null) {
-        haykirDataList = HiveDatabaseService.getKatildigimHaykirler(widget.userEmail!);
-      } else {
-        haykirDataList = [];
-      }
-    }
-
-    // GÃ¶sterilecek haykÄ±r postlarÄ± (seyir defteri formatÄ±nda â€” HaykÄ±rÄ±ÅŸlarÄ±m sekmesi)
-    final List<Map<String, dynamic>> haykirPostsToShow;
-    if (isHaykirislarim) {
-      haykirPostsToShow = haykirPostsFromFeed;
-    } else {
-      haykirPostsToShow = [];
-    }
+    final haykirPostsToShow = _haykirPostsToShow;
+    final haykirDataList = _haykirDataList;
 
     final bool isEmpty = isHaykirislarim
         ? haykirPostsToShow.isEmpty
@@ -213,6 +217,7 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                               onTap: () {
                                 setState(() {
                                   isHaykirislarim = true;
+                                  _reloadHaykirLists();
                                 });
                               },
                               child: Container(
@@ -275,6 +280,7 @@ class _HaykirislarimPageState extends State<HaykirislarimPage> {
                               onTap: () {
                                 setState(() {
                                   isHaykirislarim = false;
+                                  _reloadHaykirLists();
                                 });
                               },
                               child: Container(

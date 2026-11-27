@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/registration_model.dart';
@@ -30,7 +31,8 @@ class _DatabaseDebugPageState extends State<DatabaseDebugPage> {
     'aktif_kategoriler': 'Aktif kategoriler',
   };
 
-  bool get _authorized => HiveDatabaseService.isAdmin(widget.userEmail);
+  bool get _authorized =>
+      kDebugMode && HiveDatabaseService.isAdmin(widget.userEmail);
 
   @override
   void initState() {

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
@@ -29,6 +30,7 @@ import '../widgets/twitter_post_composer.dart';
 import '../utils/constants.dart';
 import '../utils/category_icon_utils.dart';
 import '../widgets/shared/app_snack.dart';
+import 'package:its19/utils/app_logger.dart';
 
 // Eski Dava modeli
 class Dava {
@@ -596,7 +598,7 @@ class _HomePageState extends State<HomePage> {
                 showAppSnack(context, '✅ "${davaData['davaAdi'] ?? 'Dava'}" seyir defterinizden kaldırıldı', backgroundColor: Colors.green, duration: const Duration(seconds: 2));
               }
             } catch (e) {
-              print('❌ Seyir defterinden kaldırma hatası: $e');
+              appLog('❌ Seyir defterinden kaldırma hatası: $e');
               if (context.mounted) {
                 showAppSnack(context, '❌ Hata: ${e.toString()}', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
               }
@@ -760,11 +762,11 @@ class _HomePageState extends State<HomePage> {
 
                   HiveDatabaseService.addInvitation(
                       widget.userEmail!, invitation);
-                  print('✅ Yorum invitation\'da da güncellendi: $davaId');
+                  appLog('✅ Yorum invitation\'da da güncellendi: $davaId');
                 }
               }
             } catch (e) {
-              print('⚠️ Invitation güncelleme hatası: $e');
+              appLog('⚠️ Invitation güncelleme hatası: $e');
             }
 
             showAppSnack(context, '💬 Yorum eklendi: "$yorumMetni"${isGizliTanik ? ' (Gizli Tanık olarak)' : ''}', backgroundColor: Colors.green[600], duration: const Duration(seconds: 2));
@@ -844,7 +846,7 @@ class _HomePageState extends State<HomePage> {
                 }
               }
             } catch (e) {
-              print('⚠️ Invitation güncelleme hatası: $e');
+              appLog('⚠️ Invitation güncelleme hatası: $e');
             }
 
             showAppSnack(context, '? Be�enildi!', duration: Duration(seconds: 2));
@@ -902,7 +904,7 @@ class _HomePageState extends State<HomePage> {
                 }
               }
             } catch (e) {
-              print('⚠️ Invitation güncelleme hatası: $e');
+              appLog('⚠️ Invitation güncelleme hatası: $e');
             }
 
             showAppSnack(context, '? Be�enilmedi!', duration: Duration(seconds: 2));
@@ -975,7 +977,7 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: SeyirPalette.of(context).surfaceMuted,
         backgroundImage: avatarProvider,
         onBackgroundImageError: (exception, stackTrace) {
-          print('⚠️ Avatar resim yükleme hatası: $exception');
+          appLog('⚠️ Avatar resim yükleme hatası: $exception');
         },
       ),
     );
@@ -1111,7 +1113,7 @@ class _HomePageState extends State<HomePage> {
           showAppSnack(context, '✅ "${davaData['davaAdi'] ?? 'Dava'}" seyir defterinizden kaldırıldı', backgroundColor: Colors.green, duration: const Duration(seconds: 2));
         }
       } catch (e) {
-        print('❌ Seyir defterinden kaldırma hatası: $e');
+        appLog('❌ Seyir defterinden kaldırma hatası: $e');
         if (mounted) {
           showAppSnack(context, '❌ Hata: ${e.toString()}', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
           _homeFeedPagingController.refresh();
@@ -1187,7 +1189,7 @@ class _HomePageState extends State<HomePage> {
               }
             }
           } catch (e) {
-            print('⚠️ Base64 decode hatası: $e');
+            appLog('⚠️ Base64 decode hatası: $e');
           }
         }
         // Network URL
@@ -1639,7 +1641,7 @@ class _HomePageState extends State<HomePage> {
                     onTap: () =>
                         Navigator.of(context).pop(_PostSheetAction.admin),
                   ),
-                if (isAdmin)
+                if (kDebugMode && isAdmin)
                   _buildPostTypeOption(
                     icon: Icons.storage_outlined,
                     title: 'Veritabanı Debug',
@@ -1670,7 +1672,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    if (selectedAction == _PostSheetAction.debug) {
+    if (kDebugMode && selectedAction == _PostSheetAction.debug) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => DatabaseDebugPage(userEmail: widget.userEmail),

@@ -1283,6 +1283,7 @@ class _AdminPageState extends State<AdminPage> {
   void _editUser(RegistrationModel user) {
     final nameController = TextEditingController(text: user.judgeName);
     final countryController = TextEditingController(text: user.country);
+    final emailController = TextEditingController(text: user.email);
     bool isAdmin = user.isAdmin;
     bool isActive = user.isActive;
     bool isEmailVerified = user.isEmailVerified;
@@ -1308,7 +1309,7 @@ class _AdminPageState extends State<AdminPage> {
                 children: [
                   // E-posta (salt okunur)
                   TextField(
-                    controller: TextEditingController(text: user.email),
+                    controller: emailController,
                     decoration: const InputDecoration(
                       labelText: 'E-posta',
                       border: OutlineInputBorder(),
@@ -1478,7 +1479,11 @@ class _AdminPageState extends State<AdminPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      countryController.dispose();
+      emailController.dispose();
+    });
   }
 
   /// Kullanıcı detaylarını gösteren modal
@@ -1989,7 +1994,10 @@ class _AdminPageState extends State<AdminPage> {
           ),
         ],
       ),
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      subCategoriesController.dispose();
+    });
   }
 
   /// Kategori görünürlüğünü değiştirir
@@ -2060,7 +2068,10 @@ class _AdminPageState extends State<AdminPage> {
           ),
         ],
       ),
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      subCategoriesController.dispose();
+    });
   }
 
   // ========== TOPLU İŞLEMLER ==========

@@ -1,7 +1,6 @@
-import 'package:flutter/foundation.dart';
-
 import '../models/dava_draft_state.dart';
 import '../services/hive_database_service.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Dava taslakları için Hive erişimlerini yöneten servis.
 class DavaDraftService {
@@ -54,7 +53,7 @@ class DavaDraftService {
 
   /// Hive kaydetme sorunlarını loglar.
   static void showPersistenceError(dynamic error) {
-    debugPrint('❌ Taslak kaydedilirken hata oluştu: $error');
+    appLog('❌ Taslak kaydedilirken hata oluştu: $error');
   }
 }
 

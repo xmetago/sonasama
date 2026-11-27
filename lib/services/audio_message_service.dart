@@ -5,6 +5,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Sesli mesaj kaydı ve oynatma servisi
 /// ✅ Veritabanına kaydediliyor uygula
@@ -93,7 +94,7 @@ class AudioMessageService {
 
       return true;
     } catch (e) {
-      print('❌ Ses kaydı başlatılamadı: $e');
+      appLog('❌ Ses kaydı başlatılamadı: $e');
       return false;
     }
   }
@@ -118,7 +119,7 @@ class AudioMessageService {
 
       return _currentRecordingPath;
     } catch (e) {
-      print('❌ Ses kaydı durdurulamadı: $e');
+      appLog('❌ Ses kaydı durdurulamadı: $e');
       _isRecording = false;
       _recordingTimer?.cancel();
       _recordingTimer = null;
@@ -148,7 +149,7 @@ class AudioMessageService {
       _currentRecordingPath = null;
       _recordingDuration = 0;
     } catch (e) {
-      print('❌ Kayıt iptal edilemedi: $e');
+      appLog('❌ Kayıt iptal edilemedi: $e');
     }
   }
 
@@ -163,14 +164,14 @@ class AudioMessageService {
     required String conversationId,
   }) async {
     try {
-      print('📤 Ses dosyası yükleniyor: $filePath');
+      appLog('📤 Ses dosyası yükleniyor: $filePath');
       
       final file = File(filePath);
       
       // Dosya varlık kontrolü
       if (!await file.exists()) {
         final errorMsg = 'Ses dosyası bulunamadı: $filePath';
-        print('❌ $errorMsg');
+        appLog('❌ $errorMsg');
         throw Exception(errorMsg);
       }
 
@@ -179,18 +180,18 @@ class AudioMessageService {
       const maxSize = 10 * 1024 * 1024; // 10MB
       if (fileSize > maxSize) {
         final errorMsg = 'Ses dosyası çok büyük: ${(fileSize / 1024 / 1024).toStringAsFixed(2)}MB (Max: 10MB)';
-        print('❌ $errorMsg');
+        appLog('❌ $errorMsg');
         throw Exception(errorMsg);
       }
 
-      print('📊 Dosya boyutu: ${(fileSize / 1024).toStringAsFixed(2)}KB');
+      appLog('📊 Dosya boyutu: ${(fileSize / 1024).toStringAsFixed(2)}KB');
 
       // Firebase Storage referansı oluştur
       final storage = FirebaseStorage.instance;
       final storagePath = 'audio_messages/$conversationId/$messageId.m4a';
       final ref = storage.ref().child(storagePath);
       
-      print('📁 Storage yolu: $storagePath');
+      appLog('📁 Storage yolu: $storagePath');
 
       // Metadata ekle (content type ve custom metadata)
       final metadata = SettableMetadata(
@@ -203,13 +204,13 @@ class AudioMessageService {
       );
 
       // Dosyayı yükle (metadata ile)
-      print('⬆️ Firebase Storage\'a yükleniyor...');
+      appLog('⬆️ Firebase Storage\'a yükleniyor...');
       final uploadTask = ref.putFile(file, metadata);
       
       // Upload progress takibi (opsiyonel - debug için)
       uploadTask.snapshotEvents.listen((snapshot) {
         final progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        print('📈 Yükleme ilerlemesi: ${progress.toStringAsFixed(1)}%');
+        appLog('📈 Yükleme ilerlemesi: ${progress.toStringAsFixed(1)}%');
       });
       
       // Yükleme tamamlanmasını bekle (timeout ile - 60 saniye)
@@ -220,7 +221,7 @@ class AudioMessageService {
           throw TimeoutException('Ses dosyası yükleme işlemi zaman aşımına uğradı (60 saniye)');
         },
       );
-      print('✅ Dosya yükleme tamamlandı');
+      appLog('✅ Dosya yükleme tamamlandı');
       
       // ✅ Veritabanına kaydediliyor uygula
       // ✅ Kalıcı olarak saklanıyor uygula
@@ -228,7 +229,7 @@ class AudioMessageService {
       
       // İndirme URL'sini al
       final downloadUrl = await ref.getDownloadURL();
-      print('✅ Ses dosyası Firebase Storage\'a yüklendi: $downloadUrl');
+      appLog('✅ Ses dosyası Firebase Storage\'a yüklendi: $downloadUrl');
       
       return downloadUrl;
     } on FirebaseException catch (e) {
@@ -247,19 +248,19 @@ class AudioMessageService {
         default:
           errorMsg += '${e.code}: ${e.message ?? "Bilinmeyen hata"}';
       }
-      print('❌ $errorMsg');
-      print('❌ Firebase hatası detayları: ${e.toString()}');
+      appLog('❌ $errorMsg');
+      appLog('❌ Firebase hatası detayları: ${e.toString()}');
       return null;
     } on Exception catch (e) {
       // Genel hatalar
-      print('❌ Ses dosyası yüklenemedi: $e');
-      print('❌ Hata tipi: ${e.runtimeType}');
-      print('❌ Hata mesajı: ${e.toString()}');
+      appLog('❌ Ses dosyası yüklenemedi: $e');
+      appLog('❌ Hata tipi: ${e.runtimeType}');
+      appLog('❌ Hata mesajı: ${e.toString()}');
       return null;
     } catch (e, stackTrace) {
       // Beklenmeyen hatalar
-      print('❌ Beklenmeyen hata: $e');
-      print('❌ Stack trace: $stackTrace');
+      appLog('❌ Beklenmeyen hata: $e');
+      appLog('❌ Stack trace: $stackTrace');
       return null;
     }
   }
@@ -276,7 +277,7 @@ class AudioMessageService {
       await _player.setUrl(audioUrl);
       await _player.play();
     } catch (e) {
-      print('❌ Ses oynatılamadı: $e');
+      appLog('❌ Ses oynatılamadı: $e');
       rethrow;
     }
   }
@@ -286,7 +287,7 @@ class AudioMessageService {
     try {
       await _player.pause();
     } catch (e) {
-      print('❌ Ses duraklatılamadı: $e');
+      appLog('❌ Ses duraklatılamadı: $e');
     }
   }
 
@@ -295,7 +296,7 @@ class AudioMessageService {
     try {
       await _player.stop();
     } catch (e) {
-      print('❌ Ses durdurulamadı: $e');
+      appLog('❌ Ses durdurulamadı: $e');
     }
   }
 
@@ -304,7 +305,7 @@ class AudioMessageService {
     try {
       await _player.seek(position);
     } catch (e) {
-      print('❌ Pozisyon değiştirilemedi: $e');
+      appLog('❌ Pozisyon değiştirilemedi: $e');
     }
   }
 
@@ -315,7 +316,7 @@ class AudioMessageService {
       await _player.dispose();
       _recordingTimer?.cancel();
     } catch (e) {
-      print('❌ Ses servisi temizlenemedi: $e');
+      appLog('❌ Ses servisi temizlenemedi: $e');
     }
   }
 

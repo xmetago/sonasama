@@ -5,6 +5,7 @@
 library;
 
 import 'package:its19/services/local_notification_service.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Örnek 1: Basit bildirim göster
 Future<void> example1_SimpleNotification() async {
@@ -51,10 +52,10 @@ void example5_GetAllNotifications() {
   final notifications = LocalNotificationService.getAllNotifications();
   
   for (final notification in notifications) {
-    print('Bildirim: ${notification['title']}');
-    print('İçerik: ${notification['body']}');
-    print('Tarih: ${notification['timestamp']}');
-    print('Okundu mu: ${notification['isRead']}');
+    appLog('Bildirim: ${notification['title']}');
+    appLog('İçerik: ${notification['body']}');
+    appLog('Tarih: ${notification['timestamp']}');
+    appLog('Okundu mu: ${notification['isRead']}');
   }
 }
 
@@ -79,7 +80,7 @@ Future<void> example9_CheckPermissions() async {
   
   if (!hasPermission) {
     // İzin yoksa kullanıcıya bildir
-    print('Bildirim izni verilmedi');
+    appLog('Bildirim izni verilmedi');
   } else {
     // İzin varsa bildirim göster
     await LocalNotificationService.showNotification(

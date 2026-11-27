@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class TreeMenuPageheadlines extends StatelessWidget {
   final VoidCallback? onMenuPressed;
@@ -29,7 +30,7 @@ class TreeMenuPageheadlines extends StatelessWidget {
                 color: Colors.red,
               ),
               onPressed: onMenuPressed ?? () {
-                debugPrint('Menu button pressed');
+                appLog('Menu button pressed');
               },
             ),
         Expanded(

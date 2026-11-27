@@ -19,6 +19,7 @@ import '../theme/seyir_tokens.dart';
 import '../utils/app_theme.dart';
 import '../utils/proximity_category_rules.dart';
 import '../widgets/shared/app_snack.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class FriendshipManagementPage extends StatefulWidget {
   final String userEmail;
@@ -150,7 +151,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         _needsLogin = false;
       });
     } catch (e) {
-      print('Veri yükleme hatası: $e');
+      appLog('Veri yükleme hatası: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -176,8 +177,8 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
       // Yeni sistemden arkadaş kategorilerini çek
       final friendCategories = FriendCategoryService.listByOwner(currentUser.id);
       
-      print('DEBUG: Loading friend categories for ${currentUser.email}');
-      print('DEBUG: Found ${friendCategories.length} friend categories from FriendCategoryService');
+      appLog('DEBUG: Loading friend categories');
+      appLog('DEBUG: Found ${friendCategories.length} friend categories from FriendCategoryService');
 
       // Temizle
       _categorizedUsers.forEach((key, value) => value.clear());
@@ -211,9 +212,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         }
       }
 
-      print('✅ ${friendCategories.length} kategori kaydı yüklendi');
+      appLog('✅ ${friendCategories.length} kategori kaydı yüklendi');
     } catch (e) {
-      print('❌ Arkadaşlık yükleme hatası: $e');
+      appLog('❌ Arkadaşlık yükleme hatası: $e');
     }
   }
 
@@ -226,7 +227,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
       _blockedUserIds.clear();
       _blockedUserIds.addAll(blocked.map((f) => f.recipientId));
     } catch (e) {
-      print('❌ Engellenen kullanıcılar yüklenirken hata: $e');
+      appLog('❌ Engellenen kullanıcılar yüklenirken hata: $e');
     }
   }
 
@@ -281,9 +282,9 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         });
       }
 
-      print('✅ ${_pendingRequests.length} bekleyen arkadaşlık isteği yüklendi');
+      appLog('✅ ${_pendingRequests.length} bekleyen arkadaşlık isteği yüklendi');
     } catch (e) {
-      print('❌ Bekleyen istekler yüklenirken hata: $e');
+      appLog('❌ Bekleyen istekler yüklenirken hata: $e');
     }
   }
 
@@ -1401,12 +1402,12 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         .toList();
     
     if (duplicateUsers.isNotEmpty) {
-      print('⚠️ UYARI: Aşağıdaki kullanıcılar birden fazla kategoriye eklenmiş:');
+      appLog('⚠️ UYARI: Aşağıdaki kullanıcılar birden fazla kategoriye eklenmiş:');
       for (final userId in duplicateUsers) {
-        print('   - Kullanıcı ID: $userId (${userCategoryCounts[userId]} kategori)');
+        appLog('   - Kullanıcı ID: $userId (${userCategoryCounts[userId]} kategori)');
       }
     } else {
-      print('✅ Tüm kullanıcılar sadece bir kategoriye eklenmiş');
+      appLog('✅ Tüm kullanıcılar sadece bir kategoriye eklenmiş');
     }
   }
 
@@ -1418,7 +1419,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
       if (existing != null) {
         final updated = existing.copyWith(category: category, updatedAt: DateTime.now());
         await FriendCategoryService.upsert(updated);
-        print('✅ Mevcut kategori kaydı güncellendi: ${updated.id}');
+        appLog('✅ Mevcut kategori kaydı güncellendi: ${updated.id}');
       } else {
         final record = FriendCategoryModel(
           id: deterministicId,
@@ -1428,7 +1429,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
           createdAt: DateTime.now(),
         );
         await FriendCategoryService.upsert(record);
-        print('✅ Yeni kategori kaydı oluşturuldu: ${record.id}');
+        appLog('✅ Yeni kategori kaydı oluşturuldu: ${record.id}');
       }
       await HiveDatabaseService.syncCategoryFriendship(
         currentUser.id,
@@ -1441,7 +1442,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         category: category,
       );
     } catch (e) {
-      print('❌ Kategori kaydedilirken hata: $e');
+      appLog('❌ Kategori kaydedilirken hata: $e');
       rethrow;
     }
   }
@@ -1452,7 +1453,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
       final existing = FriendCategoryService.getByOwnerAndTarget(currentUser.id, targetUser.id);
       if (existing != null) {
         await FriendCategoryService.delete(existing.id);
-        print('✅ Kategori kaydı silindi: ${existing.id}');
+        appLog('✅ Kategori kaydı silindi: ${existing.id}');
       }
       await HiveDatabaseService.removeCategoryFriendship(currentUser.id, targetUser.id);
       await FriendCategoryService.removeLegacyBoxEntry(
@@ -1460,7 +1461,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
         targetEmail: targetUser.email,
       );
     } catch (e) {
-      print('❌ Kategori silinirken hata: $e');
+      appLog('❌ Kategori silinirken hata: $e');
       rethrow;
     }
   }
@@ -1489,7 +1490,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
       // Test: Kullanıcı tutarlılığını kontrol et
       _testUserCategoryConsistency();
     } catch (e) {
-      print('Kategori ekleme hatası: $e');
+      appLog('Kategori ekleme hatası: $e');
     }
     
     // Performans bilgisi mesajını göster
@@ -1513,7 +1514,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
     try {
       await _removeFriendCategoryFromDatabase(currentUser, user);
     } catch (e) {
-      print('Kategori kaldırma hatası: $e');
+      appLog('Kategori kaldırma hatası: $e');
     }
     
     // Performans bilgisi mesajını göster
@@ -1668,7 +1669,7 @@ class _FriendshipManagementPageState extends State<FriendshipManagementPage> {
       try {
         await HiveDatabaseService.deleteRegistration(user.id);
       } catch (e) {
-        print('Veritabanından silme hatası: $e');
+        appLog('Veritabanından silme hatası: $e');
       }
 
       // Loading'i kapat

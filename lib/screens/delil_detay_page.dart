@@ -12,6 +12,7 @@ import '../services/hive_database_service.dart';
 import '../services/evidence_service.dart';
 import '../theme/seyir_tokens.dart';
 import '../utils/dialog_utils.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class DelilDetayPage extends StatefulWidget {
   final String? userEmail;
@@ -88,7 +89,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
         });
       }
     } catch (e) {
-      print('❌ Kullanıcı rolü yüklenirken hata: $e');
+      appLog('❌ Kullanıcı rolü yüklenirken hata: $e');
     }
   }
 
@@ -791,10 +792,10 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
 
   void _openVideoPlayer() {
     try {
-      print('🎥 Video player açılıyor: ${_evidence.filePath}');
+      appLog('🎥 Video player açılıyor: ${_evidence.filePath}');
       
       if (_evidence.filePath.isEmpty) {
-        print('❌ Video dosyası bulunamadı');
+        appLog('❌ Video dosyası bulunamadı');
         showAppSnack(
           context,
           '❌ Video dosyası bulunamadı',
@@ -806,7 +807,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       // Video dosyasının var olup olmadığını kontrol et
       final videoFile = File(_evidence.filePath);
       if (!videoFile.existsSync()) {
-        print('❌ Video dosyası mevcut değil: ${_evidence.filePath}');
+        appLog('❌ Video dosyası mevcut değil: ${_evidence.filePath}');
         showAppSnack(
           context,
           '❌ Video dosyası bulunamadı',
@@ -825,9 +826,9 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
         ),
       );
       
-      print('✅ Video player açıldı');
+      appLog('✅ Video player açıldı');
     } catch (e) {
-      print('❌ Video player açılırken hata: $e');
+      appLog('❌ Video player açılırken hata: $e');
       showAppSnack(
           context,
           '❌ Video açılırken hata: $e',
@@ -904,10 +905,10 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
 
   void _openPdfViewer() {
     try {
-      print('📄 PDF viewer açılıyor: ${_evidence.filePath}');
+      appLog('📄 PDF viewer açılıyor: ${_evidence.filePath}');
       
       if (_evidence.filePath.isEmpty) {
-        print('❌ PDF dosyası bulunamadı');
+        appLog('❌ PDF dosyası bulunamadı');
         showAppSnack(
           context,
           '❌ PDF dosyası bulunamadı',
@@ -919,7 +920,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       // PDF dosyasının var olup olmadığını kontrol et
       final pdfFile = File(_evidence.filePath);
       if (!pdfFile.existsSync()) {
-        print('❌ PDF dosyası mevcut değil: ${_evidence.filePath}');
+        appLog('❌ PDF dosyası mevcut değil: ${_evidence.filePath}');
         showAppSnack(
           context,
           '❌ PDF dosyası bulunamadı',
@@ -938,9 +939,9 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
         ),
       );
       
-      print('✅ PDF viewer açıldı');
+      appLog('✅ PDF viewer açıldı');
     } catch (e) {
-      print('❌ PDF viewer açılırken hata: $e');
+      appLog('❌ PDF viewer açılırken hata: $e');
       showAppSnack(
           context,
           '❌ PDF açılırken hata: $e',
@@ -976,11 +977,11 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
 
   void _openLink() async {
     try {
-      print('🔗 Link açma işlemi başlatılıyor: ${_evidence.url}');
+      appLog('🔗 Link açma işlemi başlatılıyor: ${_evidence.url}');
       
       // URL'nin boş olup olmadığını kontrol et
       if (_evidence.url.isEmpty) {
-        print('❌ URL boş');
+        appLog('❌ URL boş');
         showAppSnack(
           context,
           '❌ Link bulunamadı',
@@ -993,15 +994,15 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
       String urlString = _evidence.url;
       if (!urlString.startsWith('http://') && !urlString.startsWith('https://')) {
         urlString = 'https://$urlString';
-        print('🔗 URL formatı düzeltildi: $urlString');
+        appLog('🔗 URL formatı düzeltildi: $urlString');
       }
 
       final Uri url = Uri.parse(urlString);
-      print('🔗 URL parse edildi: $url');
+      appLog('🔗 URL parse edildi: $url');
 
       // URL'nin geçerli olup olmadığını kontrol et
       if (!url.hasScheme || !url.hasAuthority) {
-        print('❌ Geçersiz URL formatı');
+        appLog('❌ Geçersiz URL formatı');
         showAppSnack(
           context,
           '❌ Geçersiz link formatı',
@@ -1012,14 +1013,14 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
 
       // URL'yi açabilir miyiz kontrol et
       if (await canLaunchUrl(url)) {
-        print('✅ URL açılabilir, açılıyor...');
+        appLog('✅ URL açılabilir, açılıyor...');
         final result = await launchUrl(
           url,
           mode: LaunchMode.externalApplication,
         );
         
         if (result) {
-          print('✅ Link başarıyla açıldı');
+          appLog('✅ Link başarıyla açıldı');
           showAppSnack(
           context,
           '✅ Link açıldı',
@@ -1027,7 +1028,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
           duration: Duration(seconds: 2),
         );
         } else {
-          print('❌ Link açılamadı');
+          appLog('❌ Link açılamadı');
           showAppSnack(
           context,
           '❌ Link açılamadı',
@@ -1035,7 +1036,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
         );
         }
       } else {
-        print('❌ URL açılamaz');
+        appLog('❌ URL açılamaz');
         showAppSnack(
           context,
           '❌ Bu link açılamaz: ${_evidence.url}',
@@ -1043,7 +1044,7 @@ class _DelilDetayPageState extends State<DelilDetayPage> {
         );
       }
     } catch (e) {
-      print('❌ Link açılırken hata: $e');
+      appLog('❌ Link açılırken hata: $e');
       showAppSnack(
           context,
           '❌ Link açılırken hata: $e',

@@ -36,6 +36,14 @@ class UserStarBalanceStore {
     await setYellowStars(email, current + amount);
   }
 
+  /// Hesap silinince bu e-postaya bağlı yıldız bakiyesini kaldırır.
+  static Future<void> clearForEmail(String email) async {
+    if (email.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_yellowKey(email));
+    await prefs.remove(_greenKey(email));
+  }
+
   /// Yeterliyse çıkarır ve [true] döndürür.
   /// Yetersizse hiçbir değişiklik yapmaz ve [false] döndürür.
   static Future<bool> trySpendYellowStars(String email, int cost) async {

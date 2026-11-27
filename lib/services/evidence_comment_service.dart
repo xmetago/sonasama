@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import '../models/evidence_comment_model.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Delil yorumları için servis sınıfı
 /// Her delil için 8 farklı rolden yorum alabilir
@@ -64,7 +65,7 @@ class EvidenceCommentService {
           criticism: criticism,
           updatedAt: now,
         );
-        print('🔄 Yorum güncelleniyor: $commentId');
+        appLog('🔄 Yorum güncelleniyor: $commentId');
       } else {
         // Yeni yorum oluştur
         comment = EvidenceCommentModel(
@@ -78,15 +79,15 @@ class EvidenceCommentService {
           createdAt: now,
           updatedAt: now,
         );
-        print('✅ Yeni yorum ekleniyor: $commentId');
+        appLog('✅ Yeni yorum ekleniyor: $commentId');
       }
 
       // Veritabanına kaydet
       await _commentBox.put(commentId, comment);
       
-      print('✅ Veritabanına kaydediliyor: ${comment.userRole} yorumu');
-      print('✅ Kalıcı olarak saklanıyor');
-      print('✅ Uygulama yeniden başlatıldığında korunuyor');
+      appLog('✅ Veritabanına kaydediliyor: ${comment.userRole} yorumu');
+      appLog('✅ Kalıcı olarak saklanıyor');
+      appLog('✅ Uygulama yeniden başlatıldığında korunuyor');
       
       return {
         'success': true,
@@ -94,7 +95,7 @@ class EvidenceCommentService {
         'message': existingComment != null ? 'Yorum güncellendi' : 'Yorum eklendi',
       };
     } catch (e) {
-      print('❌ Yorum eklenirken hata: $e');
+      appLog('❌ Yorum eklenirken hata: $e');
       return {
         'success': false,
         'error': 'Yorum eklenirken hata oluştu: $e',
@@ -109,7 +110,7 @@ class EvidenceCommentService {
           .where((comment) => comment.evidenceId == evidenceId)
           .toList();
     } catch (e) {
-      print('❌ Yorumlar getirilirken hata: $e');
+      appLog('❌ Yorumlar getirilirken hata: $e');
       return [];
     }
   }
@@ -121,7 +122,7 @@ class EvidenceCommentService {
           .where((comment) => comment.davaId == davaId)
           .toList();
     } catch (e) {
-      print('❌ Yorumlar getirilirken hata: $e');
+      appLog('❌ Yorumlar getirilirken hata: $e');
       return [];
     }
   }
@@ -140,7 +141,7 @@ class EvidenceCommentService {
       );
       return _commentBox.get(commentId);
     } catch (e) {
-      print('❌ Yorum getirilirken hata: $e');
+      appLog('❌ Yorum getirilirken hata: $e');
       return null;
     }
   }
@@ -155,7 +156,7 @@ class EvidenceCommentService {
       );
       return _commentBox.containsKey(commentId);
     } catch (e) {
-      print('❌ Yorum kontrolü yapılırken hata: $e');
+      appLog('❌ Yorum kontrolü yapılırken hata: $e');
       return false;
     }
   }
@@ -164,10 +165,10 @@ class EvidenceCommentService {
   Future<bool> deleteComment(String commentId) async {
     try {
       await _commentBox.delete(commentId);
-      print('✅ Yorum silindi: $commentId');
+      appLog('✅ Yorum silindi: $commentId');
       return true;
     } catch (e) {
-      print('❌ Yorum silinirken hata: $e');
+      appLog('❌ Yorum silinirken hata: $e');
       return false;
     }
   }
@@ -186,7 +187,7 @@ class EvidenceCommentService {
       
       return counts;
     } catch (e) {
-      print('❌ Yorum sayıları getirilirken hata: $e');
+      appLog('❌ Yorum sayıları getirilirken hata: $e');
       return {};
     }
   }
@@ -196,7 +197,7 @@ class EvidenceCommentService {
     try {
       return _commentBox.values.toList();
     } catch (e) {
-      print('❌ Tüm yorumlar getirilirken hata: $e');
+      appLog('❌ Tüm yorumlar getirilirken hata: $e');
       return [];
     }
   }

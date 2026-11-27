@@ -1,4 +1,5 @@
 import 'hive_database_service.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Dava hüküm servisi
 /// 
@@ -48,7 +49,7 @@ class DavaHukumService {
       final rawDavaData = rawOpenedDava ?? rawAcceptedDava;
       
       if (rawDavaData == null) {
-        print('⚠️ Dava bulunamadı: $davaId');
+        appLog('⚠️ Dava bulunamadı: $davaId');
         return null;
       }
 
@@ -58,7 +59,7 @@ class DavaHukumService {
 
       // Zaten hüküm verilmişse tekrar hesaplama
       if (davaData['hukumSonucu'] != null && davaData['hukumTarihi'] != null) {
-        print('ℹ️ Dava için zaten hüküm verilmiş: $davaId');
+        appLog('ℹ️ Dava için zaten hüküm verilmiş: $davaId');
         return {
           'hukumSonucu': davaData['hukumSonucu'],
           'hukumTarihi': davaData['hukumTarihi'],
@@ -69,18 +70,18 @@ class DavaHukumService {
       // AcceptedAt tarihini al
       final acceptedAtStr = davaData['acceptedAt']?.toString();
       if (acceptedAtStr == null || acceptedAtStr.isEmpty) {
-        print('⚠️ Dava için acceptedAt tarihi bulunamadı: $davaId');
+        appLog('⚠️ Dava için acceptedAt tarihi bulunamadı: $davaId');
         return null;
       }
 
       final acceptedAt = DateTime.tryParse(acceptedAtStr);
       if (acceptedAt == null) {
-        print('⚠️ Dava için geçersiz acceptedAt tarihi: $davaId');
+        appLog('⚠️ Dava için geçersiz acceptedAt tarihi: $davaId');
         return null;
       }
 
       if (!isHukumSuresiDoldu(acceptedAt)) {
-        print('ℹ️ Dava için henüz $hukumSuresiGun gün dolmadı: $davaId');
+        appLog('ℹ️ Dava için henüz $hukumSuresiGun gün dolmadı: $davaId');
         return null;
       }
 
@@ -125,11 +126,11 @@ class DavaHukumService {
         await HiveDatabaseService.updateAcceptedDava(davaId, updatedDavaData);
       }
 
-      print('✅ Hüküm hesaplandı ve kaydedildi: $davaId, sonuç: $hukumSonucu');
+      appLog('✅ Hüküm hesaplandı ve kaydedildi: $davaId, sonuç: $hukumSonucu');
       
       return hukumVerisi;
     } catch (e) {
-      print('❌ Hüküm hesaplanırken hata: $e');
+      appLog('❌ Hüküm hesaplanırken hata: $e');
       return null;
     }
   }
@@ -152,7 +153,7 @@ class DavaHukumService {
     try {
       return HiveDatabaseService.getDavaHukumVerisi(davaId);
     } catch (e) {
-      print('❌ Hüküm verisi alınırken hata: $e');
+      appLog('❌ Hüküm verisi alınırken hata: $e');
       return null;
     }
   }
@@ -177,7 +178,7 @@ class DavaHukumService {
         }
       }
     } catch (e) {
-      print('❌ Tüm davalar için hüküm kontrolü yapılırken hata: $e');
+      appLog('❌ Tüm davalar için hüküm kontrolü yapılırken hata: $e');
     }
   }
 }

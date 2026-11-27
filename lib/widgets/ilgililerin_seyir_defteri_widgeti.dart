@@ -21,6 +21,7 @@ import '../utils/comment_utils.dart';
 import 'comment_section.dart';
 import 'rol_hukum_kartlari_section.dart';
 import 'seyir_defteri/seyir_sheet_chrome.dart';
+import 'package:its19/utils/app_logger.dart';
 part 'seyir_defteri_bundles.dart';
 
 /// [KatildigimDavalarPage] / [ActigimDavaCard] ile aynı birleştirme: gerçek `davaId` ve
@@ -638,7 +639,7 @@ class _IlgililerinSeyirDefteriWidgetiState
         }
       }
     } catch (e) {
-      print('❌ Dava bilgileri yüklenirken hata: $e');
+      appLog('❌ Dava bilgileri yüklenirken hata: $e');
     }
   }
 
@@ -664,7 +665,7 @@ class _IlgililerinSeyirDefteriWidgetiState
         _isLoadingRejecters = false;
       });
     } catch (e) {
-      print('❌ Red eden kişiler yüklenirken hata: $e');
+      appLog('❌ Red eden kişiler yüklenirken hata: $e');
       setState(() {
         _isLoadingRejecters = false;
       });

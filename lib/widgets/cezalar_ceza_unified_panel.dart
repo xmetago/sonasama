@@ -17,6 +17,7 @@ import '../services/hive_database_service.dart';
 import '../theme/seyir_tokens.dart';
 import 'cezalar_unified_dava.dart';
 import 'countdown_timer_widget.dart';
+import 'package:its19/utils/app_logger.dart';
 
 export 'cezalar_unified_dava.dart' show CezalarUnifiedDava;
 
@@ -650,7 +651,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         await _loadGorevHukumOnizleme();
       }
     } catch (e) {
-      debugPrint('❌ Hükümler yüklenirken hata: $e');
+      appLog('❌ Hükümler yüklenirken hata: $e');
       if (mounted) {
         _showMahkemeSnackBar(context, 'Hükümler yüklenirken hata oluştu.', _MahkemeRenkler.danger(context));
       }
@@ -1261,7 +1262,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         temyizPenceresiAcik =
             DavaHukumEligibilityService.isAppealJudgeWindowActive(opened);
       } catch (e) {
-        debugPrint('Mühür kilidi okunamadı: $e');
+        appLog('Mühür kilidi okunamadı: $e');
       }
     }
     return CezaMuhurKilit.degerlendir(
@@ -1420,7 +1421,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         );
       }
     } catch (e) {
-      debugPrint('❌ Ceza kaydedilirken hata: $e');
+      appLog('❌ Ceza kaydedilirken hata: $e');
       saved = false;
     }
 
@@ -1480,7 +1481,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
           text: 'Mahkeme kararı: ${selectedPenaltyText ?? ''}',
         );
       } catch (shareError) {
-        debugPrint('Paylaşım açılamadı, dosya kaydedildi: $shareError');
+        appLog('Paylaşım açılamadı, dosya kaydedildi: $shareError');
         if (!mounted) {
           return;
         }
@@ -1491,7 +1492,7 @@ class _CezalarCezaUnifiedPanelState extends State<CezalarCezaUnifiedPanel>
         );
       }
     } catch (e) {
-      debugPrint('Karar görüntüsü oluşturulamadı: $e');
+      appLog('Karar görüntüsü oluşturulamadı: $e');
       if (!mounted) {
         return;
       }
