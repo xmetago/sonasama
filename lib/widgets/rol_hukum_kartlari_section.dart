@@ -195,10 +195,14 @@ class _RolHukumKartlariSectionState extends State<RolHukumKartlariSection> {
 
   void _showNoHukumSnackBar() {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       const SnackBar(
-        content: Text('Bu rolde goruntulenecek kayitli bir hukum yok.'),
+        content: Text('Bu rol için kayıtlı bir hüküm yok.'),
         duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: SeyirTokens.radiusMdAll),
       ),
     );
   }
@@ -360,23 +364,32 @@ class _RolHukumKartlariSectionState extends State<RolHukumKartlariSection> {
   }
 
   Widget _buildRoleDialogButton(String normalizedTitle, bool hasHukum) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          if (!hasHukum) {
-            _showNoHukumSnackBar();
-            return;
-          }
-          _showHukumDialog(normalizedTitle);
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: Icon(
-            MdiIcons.fileCheckOutline,
-            size: 30,
-            color: hasHukum ? Colors.green.shade700 : Colors.brown,
+    return Semantics(
+      button: true,
+      label: hasHukum
+          ? '$normalizedTitle metnini aç'
+          : '$normalizedTitle hükmü yok',
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: () {
+            if (!hasHukum) {
+              _showNoHukumSnackBar();
+              return;
+            }
+            _showHukumDialog(normalizedTitle);
+          },
+          borderRadius: SeyirTokens.radiusMdAll,
+          child: SizedBox(
+            width: SeyirTokens.tapTarget,
+            height: SeyirTokens.tapTarget,
+            child: Center(
+              child: Icon(
+                MdiIcons.fileCheckOutline,
+                size: 30,
+                color: hasHukum ? Colors.green.shade700 : Colors.brown,
+              ),
+            ),
           ),
         ),
       ),
