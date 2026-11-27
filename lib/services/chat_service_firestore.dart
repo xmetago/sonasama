@@ -141,12 +141,14 @@ class ChatServiceFirestore {
       final snapshot = await _firestore
           .collection(_messagesCollection)
           .where('conversationId', isEqualTo: conversationId)
-          .orderBy('createdAt', descending: false)
+          .orderBy('createdAt', descending: true)
           .limit(50)
           .get();
 
       final messages = snapshot.docs
           .map((doc) => ChatMessageModel.fromJson(doc.data()))
+          .toList()
+          .reversed
           .toList();
 
       // Hive'a da kaydet (cache)
@@ -278,12 +280,14 @@ class ChatServiceFirestore {
       return _firestore
           .collection(_messagesCollection)
           .where('conversationId', isEqualTo: conversationId)
-          .orderBy('createdAt', descending: false)
+          .orderBy('createdAt', descending: true)
           .limit(50)
           .snapshots()
           .map((snapshot) {
         final messages = snapshot.docs
             .map((doc) => ChatMessageModel.fromJson(doc.data()))
+            .toList()
+            .reversed
             .toList();
 
         // Hive'a cache'le
