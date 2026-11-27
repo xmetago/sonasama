@@ -1,7 +1,6 @@
-import 'package:flutter/foundation.dart';
-
 import 'chat_service.dart';
 import 'hive_database_service.dart';
+import 'package:its19/utils/app_logger.dart';
 
 enum DurtmeSendResult { success, cooldown, noSession, error }
 
@@ -135,7 +134,7 @@ class DurtmeService {
         reason: null,
       );
     } catch (e) {
-      debugPrint('❌ Dürtme gönderilemedi: $e');
+      appLog('❌ Dürtme gönderilemedi: $e');
       return (
         result: DurtmeSendResult.error,
         remaining: null,

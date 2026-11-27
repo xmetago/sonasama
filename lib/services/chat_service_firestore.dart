@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../models/chat_message_model.dart';
 import 'hive_database_service.dart';
 import 'user_session_service.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Real-time mesajlaşma için Firestore entegrasyonlu Chat Service
 /// Hive offline cache olarak kullanılır, Firestore real-time sync için
@@ -100,7 +101,7 @@ class ChatServiceFirestore {
     } catch (e) {
       // Hata durumunda sadece Hive'a kaydet (offline mode)
       await _chatMessageBox?.put(messageId, message);
-      print('⚠️ Firestore hatası, mesaj Hive\'a kaydedildi: $e');
+      appLog('⚠️ Firestore hatası, mesaj Hive\'a kaydedildi: $e');
     }
 
     return message;
@@ -123,7 +124,7 @@ class ChatServiceFirestore {
         'participants': [message.senderId, message.receiverId],
       }, SetOptions(merge: true));
     } catch (e) {
-      print('⚠️ Konuşma güncellenirken hata: $e');
+      appLog('⚠️ Konuşma güncellenirken hata: $e');
     }
   }
 
@@ -140,11 +141,14 @@ class ChatServiceFirestore {
       final snapshot = await _firestore
           .collection(_messagesCollection)
           .where('conversationId', isEqualTo: conversationId)
-          .orderBy('createdAt', descending: false)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
           .get();
 
       final messages = snapshot.docs
           .map((doc) => ChatMessageModel.fromJson(doc.data()))
+          .toList()
+          .reversed
           .toList();
 
       // Hive'a da kaydet (cache)
@@ -154,7 +158,7 @@ class ChatServiceFirestore {
 
       return messages;
     } catch (e) {
-      print('⚠️ Firestore\'dan mesajlar alınamadı, Hive\'dan okunuyor: $e');
+      appLog('⚠️ Firestore\'dan mesajlar alınamadı, Hive\'dan okunuyor: $e');
       // Hata durumunda Hive'dan oku
       return getMessagesFromHive(conversationId);
     }
@@ -196,7 +200,7 @@ class ChatServiceFirestore {
         await _chatMessageBox?.put(messageId, message);
       }
     } catch (e) {
-      print('⚠️ Mesaj okundu işaretlenirken hata: $e');
+      appLog('⚠️ Mesaj okundu işaretlenirken hata: $e');
     }
   }
 
@@ -226,18 +230,26 @@ class ChatServiceFirestore {
           .where('isRead', isEqualTo: false)
           .get();
 
-      final batch = _firestore.batch();
-      for (final doc in snapshot.docs) {
-        batch.update(doc.reference, {
-          'isRead': true,
-          'readAt': DateTime.now().toIso8601String(),
-        });
+      const int batchLimit = 450;
+      final docs = snapshot.docs;
+      for (var start = 0; start < docs.length; start += batchLimit) {
+        final end = start + batchLimit < docs.length
+            ? start + batchLimit
+            : docs.length;
+        final batch = _firestore.batch();
+        final readAt = DateTime.now().toIso8601String();
+        for (var i = start; i < end; i++) {
+          batch.update(docs[i].reference, {
+            'isRead': true,
+            'readAt': readAt,
+          });
+        }
+        await batch.commit();
       }
-      await batch.commit();
 
       await _markConversationReadInHive(conversationId, currentUser.id);
     } catch (e) {
-      print('⚠️ Konuşma okundu işaretlenirken hata: $e');
+      appLog('⚠️ Konuşma okundu işaretlenirken hata: $e');
       await _markConversationReadInHive(conversationId, currentUser.id);
     }
   }
@@ -268,11 +280,14 @@ class ChatServiceFirestore {
       return _firestore
           .collection(_messagesCollection)
           .where('conversationId', isEqualTo: conversationId)
-          .orderBy('createdAt', descending: false)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
           .snapshots()
           .map((snapshot) {
         final messages = snapshot.docs
             .map((doc) => ChatMessageModel.fromJson(doc.data()))
+            .toList()
+            .reversed
             .toList();
 
         // Hive'a cache'le
@@ -283,7 +298,7 @@ class ChatServiceFirestore {
         return messages;
       });
     } catch (e) {
-      print('⚠️ Real-time dinleme hatası, Hive stream kullanılıyor: $e');
+      appLog('⚠️ Real-time dinleme hatası, Hive stream kullanılıyor: $e');
       // Hata durumunda Hive stream'i kullan
       return _watchConversationFromHive(conversationId);
     }
@@ -344,7 +359,7 @@ class ChatServiceFirestore {
 
       return conversations;
     } catch (e) {
-      print('⚠️ Konuşmalar alınamadı: $e');
+      appLog('⚠️ Konuşmalar alınamadı: $e');
       return {};
     }
   }
@@ -366,7 +381,7 @@ class ChatServiceFirestore {
 
       return snapshot.docs.length;
     } catch (e) {
-      print('⚠️ Okunmamış mesaj sayısı alınamadı: $e');
+      appLog('⚠️ Okunmamış mesaj sayısı alınamadı: $e');
       return 0;
     }
   }
@@ -385,7 +400,7 @@ class ChatServiceFirestore {
 
       return snapshot.docs.length;
     } catch (e) {
-      print('⚠️ Toplam okunmamış mesaj sayısı alınamadı: $e');
+      appLog('⚠️ Toplam okunmamış mesaj sayısı alınamadı: $e');
       return 0;
     }
   }
@@ -396,7 +411,7 @@ class ChatServiceFirestore {
       await _firestore.collection(_messagesCollection).doc(messageId).delete();
       await _chatMessageBox?.delete(messageId);
     } catch (e) {
-      print('⚠️ Mesaj silinirken hata: $e');
+      appLog('⚠️ Mesaj silinirken hata: $e');
     }
   }
 
@@ -429,7 +444,7 @@ class ChatServiceFirestore {
         await _chatMessageBox?.delete(message.id);
       }
     } catch (e) {
-      print('⚠️ Konuşma silinirken hata: $e');
+      appLog('⚠️ Konuşma silinirken hata: $e');
     }
   }
 
@@ -452,8 +467,33 @@ class ChatServiceFirestore {
       await ref.putFile(file);
       return await ref.getDownloadURL();
     } catch (e) {
-      print('⚠️ Dosya yüklenemedi, yerel yol kullanılacak: $e');
+      appLog('⚠️ Dosya yüklenemedi, yerel yol kullanılacak: $e');
       return filePath;
+    }
+  }
+
+  /// Bu kullanıcının Hive sohbetlerindeki konuşma kimlikleri.
+  static Set<String> conversationIdsForUser(String userId) {
+    final box = _chatMessageBox;
+    if (box == null || userId.isEmpty) return <String>{};
+    return box.values
+        .where((message) =>
+            message.senderId == userId || message.receiverId == userId)
+        .map((message) => message.conversationId)
+        .toSet();
+  }
+
+  /// Bu kullanıcının gönderdiği ve aldığı yerel mesajları siler.
+  static Future<void> deleteLocalMessagesForUser(String userId) async {
+    final box = _chatMessageBox;
+    if (box == null || userId.isEmpty) return;
+    final ids = box.values
+        .where((message) =>
+            message.senderId == userId || message.receiverId == userId)
+        .map((message) => message.id)
+        .toList();
+    for (final id in ids) {
+      await box.delete(id);
     }
   }
 }

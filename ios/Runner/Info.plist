@@ -45,13 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<!-- Bildirimler için gerekli izinler -->
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
-	<!-- Ses kaydı için gerekli izinler - sesli mesaj özelliği -->
+	<key>NSCameraUsageDescription</key>
+	<string>Dava delili, albüm ve profil fotoğrafı çekmek için kamera kullanılır.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Dava delili, albüm ve profil fotoğrafı seçmek için fotoğraf arşivine erişilir.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Bu uygulama sesli mesaj göndermek için mikrofon erişimine ihtiyaç duyar.</string>
+	<string>Sesli mesaj göndermek için mikrofon kullanılır.</string>
 </dict>
 </plist>

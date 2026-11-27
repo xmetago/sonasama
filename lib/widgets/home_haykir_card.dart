@@ -13,6 +13,7 @@ import '../utils/haykir_duration.dart';
 import 'expandable_comment_text.dart';
 import 'haykir_card_shell.dart';
 import 'shared/app_snack.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class HaykirCardWidget extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -59,7 +60,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
     _hourglassController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
-    )..repeat();
+    );
 
     // ✅ Açılma/kapanma animasyonu için controller
     _expandController = AnimationController(
@@ -71,7 +72,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
     _groupIconController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000), // Daha hızlı yanıp sönme
-    )..repeat(reverse: true);
+    );
   }
 
   @override
@@ -82,6 +83,27 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
     _groupIconController
         ?.dispose(); // ✅ Dispose (nullable check - hot reload için)
     super.dispose();
+  }
+
+  void _setLoop(AnimationController controller, bool active, {bool reverse = false}) {
+    if (active) {
+      if (!controller.isAnimating) {
+        controller.repeat(reverse: reverse);
+      }
+    } else if (controller.isAnimating) {
+      controller.stop();
+    }
+  }
+
+  void _syncCardMotion({
+    required bool hourglassActive,
+    required bool groupJoinActive,
+  }) {
+    _setLoop(_hourglassController, hourglassActive);
+    final group = _groupIconController;
+    if (group != null) {
+      _setLoop(group, groupJoinActive, reverse: true);
+    }
   }
 
   Map<String, dynamic> _copyPostWithPayloadUpdates(
@@ -666,6 +688,10 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
 
     // ✅ Grup ikonu pasif mi? (19 gün geçmişse veya kullanıcı zaten katılmışsa)
     final bool isGroupIconDisabled = isExpired || isParticipated;
+    _syncCardMotion(
+      hourglassActive: createdAt.isNotEmpty && !isExpired,
+      groupJoinActive: !isGroupIconDisabled,
+    );
 
     final haykirData = HiveDatabaseService.getHaykir(haykirId);
     final scoringApplied = haykirData?['scoringApplied'] == 'true' ||
@@ -837,7 +863,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
             ),);
       }
     } catch (e) {
-      print('❌ Haykıra katılma hatası: $e');
+      appLog('❌ Haykıra katılma hatası: $e');
       if (mounted) {
         showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }
@@ -1110,7 +1136,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
         };
         await davaProvider.addHomeFeedPost(haykirPostData);
       } catch (e) {
-        print('⚠️ Retweet seyir defterine eklenirken hata: $e');
+        appLog('⚠️ Retweet seyir defterine eklenirken hata: $e');
       }
 
       // ✅ Adım 3: Seçeneğe göre işlem yap
@@ -1158,7 +1184,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
         };
         HiveDatabaseService.addInvitation(
             widget.userEmail!, currentUserInvitation);
-        print('✅ Kendine davet gönderildi: ${widget.userEmail}');
+        appLog('✅ Kendine davet gönderildi: ${widget.userEmail}');
 
         // ✅ Haykır başlatan kişiyi bul (authorEmail veya userEmail)
         final authorEmail = widget.post['authorEmail']?.toString() ??
@@ -1166,15 +1192,15 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
             haykirData['userEmail']?.toString() ??
             '';
 
-        print('🔍 DEBUG: Haykır başlatan kişi bulunuyor...');
-        print(
+        appLog('🔍 DEBUG: Haykır başlatan kişi bulunuyor...');
+        appLog(
             '🔍 DEBUG: widget.post[\'authorEmail\']: ${widget.post['authorEmail']}');
-        print(
+        appLog(
             '🔍 DEBUG: widget.payload[\'userEmail\']: ${widget.payload['userEmail']}');
-        print(
+        appLog(
             '🔍 DEBUG: haykirData[\'userEmail\']: ${haykirData['userEmail']}');
-        print('🔍 DEBUG: Bulunan authorEmail: $authorEmail');
-        print(
+        appLog('🔍 DEBUG: Bulunan authorEmail: $authorEmail');
+        appLog(
             '🔍 DEBUG: Davet gönderen kişi (widget.userEmail): ${widget.userEmail}');
 
         // ✅ Haykır başlatan kişi varsa ve davet gönderen kişiden farklıysa, ona da davet gönder
@@ -1184,7 +1210,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
           // Haykır başlatan kişi zaten Grup19 listesinde mi kontrol et (sadece bilgi için)
           authorAlreadyInList =
               invitationRecipients.any((r) => r.email == authorEmail);
-          print(
+          appLog(
               '🔍 DEBUG: Haykır başlatan kişi Grup19 listesinde mi? $authorAlreadyInList');
 
           // ✅ Haykır başlatan kişiye her zaman davet gönder (Grup19 listesinde olsa bile)
@@ -1224,13 +1250,13 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
 
           // ✅ Haykır başlatan kişiye davet gönder
           HiveDatabaseService.addInvitation(authorEmail, authorInvitation);
-          print(
+          appLog(
               '✅ Haykır başlatan kişiye davet gönderildi: $authorEmail (Grup19 listesinde: $authorAlreadyInList)');
         } else {
           if (authorEmail.isEmpty) {
-            print('⚠️ Haykır başlatan kişi bulunamadı!');
+            appLog('⚠️ Haykır başlatan kişi bulunamadı!');
           } else if (authorEmail == widget.userEmail) {
-            print(
+            appLog(
                 'ℹ️ Haykır başlatan kişi davet gönderen kişi ile aynı, davet gönderilmedi.');
           }
         }
@@ -1283,7 +1309,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
                     !authorAlreadyInList
                 ? 1
                 : 0);
-        print(
+        appLog(
             '✅ Haykır retweet: Grup19 için ${invitationRecipients.length} kişiye + haykır başlatan kişiye davet gönderildi (Toplam: $totalInvitations)');
 
         // ✅ Grup-19 ile retweet yapıldığında kalıcı hale getir (geri alınamaz)
@@ -1294,11 +1320,11 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
             grup19Retweets.add(widget.userEmail!);
             haykirData['grup19Retweets'] = grup19Retweets;
             await HiveDatabaseService.updateHaykir(haykirId, haykirData);
-            print(
+            appLog(
                 '✅ Grup-19 retweet kalıcı olarak işaretlendi: ${widget.userEmail}');
           }
         } catch (e) {
-          print('⚠️ Grup-19 retweet kalıcı işaretleme hatası: $e');
+          appLog('⚠️ Grup-19 retweet kalıcı işaretleme hatası: $e');
         }
 
         if (mounted) {
@@ -1315,10 +1341,10 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
             retweetDisabledUsers.add(widget.userEmail!);
             haykirData['retweetDisabledUsers'] = retweetDisabledUsers;
             await HiveDatabaseService.updateHaykir(haykirId, haykirData);
-            print('✅ Retweet devre dışı bırakıldı: ${widget.userEmail}');
+            appLog('✅ Retweet devre dışı bırakıldı: ${widget.userEmail}');
           }
         } catch (e) {
-          print('⚠️ Retweet devre dışı bırakma hatası: $e');
+          appLog('⚠️ Retweet devre dışı bırakma hatası: $e');
         }
 
         if (mounted) {
@@ -1337,7 +1363,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
       });
       _refreshInteractionUi(haykirId: haykirId);
     } catch (e) {
-      print('❌ Retweet hatası: $e');
+      appLog('❌ Retweet hatası: $e');
       if (mounted) {
         showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }
@@ -1380,11 +1406,11 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
 
         if (retweetPost.isNotEmpty && retweetPost['id'] != null) {
           await widget.davaProvider.removeHomeFeedPost(retweetPost['id']);
-          print(
+          appLog(
               '✅ Retweet post seyir defterinden kaldırıldı: ${retweetPost['id']}');
         }
       } catch (e) {
-        print('⚠️ Retweet post kaldırılırken hata: $e');
+        appLog('⚠️ Retweet post kaldırılırken hata: $e');
       }
 
       // ✅ Adım 3: Post'u güncelle
@@ -1402,7 +1428,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
         showAppSnack(context, '✅ Retweet geri alındı', backgroundColor: Colors.orange, duration: Duration(seconds: 2));
       }
     } catch (e) {
-      print('❌ Retweet geri alma hatası: $e');
+      appLog('❌ Retweet geri alma hatası: $e');
       if (mounted) {
         showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }
@@ -1433,7 +1459,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
           haykirData['userEmail']?.toString();
 
       if (authorEmail == null || authorEmail.isEmpty) {
-        print('⚠️ Haykır başlatan kişi bulunamadı: $haykirId');
+        appLog('⚠️ Haykır başlatan kişi bulunamadı: $haykirId');
         return;
       }
 
@@ -1449,7 +1475,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
           isSuccess = true;
           await _addUserPoints(
               authorEmail, 19, 'Haykır başarılı (DESTEK > KINAma)');
-          print(
+          appLog(
               '✅ Haykır başarılı: $authorEmail +19 puan aldı (DESTEK: $destek, KINAma: $kinaMa)');
         } else {
           // ✅ DESTEK >= 6.859 AMA DESTEK < KINAma → Haykır LİDERi -19 puan
@@ -1457,13 +1483,13 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
           isSuccess = false;
           await _addUserPoints(
               authorEmail, -19, 'Haykır başarısız (DESTEK < KINAma)');
-          print(
+          appLog(
               '❌ Haykır başarısız: $authorEmail -19 puan aldı (DESTEK: $destek, KINAma: $kinaMa)');
         }
       } else {
         // ✅ DESTEK < minDestek durumunda da başarısız olarak işaretle (badge görünsün)
         isSuccess = false;
-        print('❌ Haykır başarısız: DESTEK ($destek) < minDestek ($minDestek)');
+        appLog('❌ Haykır başarısız: DESTEK ($destek) < minDestek ($minDestek)');
       }
 
       // Puanlama yapıldığını işaretle ve başarı durumunu kaydet
@@ -1476,7 +1502,7 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
             isSuccess.toString(), // ✅ Başarı durumu: 'true' veya 'false'
       });
     } catch (e) {
-      print('❌ Haykır puanlama kontrolü hatası: $e');
+      appLog('❌ Haykır puanlama kontrolü hatası: $e');
     }
   }
 
@@ -1517,10 +1543,10 @@ class _HaykirCardWidgetState extends State<HaykirCardWidget>
         'lastUpdated': DateTime.now().toIso8601String(),
       });
 
-      print(
+      appLog(
           '✅ Kullanıcı puanı güncellendi: $userEmail -> $newPoints (${points > 0 ? '+' : ''}$points)');
     } catch (e) {
-      print('❌ Kullanıcı puanı eklenirken hata: $e');
+      appLog('❌ Kullanıcı puanı eklenirken hata: $e');
     }
   }
 

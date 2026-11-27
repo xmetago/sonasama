@@ -101,7 +101,7 @@ class TermsConditionsPage extends StatelessWidget {
                   ),
                 ),
                 TextSpan(
-                  text: 'Koşulların ihlali halinde hesabınız askıya alınabilir veya silinebilir. Bu durum size bildirilmek zorunda değildir.\n\nHesabınızı istediğiniz zaman silebilirsiniz.\n\n',
+                  text: 'Koşulların ihlali halinde hesabınız askıya alınabilir veya silinebilir. Bu durum size bildirilmek zorunda değildir.\n\nHesabınızı istediğiniz zaman Hesap ve Gizlilik ayarlarındaki "Hesabımı sil" ile silebilirsiniz. Silme; kaydınızı, davalarınızı, delillerinizi, mesajlarınızı, arkadaşlıklarınızı ve tercihlerinizi kaldırır.\n\n',
                 ),
                 TextSpan(
                   text: '7. Hukuki Sınırlamalar ve Sorumluluk Reddi\n',

@@ -372,7 +372,7 @@ class _ModernDavaCardState extends State<ModernDavaCard> {
           },
         );
       },
-    );
+    ).whenComplete(commentController.dispose);
   }
 
   Widget _buildActionButton({

@@ -1,9 +1,9 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
+import 'package:its19/utils/app_logger.dart';
 
 /// Yerel bildirim servisi
 /// Uygulama içi ve arka plan bildirimlerini yönetir
@@ -23,7 +23,7 @@ class LocalNotificationService {
   /// Android ve iOS için gerekli yapılandırmaları yapar
   static Future<void> initialize() async {
     if (_isInitialized) {
-      debugPrint('⚠️ LocalNotificationService zaten başlatılmış');
+      appLog('⚠️ LocalNotificationService zaten başlatılmış');
       return;
     }
 
@@ -56,7 +56,7 @@ class LocalNotificationService {
 
       if (initialized == true) {
         _isInitialized = true;
-        debugPrint('✅ LocalNotificationService başlatıldı');
+        appLog('✅ LocalNotificationService başlatıldı');
 
         // Android için bildirim kanalları oluştur
         await _createNotificationChannels();
@@ -64,10 +64,10 @@ class LocalNotificationService {
         // Bildirim veritabanını başlat
         await _initializeNotificationDatabase();
       } else {
-        debugPrint('❌ LocalNotificationService başlatılamadı');
+        appLog('❌ LocalNotificationService başlatılamadı');
       }
     } catch (e) {
-      debugPrint('❌ LocalNotificationService başlatılırken hata: $e');
+      appLog('❌ LocalNotificationService başlatılırken hata: $e');
     }
   }
 
@@ -119,7 +119,7 @@ class LocalNotificationService {
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(androidChannelUyari);
 
-    debugPrint('✅ Bildirim kanalları oluşturuldu');
+    appLog('✅ Bildirim kanalları oluşturuldu');
   }
 
   /// Bildirim veritabanını başlat
@@ -128,15 +128,15 @@ class LocalNotificationService {
     try {
       // Hive box'ı aç veya oluştur
       _notificationBox = await Hive.openBox('notifications');
-      debugPrint('✅ Bildirim veritabanı başlatıldı');
+      appLog('✅ Bildirim veritabanı başlatıldı');
     } catch (e) {
-      debugPrint('❌ Bildirim veritabanı başlatılırken hata: $e');
+      appLog('❌ Bildirim veritabanı başlatılırken hata: $e');
     }
   }
 
   /// Bildirim tıklandığında çağrılır
   static void _onNotificationTapped(NotificationResponse response) {
-    debugPrint('📱 Bildirim tıklandı: ${response.id} - ${response.payload}');
+    appLog('📱 Bildirim tıklandı: ${response.id} - ${response.payload}');
     // Burada bildirime tıklandığında yapılacak işlemler yapılabilir
     // Örneğin: Belirli bir sayfaya yönlendirme
   }
@@ -154,7 +154,7 @@ class LocalNotificationService {
     int? notificationId,
   }) async {
     if (!_isInitialized) {
-      debugPrint('⚠️ LocalNotificationService başlatılmamış');
+      appLog('⚠️ LocalNotificationService başlatılmamış');
       await initialize();
     }
 
@@ -207,9 +207,9 @@ class LocalNotificationService {
         timestamp: DateTime.now(),
       );
 
-      debugPrint('✅ Bildirim gösterildi: $title');
+      appLog('✅ Bildirim gösterildi: $title');
     } catch (e) {
-      debugPrint('❌ Bildirim gösterilirken hata: $e');
+      appLog('❌ Bildirim gösterilirken hata: $e');
     }
   }
 
@@ -257,7 +257,7 @@ class LocalNotificationService {
     int? notificationId,
   }) async {
     if (!_isInitialized) {
-      debugPrint('⚠️ LocalNotificationService başlatılmamış');
+      appLog('⚠️ LocalNotificationService başlatılmamış');
       await initialize();
     }
 
@@ -310,9 +310,9 @@ class LocalNotificationService {
         isScheduled: true,
       );
 
-      debugPrint('✅ Zamanlanmış bildirim ayarlandı: $title - $scheduledDate');
+      appLog('✅ Zamanlanmış bildirim ayarlandı: $title - $scheduledDate');
     } catch (e) {
-      debugPrint('❌ Zamanlanmış bildirim ayarlanırken hata: $e');
+      appLog('❌ Zamanlanmış bildirim ayarlanırken hata: $e');
     }
   }
 
@@ -346,9 +346,9 @@ class LocalNotificationService {
 
       // Bildirimi kaydet
       await _notificationBox?.put('notification_$id', notificationData);
-      debugPrint('✅ Bildirim veritabanına kaydedildi: $id');
+      appLog('✅ Bildirim veritabanına kaydedildi: $id');
     } catch (e) {
-      debugPrint('❌ Bildirim veritabanına kaydedilirken hata: $e');
+      appLog('❌ Bildirim veritabanına kaydedilirken hata: $e');
     }
   }
 
@@ -393,7 +393,7 @@ class LocalNotificationService {
 
       return notifications;
     } catch (e) {
-      debugPrint('❌ Bildirimler getirilirken hata: $e');
+      appLog('❌ Bildirimler getirilirken hata: $e');
       return [];
     }
   }
@@ -412,10 +412,10 @@ class LocalNotificationService {
         final updatedNotification = Map<String, dynamic>.from(notification);
         updatedNotification['isRead'] = true;
         await _notificationBox?.put(key, updatedNotification);
-        debugPrint('✅ Bildirim okundu olarak işaretlendi: $notificationId');
+        appLog('✅ Bildirim okundu olarak işaretlendi: $notificationId');
       }
     } catch (e) {
-      debugPrint('❌ Bildirim okundu olarak işaretlenirken hata: $e');
+      appLog('❌ Bildirim okundu olarak işaretlenirken hata: $e');
     }
   }
 
@@ -428,9 +428,9 @@ class LocalNotificationService {
 
       await _notificationStore()?.delete('notification_$notificationId');
       await _notifications.cancel(notificationId);
-      debugPrint('✅ Bildirim silindi: $notificationId');
+      appLog('✅ Bildirim silindi: $notificationId');
     } catch (e) {
-      debugPrint('❌ Bildirim silinirken hata: $e');
+      appLog('❌ Bildirim silinirken hata: $e');
     }
   }
 
@@ -449,9 +449,9 @@ class LocalNotificationService {
       }
 
       await _notifications.cancelAll();
-      debugPrint('✅ Tüm bildirimler silindi');
+      appLog('✅ Tüm bildirimler silindi');
     } catch (e) {
-      debugPrint('❌ Tüm bildirimler silinirken hata: $e');
+      appLog('❌ Tüm bildirimler silinirken hata: $e');
     }
   }
 
@@ -460,9 +460,9 @@ class LocalNotificationService {
     try {
       await _notifications.cancel(notificationId);
       await deleteNotification(notificationId);
-      debugPrint('✅ Zamanlanmış bildirim iptal edildi: $notificationId');
+      appLog('✅ Zamanlanmış bildirim iptal edildi: $notificationId');
     } catch (e) {
-      debugPrint('❌ Zamanlanmış bildirim iptal edilirken hata: $e');
+      appLog('❌ Zamanlanmış bildirim iptal edilirken hata: $e');
     }
   }
 

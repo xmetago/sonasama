@@ -25,6 +25,8 @@ import 'package:its19/utils/country_picker_extension.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:its19/screens/tutorial_case_page.dart';
 import 'package:its19/screens/gunun_haykirisi_page.dart';
+import 'package:its19/utils/debug_seed_gate.dart';
+import 'package:its19/utils/app_logger.dart';
 
 void main() async {
   // Flutter binding'i başlat (dosya sistemi ve async işlemler için gerekli)
@@ -33,18 +35,14 @@ void main() async {
   // Firebase'i başlat (opsiyonel - Firebase yapılandırması yoksa hata vermez)
   try {
     await Firebase.initializeApp();
-    print('✅ Firebase başlatıldı');
+    appLog('✅ Firebase başlatıldı');
   } catch (e) {
-    print('⚠️ Firebase başlatılamadı (opsiyonel): $e');
-    print('💡 Firebase kullanmak için firebase_options.dart dosyası gerekli');
+    appLog('⚠️ Firebase başlatılamadı (opsiyonel): $e');
+    appLog('💡 Firebase kullanmak için firebase_options.dart dosyası gerekli');
   }
   
   // Hive veritabanını başlat
   await HiveDatabaseService.initialize();
-  
-  // Açılmış tüm davaları sil
-  HiveDatabaseService.clearOpenedDavalar();
-  print('✅ Tüm açılmış davalar silindi!');
   
   // FriendCategoryService'i başlat
   await FriendCategoryService.initialize();
@@ -72,16 +70,19 @@ void main() async {
     ),
   );
   
-  // Test kullanıcılarını arka planda ekle (UI bloklanmasın)
-  _initializeTestDataInBackground();
+  // Test kullanıcılarını arka planda ekle (yalnızca debug derlemesi)
+  if (shouldSeedDebugData()) {
+    _initializeTestDataInBackground();
+  }
 }
 
 /// Test verilerini arka planda yükler
 /// UI thread'i bloklamadan test kullanıcıları ve ayarları oluşturur
 /// İşlemleri küçük parçalara bölerek UI thread'ine nefes alma fırsatı verir
 Future<void> _initializeTestDataInBackground() async {
+  if (!shouldSeedDebugData()) return;
   try {
-    print('📦 Arka planda test verileri yükleniyor...');
+    appLog('📦 Arka planda test verileri yükleniyor...');
     
     // UI thread'ine nefes alma fırsatı ver
     await Future.delayed(const Duration(milliseconds: 100));
@@ -110,15 +111,16 @@ Future<void> _initializeTestDataInBackground() async {
       );
     }
     
-    print('✅ Test verileri başarıyla yüklendi!');
+    appLog('✅ Test verileri başarıyla yüklendi!');
   } catch (e) {
-    print('❌ Test verileri yüklenirken hata: $e');
+    appLog('❌ Test verileri yüklenirken hata: $e');
   }
 }
 
 /// Test kullanıcılarını veritabanına ekler
 /// Admin ve normal kullanıcı örnekleri oluşturur
 Future<void> _addTestUsers() async {
+  if (!shouldSeedDebugData()) return;
   try {
     // Admin kullanıcısı
     final adminUser = RegistrationModel(
@@ -244,7 +246,7 @@ Future<void> _addTestUsers() async {
     final existingAdmin = HiveDatabaseService.getRegistrationByEmail(adminUser.email);
     if (existingAdmin == null) {
       await HiveDatabaseService.addRegistration(adminUser);
-      print('Admin kullanıcısı eklendi: ${adminUser.email}');
+      appLog('Admin kullanıcısı eklendi: ${adminUser.email}');
     } else {
       // Mevcut admin kullanıcısını güncelle
       final updatedAdmin = existingAdmin.copyWith(
@@ -254,15 +256,15 @@ Future<void> _addTestUsers() async {
         loginAttempts: 0,
       );
       await HiveDatabaseService.updateRegistration(updatedAdmin);
-      print('Admin kullanıcısı güncellendi: ${adminUser.email}');
-      print('Admin durumu: isActive=${updatedAdmin.isActive}, isEmailVerified=${updatedAdmin.isEmailVerified}, canLogin=${updatedAdmin.canLogin}');
+      appLog('Admin kullanıcısı güncellendi: ${adminUser.email}');
+      appLog('Admin durumu: isActive=${updatedAdmin.isActive}, isEmailVerified=${updatedAdmin.isEmailVerified}, canLogin=${updatedAdmin.canLogin}');
     }
     await Future.delayed(const Duration(milliseconds: 10));
 
     final existingUser2 = HiveDatabaseService.getRegistrationByEmail(user2.email);
     if (existingUser2 == null) {
       await HiveDatabaseService.addRegistration(user2);
-      print('Test kullanıcısı 2 eklendi: ${user2.email}');
+      appLog('Test kullanıcısı 2 eklendi: ${user2.email}');
     } else {
       // Mevcut test kullanıcısını güncelle
       final updatedUser2 = existingUser2.copyWith(
@@ -272,8 +274,8 @@ Future<void> _addTestUsers() async {
         loginAttempts: 0,
       );
       await HiveDatabaseService.updateRegistration(updatedUser2);
-      print('Test kullanıcısı 2 güncellendi: ${user2.email}');
-      print('Test kullanıcısı durumu: isActive=${updatedUser2.isActive}, isEmailVerified=${updatedUser2.isEmailVerified}, canLogin=${updatedUser2.canLogin}');
+      appLog('Test kullanıcısı 2 güncellendi: ${user2.email}');
+      appLog('Test kullanıcısı durumu: isActive=${updatedUser2.isActive}, isEmailVerified=${updatedUser2.isEmailVerified}, canLogin=${updatedUser2.canLogin}');
     }
     await Future.delayed(const Duration(milliseconds: 10));
 
@@ -281,7 +283,7 @@ Future<void> _addTestUsers() async {
     final existingCanan = HiveDatabaseService.getRegistrationByEmail(cananUser.email);
     if (existingCanan == null) {
       await HiveDatabaseService.addRegistration(cananUser);
-      print('Canan kullanıcısı eklendi: ${cananUser.email}');
+      appLog('Canan kullanıcısı eklendi: ${cananUser.email}');
     } else {
       // Mevcut Canan kullanıcısını güncelle
       final updatedCanan = existingCanan.copyWith(
@@ -291,8 +293,8 @@ Future<void> _addTestUsers() async {
         loginAttempts: 0,
       );
       await HiveDatabaseService.updateRegistration(updatedCanan);
-      print('Canan kullanıcısı güncellendi: ${cananUser.email}');
-      print('Canan kullanıcısı durumu: isActive=${updatedCanan.isActive}, isEmailVerified=${updatedCanan.isEmailVerified}, canLogin=${updatedCanan.canLogin}');
+      appLog('Canan kullanıcısı güncellendi: ${cananUser.email}');
+      appLog('Canan kullanıcısı durumu: isActive=${updatedCanan.isActive}, isEmailVerified=${updatedCanan.isEmailVerified}, canLogin=${updatedCanan.canLogin}');
     }
     await Future.delayed(const Duration(milliseconds: 10));
 
@@ -300,7 +302,7 @@ Future<void> _addTestUsers() async {
     final existingFatih = HiveDatabaseService.getRegistrationByEmail(fatihUser.email);
     if (existingFatih == null) {
       await HiveDatabaseService.addRegistration(fatihUser);
-      print('Fatih kullanıcısı eklendi: ${fatihUser.email}');
+      appLog('Fatih kullanıcısı eklendi: ${fatihUser.email}');
     } else {
       // Mevcut Fatih kullanıcısını güncelle - sıradan kullanıcı olarak
       final updatedFatih = existingFatih.copyWith(
@@ -310,7 +312,7 @@ Future<void> _addTestUsers() async {
         loginAttempts: 0,
       );
       await HiveDatabaseService.updateRegistration(updatedFatih);
-      print('Fatih kullanıcısı güncellendi: ${fatihUser.email}');
+      appLog('Fatih kullanıcısı güncellendi: ${fatihUser.email}');
     }
     await Future.delayed(const Duration(milliseconds: 10));
 
@@ -318,7 +320,7 @@ Future<void> _addTestUsers() async {
     final existingYargic1 = HiveDatabaseService.getRegistrationByEmail(yargic1.email);
     if (existingYargic1 == null) {
       await HiveDatabaseService.addRegistration(yargic1);
-      print('Test Yargıç 1 eklendi: ${yargic1.email}');
+      appLog('Test Yargıç 1 eklendi: ${yargic1.email}');
     } else {
       // Mevcut test yargıcını güncelle
       final updatedYargic1 = existingYargic1.copyWith(
@@ -328,7 +330,7 @@ Future<void> _addTestUsers() async {
         loginAttempts: 0,
       );
       await HiveDatabaseService.updateRegistration(updatedYargic1);
-      print('Test Yargıç 1 güncellendi: ${yargic1.email}');
+      appLog('Test Yargıç 1 güncellendi: ${yargic1.email}');
     }
     await Future.delayed(const Duration(milliseconds: 10));
 
@@ -336,7 +338,7 @@ Future<void> _addTestUsers() async {
     final existingYargic2 = HiveDatabaseService.getRegistrationByEmail(yargic2.email);
     if (existingYargic2 == null) {
       await HiveDatabaseService.addRegistration(yargic2);
-      print('Test Yargıç 2 eklendi: ${yargic2.email}');
+      appLog('Test Yargıç 2 eklendi: ${yargic2.email}');
     } else {
       // Mevcut test yargıcını güncelle
       final updatedYargic2 = existingYargic2.copyWith(
@@ -346,12 +348,12 @@ Future<void> _addTestUsers() async {
         loginAttempts: 0,
       );
       await HiveDatabaseService.updateRegistration(updatedYargic2);
-      print('Test Yargıç 2 güncellendi: ${yargic2.email}');
+      appLog('Test Yargıç 2 güncellendi: ${yargic2.email}');
     }
     await Future.delayed(const Duration(milliseconds: 10));
 
      // Sadece ilk 5 test yargıcını ekle (performans için)
-     print('İlk 5 test yargıcı ekleniyor...');
+     appLog('İlk 5 test yargıcı ekleniyor...');
      final testYargiclarSubset = testYargiclar.take(5).toList();
      for (int i = 0; i < testYargiclarSubset.length; i++) {
        final yargic = testYargiclarSubset[i];
@@ -359,7 +361,7 @@ Future<void> _addTestUsers() async {
        
        if (existingYargic == null) {
          await HiveDatabaseService.addRegistration(yargic);
-         print('Test Yargıç ${i + 1} eklendi: ${yargic.email} (${yargic.country})');
+         appLog('Test Yargıç ${i + 1} eklendi: ${yargic.email} (${yargic.country})');
        } else {
          // Mevcut test yargıcını güncelle
          final updatedYargic = existingYargic.copyWith(
@@ -369,24 +371,24 @@ Future<void> _addTestUsers() async {
            loginAttempts: 0,
          );
          await HiveDatabaseService.updateRegistration(updatedYargic);
-         print('Test Yargıç ${i + 1} güncellendi: ${yargic.email} (${yargic.country})');
+         appLog('Test Yargıç ${i + 1} güncellendi: ${yargic.email} (${yargic.country})');
        }
        // Her yargıç işleminden sonra UI thread'ine nefes alma fırsatı ver
        if (i < testYargiclarSubset.length - 1) {
          await Future.delayed(const Duration(milliseconds: 10));
        }
      }
-     print('${testYargiclarSubset.length} test yargıcı işlemi tamamlandı!');
+     appLog('${testYargiclarSubset.length} test yargıcı işlemi tamamlandı!');
 
     // Özel kullanıcıların admin yetkilerini kontrol et (örn. testyargic3 admin olmamalı)
     await HiveDatabaseService.setUserAdminStatus('testyargic3@gmail.com', false);
 
     // Tüm kullanıcıları listele (sadece sayı)
     final allUsers = HiveDatabaseService.getAllRegistrations();
-    print('✅ Toplam kullanıcı sayısı: ${allUsers.length}');
-    print('✅ Test kullanıcıları hazır.');
+    appLog('✅ Toplam kullanıcı sayısı: ${allUsers.length}');
+    appLog('✅ Test kullanıcıları hazır.');
   } catch (e) {
-    print('Test kullanıcıları eklenirken hata: $e');
+    appLog('Test kullanıcıları eklenirken hata: $e');
   }
 }
 
@@ -446,19 +448,18 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
   Future<void> _loadRememberedCredentials() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('remembered_password');
       final rememberedEmail = prefs.getString('remembered_email');
-      final rememberedPassword = prefs.getString('remembered_password');
       final rememberMe = prefs.getBool('remember_me') ?? false;
 
-      if (rememberMe && rememberedEmail != null && rememberedPassword != null) {
+      if (rememberMe && rememberedEmail != null && rememberedEmail.isNotEmpty) {
         setState(() {
           _rememberMe = true;
           _formData['email'] = rememberedEmail;
-          _formData['password'] = rememberedPassword;
         });
       }
     } catch (e) {
-      print('Kaydedilmiş bilgiler yüklenirken hata: $e');
+      appLog('Kaydedilmiş bilgiler yüklenirken hata: $e');
     }
   }
 
@@ -466,17 +467,16 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
   Future<void> _saveRememberedCredentials() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('remembered_password');
       if (_rememberMe) {
         await prefs.setString('remembered_email', _formData['email'] as String);
-        await prefs.setString('remembered_password', _formData['password'] as String);
         await prefs.setBool('remember_me', true);
       } else {
         await prefs.remove('remembered_email');
-        await prefs.remove('remembered_password');
         await prefs.setBool('remember_me', false);
       }
     } catch (e) {
-      print('Bilgiler kaydedilirken hata: $e');
+      appLog('Bilgiler kaydedilirken hata: $e');
     }
   }
 
@@ -932,8 +932,6 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
         final screenHeight = MediaQuery.of(context).size.height;
         // Daha fazla cihazda kaydırmasız görünüm için eşik yükseltildi
         final isCompact = screenHeight < 800;
@@ -1391,7 +1389,9 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                           const SizedBox(height: 24),
                         ],
                         // Submit Button
-                        SizedBox(
+                        Consumer<AuthProvider>(
+                          builder: (context, authProvider, _) {
+                            return SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: authProvider.isLoading ? null : _handleSubmit,
@@ -1419,6 +1419,8 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
                                     ],
                                   ),
                           ),
+                        );
+                          },
                         ),
 
                         // Forgot Password
@@ -1601,8 +1603,6 @@ class _WhoBoomLoginPageState extends State<WhoBoomLoginPage> {
           ),
         ),
       ),
-    );
-      },
     );
   }
 

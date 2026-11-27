@@ -19,6 +19,7 @@ import 'actigim_case_card.dart';
 import 'countdown_timer_widget.dart';
 import 'masraf_onay_panel.dart';
 import 'rol_hukum_kartlari_section.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class ActigimDavaCard extends StatefulWidget {
   final Dava dava;
@@ -118,15 +119,43 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
       }
       _kunyeOpenedAt = DateTime.tryParse(openedAtStr);
     } catch (e) {
-      print('⚠️ [ActigimDavaCard] Açılış tarihi okunamadı: $e');
+      appLog('⚠️ [ActigimDavaCard] Açılış tarihi okunamadı: $e');
       _kunyeOpenedAt = null;
     }
+  }
+
+  bool _motionReady = false;
+
+  void _setLoop(AnimationController? controller, bool active, {bool reverse = false}) {
+    if (controller == null) return;
+    if (active) {
+      if (!controller.isAnimating) {
+        controller.repeat(reverse: reverse);
+      }
+    } else if (controller.isAnimating) {
+      controller.stop();
+    }
+  }
+
+  void _syncAttentionAnimations() {
+    if (!_motionReady) return;
+    final cezaActive = _yargicCezaText != null &&
+        _yargicCezaText!.isNotEmpty &&
+        !_cezaOnaylandi;
+    final masrafActive = _yargicMasraflar != null &&
+        _yargicMasraflar!.isNotEmpty &&
+        !_masrafOnaylandi;
+    _setLoop(_cezaPulseController, cezaActive, reverse: true);
+    _setLoop(_cezaGlowController, cezaActive);
+    _setLoop(_masrafPulseController, masrafActive, reverse: true);
+    _setLoop(_masrafGlowController, masrafActive);
   }
 
   @override
   void setState(VoidCallback fn) {
     _refreshKunyeOpenedAt();
     super.setState(fn);
+    _syncAttentionAnimations();
   }
 
   @override
@@ -144,12 +173,13 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
       CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
     );
     _animationController.forward();
+    _motionReady = true;
     
-    // Ceza butonu için pulse animasyonu (sürekli büyüyüp küçülme)
+    // Ceza butonu için pulse animasyonu. Yalnızca onay beklerken döner.
     _cezaPulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
-    )..repeat(reverse: true);
+    );
     _cezaPulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _cezaPulseController!, curve: Curves.easeInOut),
     );
@@ -158,7 +188,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
     _cezaGlowController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
-    )..repeat();
+    );
     _cezaGlowAnimation = Tween<double>(begin: 0.3, end: 0.8).animate(
       CurvedAnimation(parent: _cezaGlowController!, curve: Curves.easeInOut),
     );
@@ -167,7 +197,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
     _masrafPulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
-    )..repeat(reverse: true);
+    );
     _masrafPulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _masrafPulseController!, curve: Curves.easeInOut),
     );
@@ -176,7 +206,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
     _masrafGlowController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
-    )..repeat();
+    );
     _masrafGlowAnimation = Tween<double>(begin: 0.3, end: 0.8).animate(
       CurvedAnimation(parent: _masrafGlowController!, curve: Curves.easeInOut),
     );
@@ -190,9 +220,9 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
         try {
           final davaProvider = Provider.of<DavaProvider>(context, listen: false);
           _lastHukumUpdateVersion = davaProvider.hukumUpdateVersion;
-          print('🔍 [ActigimDavaCard] initState: Provider versiyonu = $_lastHukumUpdateVersion');
+          appLog('🔍 [ActigimDavaCard] initState: Provider versiyonu = $_lastHukumUpdateVersion');
         } catch (e) {
-          print('⚠️ [ActigimDavaCard] initState: Provider bulunamadı: $e');
+          appLog('⚠️ [ActigimDavaCard] initState: Provider bulunamadı: $e');
         }
       }
     });
@@ -224,17 +254,17 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
     if (!mounted || _hukumProvider == null) return;
     final int currentVersion = _hukumProvider!.hukumUpdateVersion;
     if (_lastHukumUpdateVersion != currentVersion) {
-      print('🔄 [ActigimDavaCard] Provider versiyonu değişti: $_lastHukumUpdateVersion -> $currentVersion');
+      appLog('🔄 [ActigimDavaCard] Provider versiyonu değişti: $_lastHukumUpdateVersion -> $currentVersion');
     }
     if (_lastHukumUpdateVersion != currentVersion && mounted) {
       _lastHukumUpdateVersion = currentVersion;
-      print('✅ [ActigimDavaCard] Hükümler yeniden yüklenecek (versiyon: $currentVersion)');
+      appLog('✅ [ActigimDavaCard] Hükümler yeniden yüklenecek (versiyon: $currentVersion)');
       Future.microtask(() async {
         if (mounted) {
-          print('🔄 [ActigimDavaCard] Veriler yükleniyor... (versiyon: $currentVersion)');
+          appLog('🔄 [ActigimDavaCard] Veriler yükleniyor... (versiyon: $currentVersion)');
           await _loadExistingHukumler();
           await _loadYargicCezaVeMasraf();
-          print('✅ [ActigimDavaCard] Veriler yüklendi, widget rebuild olacak');
+          appLog('✅ [ActigimDavaCard] Veriler yüklendi, widget rebuild olacak');
         }
       });
     }
@@ -267,7 +297,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
     final now = DateTime.now();
     if (_lastRefreshTime != null && 
         now.difference(_lastRefreshTime!) < _refreshCooldown) {
-      print('⏭️ [ActigimDavaCard] Refresh cooldown aktif, atlanıyor');
+      appLog('⏭️ [ActigimDavaCard] Refresh cooldown aktif, atlanıyor');
       return;
     }
     
@@ -296,10 +326,10 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
       final DateTime? openedAt = _kunyeOpenedAt;
 
       // Debug: Konsensus yükleme bilgilerini yazdır
-      print('🔍 [ActigimDavaCard] Konsensus yükleniyor...');
-      print('   - Dava ID: ${widget.dava.id}');
-      print('   - OpenedAt: $openedAt');
-      print('   - Parsed DateTime: $openedAt');
+      appLog('🔍 [ActigimDavaCard] Konsensus yükleniyor...');
+      appLog('   - Dava ID: ${widget.dava.id}');
+      appLog('   - OpenedAt: $openedAt');
+      appLog('   - Parsed DateTime: $openedAt');
 
       final evaluation = await DavaConsensusService.evaluateConsensus(
         davaId: widget.dava.id,
@@ -307,12 +337,12 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
       );
 
       // Debug: Konsensus sonuçlarını yazdır
-      print('✅ [ActigimDavaCard] Konsensus yüklendi:');
-      print('   - Olumlu: ${evaluation.positiveCount}');
-      print('   - Olumsuz: ${evaluation.negativeCount}');
-      print('   - Toplam: ${evaluation.totalVotes}');
-      print('   - Karar: ${evaluation.verdictLabel}');
-      print('   - Kalan Süre: ${evaluation.remainingLabel ?? "Süre doldu"}');
+      appLog('✅ [ActigimDavaCard] Konsensus yüklendi:');
+      appLog('   - Olumlu: ${evaluation.positiveCount}');
+      appLog('   - Olumsuz: ${evaluation.negativeCount}');
+      appLog('   - Toplam: ${evaluation.totalVotes}');
+      appLog('   - Karar: ${evaluation.verdictLabel}');
+      appLog('   - Kalan Süre: ${evaluation.remainingLabel ?? "Süre doldu"}');
 
       if (mounted) {
         setState(() {
@@ -321,7 +351,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
         });
       }
     } catch (e) {
-      print('❌ [ActigimDavaCard] Konsensus yüklenirken hata: $e');
+      appLog('❌ [ActigimDavaCard] Konsensus yüklenirken hata: $e');
       if (mounted) {
         setState(() {
           _isLoadingConsensus = false;
@@ -464,7 +494,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
       // 72 saat geçmişse UZLAŞMA göster
       return elapsed >= seventyTwoHours;
     } catch (e) {
-      print('⚠️ [ActigimDavaCard] UZLAŞMA kontrolü sırasında hata: $e');
+      appLog('⚠️ [ActigimDavaCard] UZLAŞMA kontrolü sırasında hata: $e');
       return false;
     }
   }
@@ -1168,15 +1198,15 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
     final String? hid =
         widget.dava.adi.isNotEmpty ? 'dava_${widget.dava.adi.hashCode}' : null;
     if (pid.isEmpty && (hid == null || hid.isEmpty)) {
-      print('❌ [ActigimDavaCard] Dava ID ve dava adı yok, hüküm yüklenemiyor!');
+      appLog('❌ [ActigimDavaCard] Dava ID ve dava adı yok, hüküm yüklenemiyor!');
       return;
     }
 
-    print('🔍 [ActigimDavaCard] ========== HÜKÜMLER YÜKLENİYOR ==========');
-    print('   - Dava ID: "${widget.dava.id}"');
-    print('   - Dava Adı: "${widget.dava.adi}"');
-    print('   - Mevcut versiyon: $_lastHukumUpdateVersion');
-    print('   - Alternatif ID (hash): "dava_${widget.dava.adi.hashCode}"');
+    appLog('🔍 [ActigimDavaCard] ========== HÜKÜMLER YÜKLENİYOR ==========');
+    appLog('   - Dava ID: "${widget.dava.id}"');
+    appLog('   - Dava Adı: "${widget.dava.adi}"');
+    appLog('   - Mevcut versiyon: $_lastHukumUpdateVersion');
+    appLog('   - Alternatif ID (hash): "dava_${widget.dava.adi.hashCode}"');
 
     try {
       final davaProvider = Provider.of<DavaProvider>(context, listen: false);
@@ -1211,17 +1241,17 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
           _mergeHukumlerGroupedMaps(idChunks);
 
       if (!mounted) {
-        print('⚠️ [ActigimDavaCard] Widget unmounted, yükleme iptal edildi');
+        appLog('⚠️ [ActigimDavaCard] Widget unmounted, yükleme iptal edildi');
         return;
       }
 
       // Debug: Veritabanından gelen verileri yazdır
-      print('🔍 [ActigimDavaCard] Veritabanından gelen hükümler (${existing.length} adet):');
+      appLog('🔍 [ActigimDavaCard] Veritabanından gelen hükümler (${existing.length} adet):');
       if (existing.isEmpty) {
-        print('   ⚠️ Hiç hüküm bulunamadı!');
-        print('   💡 Kontrol edilmesi gerekenler:');
-        print('      - Dava ID doğru mu? "${widget.dava.id}"');
-        print('      - Hüküm kaydedilirken hangi ID kullanıldı?');
+        appLog('   ⚠️ Hiç hüküm bulunamadı!');
+        appLog('   💡 Kontrol edilmesi gerekenler:');
+        appLog('      - Dava ID doğru mu? "${widget.dava.id}"');
+        appLog('      - Hüküm kaydedilirken hangi ID kullanıldı?');
         
         // Eğer gerçek ID ile bulunamadıysa, dava adının hash'ini kullanarak ara
         if (existing.isEmpty && widget.dava.adi.isNotEmpty) {
@@ -1234,10 +1264,10 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
             final davaAdiHashWithoutComma = widget.dava.adi.replaceAll(',', '').trim().hashCode;
             final davaAdiHashClean = widget.dava.adi.replaceAll(RegExp(r'[^\w\s]'), '').trim().hashCode;
             
-            print('   🔍 Dava adı hash\'leri:');
-            print('      - Orijinal: $davaAdiHash');
-            print('      - Virgülsüz: $davaAdiHashWithoutComma');
-            print('      - Temizlenmiş: $davaAdiHashClean');
+            appLog('   🔍 Dava adı hash\'leri:');
+            appLog('      - Orijinal: $davaAdiHash');
+            appLog('      - Virgülsüz: $davaAdiHashWithoutComma');
+            appLog('      - Temizlenmiş: $davaAdiHashClean');
             
             // Key'lerden dava ID'sini çıkar ve hash'leri karşılaştır
             String? matchedDavaId;
@@ -1256,7 +1286,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
                       (hash == davaAdiHash || 
                        hash == davaAdiHashWithoutComma || 
                        hash == davaAdiHashClean)) {
-                    print('   ✅ Hash eşleşmesi bulundu! Key: "$key", Dava ID: "$extractedDavaId"');
+                    appLog('   ✅ Hash eşleşmesi bulundu! Key: "$key", Dava ID: "$extractedDavaId"');
                     matchedDavaId = extractedDavaId;
                     break;
                   }
@@ -1268,7 +1298,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
             if (matchedDavaId != null) {
               final testResult = await HiveDatabaseService.getHukumlerByDavaIdGrouped(matchedDavaId);
               if (testResult.isNotEmpty) {
-                print('   ✅ "$matchedDavaId" ile ${testResult.length} hüküm bulundu!');
+                appLog('   ✅ "$matchedDavaId" ile ${testResult.length} hüküm bulundu!');
                 existing = testResult;
               }
             }
@@ -1284,19 +1314,19 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
                 if (widget.dava.adi.isNotEmpty) 'dava_${widget.dava.adi.replaceAll(RegExp(r'[^\w\s]'), '').trim().hashCode}',
               ];
               
-              print('   🔍 Olası ID formatları deneniyor:');
+              appLog('   🔍 Olası ID formatları deneniyor:');
               for (final possibleId in possibleIds) {
                 if (possibleId.isEmpty) continue;
                 final testResult = await HiveDatabaseService.getHukumlerByDavaIdGrouped(possibleId);
                 if (testResult.isNotEmpty) {
-                  print('   ✅ "$possibleId" ile ${testResult.length} hüküm bulundu!');
+                  appLog('   ✅ "$possibleId" ile ${testResult.length} hüküm bulundu!');
                   existing = testResult;
                   break;
                 }
               }
             }
           } catch (e) {
-            print('   ❌ Hash eşleştirme sırasında hata: $e');
+            appLog('   ❌ Hash eşleştirme sırasında hata: $e');
           }
         }
       }
@@ -1307,16 +1337,16 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
 
       if (existing.isNotEmpty) {
         for (final entry in existing.entries) {
-          print('   - Key: "${entry.key}"');
+          appLog('   - Key: "${entry.key}"');
           final hukumTextStr = entry.value['hukumText']?.toString() ?? '';
           final preview = hukumTextStr.length > 50 ? hukumTextStr.substring(0, 50) : hukumTextStr;
-          print('   - Hüküm: $preview...');
-          print('   - UserEmail: ${entry.value['userEmail']}');
-          print('   - CreatedAt: ${entry.value['createdAt']}');
+          appLog('   - Hüküm: $preview...');
+          appLog('   - UserEmail: ${entry.value['userEmail']}');
+          appLog('   - CreatedAt: ${entry.value['createdAt']}');
         }
       }
 
-      print('✅ [ActigimDavaCard] ${existing.length} hüküm bulundu, setState() çağrılıyor...');
+      appLog('✅ [ActigimDavaCard] ${existing.length} hüküm bulundu, setState() çağrılıyor...');
 
       final String cezaPrimaryId = pid.isNotEmpty ? pid : (hid ?? '');
       final Map<String, String> cezalarByEmail = cezaPrimaryId.isNotEmpty
@@ -1352,27 +1382,27 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
           // Key zaten normalize edilmiş (modern_hukum_card.dart'ta normalize edilmiş olarak kaydediliyor)
           // Ama yine de normalize edelim ki tutarlı olsun (eğer eski veriler varsa)
           final String normalizedKey = normalizeRolKarari(entry.key);
-          print('   ✅ Key: "${entry.key}" -> Normalize: "$normalizedKey"');
-          print('   🔍 [ActigimDavaCard] Hüküm yükleniyor: "$normalizedKey" = "${entry.value['hukumText'].toString().substring(0, entry.value['hukumText'].toString().length > 30 ? 30 : entry.value['hukumText'].toString().length)}..."');
+          appLog('   ✅ Key: "${entry.key}" -> Normalize: "$normalizedKey"');
+          appLog('   🔍 [ActigimDavaCard] Hüküm yükleniyor: "$normalizedKey" = "${entry.value['hukumText'].toString().substring(0, entry.value['hukumText'].toString().length > 30 ? 30 : entry.value['hukumText'].toString().length)}..."');
           return MapEntry(
             normalizedKey,
             entry.value['hukumText'].toString(),
           );
         }));
         
-        print('🔍 [ActigimDavaCard] Yüklenen hüküm sayısı: ${_rolHukumleri.length}');
-        print('🔍 [ActigimDavaCard] Hüküm key\'leri: ${_rolHukumleri.keys.toList()}');
+        appLog('🔍 [ActigimDavaCard] Yüklenen hüküm sayısı: ${_rolHukumleri.length}');
+        appLog('🔍 [ActigimDavaCard] Hüküm key\'leri: ${_rolHukumleri.keys.toList()}');
 
         // Debug: Normalize edilmiş map'i yazdır
-        print('🔍 [ActigimDavaCard] Normalize edilmiş hükümler:');
+        appLog('🔍 [ActigimDavaCard] Normalize edilmiş hükümler:');
         for (final entry in _rolHukumleri.entries) {
-          print('   - Key: "${entry.key}"');
-          print('   - Hüküm: ${entry.value.substring(0, entry.value.length > 50 ? 50 : entry.value.length)}...');
+          appLog('   - Key: "${entry.key}"');
+          appLog('   - Hüküm: ${entry.value.substring(0, entry.value.length > 50 ? 50 : entry.value.length)}...');
         }
 
         // Sentiment'leri yükle (normalize edilmiş key'ler ile)
         _rolSentimentleri.clear();
-        print('🔍 [ActigimDavaCard] Sentimentler yükleniyor...');
+        appLog('🔍 [ActigimDavaCard] Sentimentler yükleniyor...');
         for (final entry in existing.entries) {
           final String? sentimentValue = entry.value['hukumSentiment'] as String?;
           final HukumSentiment? sentiment = hukumSentimentFromStorage(sentimentValue);
@@ -1382,12 +1412,12 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
           
           if (sentiment != null) {
             _rolSentimentleri[normalizedKey] = sentiment;
-            print('   ✅ Sentiment yüklendi: "$normalizedKey" -> ${sentiment.storageValue}');
+            appLog('   ✅ Sentiment yüklendi: "$normalizedKey" -> ${sentiment.storageValue}');
           } else {
-            print('   ⚠️ Sentiment bulunamadı: "$normalizedKey" (value: $sentimentValue)');
+            appLog('   ⚠️ Sentiment bulunamadı: "$normalizedKey" (value: $sentimentValue)');
           }
         }
-        print('🔍 [ActigimDavaCard] Toplam ${_rolSentimentleri.length} sentiment yüklendi');
+        appLog('🔍 [ActigimDavaCard] Toplam ${_rolSentimentleri.length} sentiment yüklendi');
 
         // Finalizasyon durumlarını yükle (normalize edilmiş key'ler ile)
         _rolFinalizasyonlari.clear();
@@ -1447,14 +1477,14 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
         final String normalizedUserRole = normalizeRolKarari(widget.dava.mevkii);
         _selectedSentiment = _rolSentimentleri[normalizedUserRole];
         
-        print('✅ [ActigimDavaCard] setState() tamamlandı!');
-        print('   - Yüklenen hüküm sayısı: ${_rolHukumleri.length}');
-        print('   - Yüklenen sentiment sayısı: ${_rolSentimentleri.length}');
-        print('🔍 [ActigimDavaCard] ========== HÜKÜMLER YÜKLEME TAMAMLANDI ==========');
+        appLog('✅ [ActigimDavaCard] setState() tamamlandı!');
+        appLog('   - Yüklenen hüküm sayısı: ${_rolHukumleri.length}');
+        appLog('   - Yüklenen sentiment sayısı: ${_rolSentimentleri.length}');
+        appLog('🔍 [ActigimDavaCard] ========== HÜKÜMLER YÜKLEME TAMAMLANDI ==========');
       });
     } catch (e) {
-      print('❌ [ActigimDavaCard] Hükümler yüklenirken hata: $e');
-      print('   Stack trace: ${StackTrace.current}');
+      appLog('❌ [ActigimDavaCard] Hükümler yüklenirken hata: $e');
+      appLog('   Stack trace: ${StackTrace.current}');
     }
   }
 
@@ -1473,7 +1503,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
         });
       }
     } catch (e) {
-      print('❌ [ActigimDavaCard] Deliller yüklenirken hata: $e');
+      appLog('❌ [ActigimDavaCard] Deliller yüklenirken hata: $e');
     }
   }
 
@@ -1523,7 +1553,7 @@ class _ActigimDavaCardState extends State<ActigimDavaCard>
         _effectiveHediyeKaynak = hediyeKaynak.isNotEmpty ? hediyeKaynak : null;
       });
     } catch (e) {
-      print('❌ [ActigimDavaCard] Ceza/masraf/hediye yüklenirken hata: $e');
+      appLog('❌ [ActigimDavaCard] Ceza/masraf/hediye yüklenirken hata: $e');
       if (mounted) {
         setState(() {
           _yargicCezaText = null;

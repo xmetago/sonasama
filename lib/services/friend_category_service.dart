@@ -3,6 +3,7 @@ import '../models/friend_category_model.dart';
 import '../models/registration_model.dart';
 import '../utils/proximity_category_rules.dart';
 import 'hive_database_service.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Tek yönlü arkadaş kategorileri için ayrı Hive servisi
 class FriendCategoryService {
@@ -149,6 +150,20 @@ class FriendCategoryService {
     await _box?.delete(id);
   }
 
+  /// Hesap silinirken bu kullanıcının kurduğu ve ona ait kategorileri kaldırır.
+  static Future<void> deleteInvolvingUser(String userId) async {
+    if (userId.isEmpty) return;
+    final ids = _box?.values
+            .where((record) =>
+                record.ownerUserId == userId || record.targetUserId == userId)
+            .map((record) => record.id)
+            .toList() ??
+        <String>[];
+    for (final id in ids) {
+      await _box?.delete(id);
+    }
+  }
+
   /// Sahibin bir kullanıcı için kategorisini getir
   static FriendCategoryModel? getByOwnerAndTarget(String ownerUserId, String targetUserId) {
     try {
@@ -204,7 +219,7 @@ class FriendCategoryService {
     }
 
     if (migrated > 0) {
-      print('✅ $migrated eski kategori kaydı FriendCategoryService\'e taşındı');
+      appLog('✅ $migrated eski kategori kaydı FriendCategoryService\'e taşındı');
     }
     return migrated;
   }

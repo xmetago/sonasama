@@ -17,6 +17,7 @@ import '../providers/dava_provider.dart';
 import '../widgets/katildigim_dava_sayilari_section.dart';
 import '../widgets/ilgililerin_seyir_defteri_widgeti.dart';
 import '../theme/seyir_tokens.dart';
+import 'package:its19/utils/app_logger.dart';
 export '../widgets/katildigim_case_card.dart' show FiveCardCaseInformation;
 
 class Dava {
@@ -101,7 +102,7 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
     setState(() {
       _katildigimDavalar = davalar;
     });
-    print('✅ Katıldığım davalar yüklendi (8 rol): ${davalar.length} dava');
+    appLog('✅ Katıldığım davalar yüklendi (8 rol): ${davalar.length} dava');
     unawaited(_calculateStatistics());
   }
 
@@ -189,7 +190,7 @@ class _KatildigimDavalarPageState extends State<KatildigimDavalarPage> {
         _banaAcilanSayisi = stats.banaAcilan;
       });
     } catch (e) {
-      print('❌ İstatistik hesaplama hatası: $e');
+      appLog('❌ İstatistik hesaplama hatası: $e');
     }
   }
 

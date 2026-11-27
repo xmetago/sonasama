@@ -873,7 +873,14 @@ class _ReklamYonetimPageState extends State<ReklamYonetimPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      reklamAdiController.dispose();
+      reklamBasligiController.dispose();
+      reklamAciklamasiController.dispose();
+      reklamResmiController.dispose();
+      reklamKoduController.dispose();
+      hedefUrlController.dispose();
+    });
   }
 }
 

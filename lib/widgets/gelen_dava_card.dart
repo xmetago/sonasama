@@ -10,6 +10,7 @@ import '../services/dava_timer_service.dart';
 import '../services/hive_database_service.dart';
 import '../theme/seyir_tokens.dart';
 import 'countdown_timer_widget.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class Dava {
   final String id;
@@ -181,11 +182,11 @@ Future<void> commitGelenDavaRejection({
         await provider.reloadKatildigimDavalar(email);
         await provider.reloadIncomingDavalar(email);
       } catch (e) {
-        debugPrint('Red sonrası liste yenilenemedi: $e');
+        appLog('Red sonrası liste yenilenemedi: $e');
       }
     }
   } catch (e) {
-    debugPrint('Gelen dava reddi kaydedilemedi: $e');
+    appLog('Gelen dava reddi kaydedilemedi: $e');
   }
 }
 
@@ -1017,7 +1018,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
       });
       return false;
     } catch (e) {
-      debugPrint('Katılımcı kontrolü sırasında hata: $e');
+      appLog('Katılımcı kontrolü sırasında hata: $e');
       return false;
     }
   }
@@ -1200,7 +1201,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
           }
         }
       } catch (e) {
-        debugPrint('Katılımcı kontrolü sırasında hata: $e');
+        appLog('Katılımcı kontrolü sırasında hata: $e');
       }
     }
 
@@ -1287,7 +1288,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
         davaData: davaData,
       );
     } catch (e) {
-      debugPrint('Kabul sonrası kayıt tamamlanamadı: $e');
+      appLog('Kabul sonrası kayıt tamamlanamadı: $e');
     }
   }
 

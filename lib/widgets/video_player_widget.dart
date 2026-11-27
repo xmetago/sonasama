@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io';
+import 'package:its19/utils/app_logger.dart';
 
 class CustomVideoPlayer extends StatefulWidget {
   final String videoPath;
@@ -31,7 +32,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
   Future<void> _initializeVideoPlayer() async {
     try {
-      print('🎥 Video player başlatılıyor: ${widget.videoPath}');
+      appLog('🎥 Video player başlatılıyor: ${widget.videoPath}');
       
       _controller = VideoPlayerController.file(File(widget.videoPath));
       
@@ -51,9 +52,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         _isInitialized = true;
       });
       
-      print('✅ Video player başarıyla başlatıldı');
+      appLog('✅ Video player başarıyla başlatıldı');
     } catch (e) {
-      print('❌ Video player başlatılırken hata: $e');
+      appLog('❌ Video player başlatılırken hata: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

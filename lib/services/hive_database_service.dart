@@ -17,6 +17,7 @@ import '../utils/proximity_category_rules.dart';
 import 'verified_users_service.dart';
 import '../utils/comment_utils.dart';
 import 'ceza_muhur.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class HiveDatabaseService {
   static const String _davaBoxName = 'dava_box';
@@ -92,6 +93,8 @@ class HiveDatabaseService {
   static Box? _albumBox; // ✅ Step-3: key: userEmail, value: List<Map<String, dynamic>> (albümler)
   static Box? _albumImageBox; // ✅ Step-3: key: albumId, value: List<Map<String, dynamic>> (albüm resimleri)
   static Box? _dailyQuotaBox; // key: action_email_yyyy-mm-dd, value: int
+  static final Map<String, RegistrationModel> _registrationByEmail = {};
+  static bool _registrationCacheReady = false;
   
   // Sabit grup üyelikleri (istenen kesin 7 kişi)
   static const List<String> _grup19Members = <String>[
@@ -165,6 +168,51 @@ class HiveDatabaseService {
     await VerifiedUsersService.initialize();
 
     await migrateRetiredHerkesCategories();
+    _rebuildRegistrationEmailCache();
+  }
+
+  static void _rebuildRegistrationEmailCache() {
+    _registrationByEmail.clear();
+    final box = _registrationBox;
+    if (box != null) {
+      for (final registration in box.values) {
+        _registrationByEmail.putIfAbsent(registration.email, () => registration);
+      }
+    }
+    _registrationCacheReady = true;
+  }
+
+  static void _clearRegistrationEmailCache() {
+    _registrationByEmail.clear();
+    _registrationCacheReady = true;
+  }
+
+  static void _rememberRegistration(RegistrationModel registration) {
+    if (!_registrationCacheReady) {
+      _rebuildRegistrationEmailCache();
+    }
+    _registrationByEmail.removeWhere((_, existing) => existing.id == registration.id);
+    _registrationByEmail[registration.email] = registration;
+  }
+
+  static void _forgetRegistration(String id) {
+    if (!_registrationCacheReady) {
+      _rebuildRegistrationEmailCache();
+    }
+    String? removedEmail;
+    _registrationByEmail.removeWhere((email, existing) {
+      if (existing.id != id) return false;
+      removedEmail = email;
+      return true;
+    });
+    final box = _registrationBox;
+    if (removedEmail == null || box == null) return;
+    for (final registration in box.values) {
+      if (registration.email == removedEmail) {
+        _registrationByEmail[removedEmail!] = registration;
+        break;
+      }
+    }
   }
 
   /// Eski Herkes / Tanımadıklarım arkadaş kategorisini Takipçi olarak saklar.
@@ -213,7 +261,7 @@ class HiveDatabaseService {
     // ✅ Düzeltme: Kullanıcı bazlı key kullan
     final authorEmail = post['authorEmail'] ?? userEmail;
     if (authorEmail == null || authorEmail.toString().isEmpty) {
-      print('⚠️ addHomeFeedPost: authorEmail bulunamadı');
+      appLog('⚠️ addHomeFeedPost: authorEmail bulunamadı');
       return;
     }
     
@@ -258,7 +306,7 @@ class HiveDatabaseService {
   /// Home feed postunu sil
   static void removeHomeFeedPost(String postId, {String? userEmail}) {
     if (userEmail == null || userEmail.isEmpty) {
-      print('⚠️ removeHomeFeedPost: userEmail bulunamadı');
+      appLog('⚠️ removeHomeFeedPost: userEmail bulunamadı');
       return;
     }
     
@@ -270,14 +318,14 @@ class HiveDatabaseService {
 
     list.removeWhere((p) => p['id']?.toString() == postId);
     _homeFeedBox?.put(key, list);
-    print('✅ Home feed postu silindi: $postId, $userEmail');
+    appLog('✅ Home feed postu silindi: $postId');
   }
 
   static void updateHomeFeedPost(String postId, Map<String, dynamic> updatedPost, {String? userEmail}) {
     // ✅ Düzeltme: Kullanıcı bazlı key kullan
     final authorEmail = updatedPost['authorEmail'] ?? userEmail;
     if (authorEmail == null || authorEmail.toString().isEmpty) {
-      print('⚠️ updateHomeFeedPost: authorEmail bulunamadı');
+      appLog('⚠️ updateHomeFeedPost: authorEmail bulunamadı');
       return;
     }
     
@@ -398,6 +446,7 @@ class HiveDatabaseService {
     await _commentBox?.clear();
     await _categoryBox?.clear();
     await _registrationBox?.clear();
+    _clearRegistrationEmailCache();
     await _evidenceBox?.clear();
     await _friendshipBox?.clear();
     await _settingsBox?.clear();
@@ -767,7 +816,7 @@ class HiveDatabaseService {
         // Ayarları yoksa varsayılan ayarlarla oluştur
         final defaultSettings = SettingsModel(userEmail: registration.email);
         await saveSettings(defaultSettings);
-        print('Varsayılan ayarlar oluşturuldu: ${registration.email}');
+        appLog('Varsayılan ayarlar oluşturuldu');
       }
     }
   }
@@ -829,9 +878,9 @@ class HiveDatabaseService {
             f.status == FriendshipStatus.following)
         .toList() ?? [];
     
-    print('DEBUG: getFollowers($userId) - Found ${followers.length} followers');
+    appLog('DEBUG: getFollowers($userId) - Found ${followers.length} followers');
     for (final f in followers) {
-      print('  - Follower: ${f.requesterId} -> ${f.recipientId} (${f.status})');
+      appLog('  - Follower: ${f.requesterId} -> ${f.recipientId} (${f.status})');
     }
     
     return followers;
@@ -1006,13 +1055,12 @@ class HiveDatabaseService {
         .toSet();
   }
 
-  /// E-posta ile kayıt getir
+  /// E-posta ile kayıt getir. Sonuç, ekleme/güncelleme/silme ile güncel tutulan önbellekten okunur.
   static RegistrationModel? getRegistrationByEmail(String email) {
-    try {
-      return _registrationBox?.values.firstWhere((r) => r.email == email);
-    } catch (e) {
-      return null;
+    if (!_registrationCacheReady) {
+      _rebuildRegistrationEmailCache();
     }
+    return _registrationByEmail[email];
   }
 
   static String _normalizeJudgeName(String judgeName) {
@@ -1036,16 +1084,277 @@ class HiveDatabaseService {
   /// Kayıt ekle
   static Future<void> addRegistration(RegistrationModel registration) async {
     await _registrationBox?.put(registration.id, registration);
+    _rememberRegistration(registration);
   }
 
   /// Kayıt güncelle
   static Future<void> updateRegistration(RegistrationModel registration) async {
     await _registrationBox?.put(registration.id, registration);
+    _rememberRegistration(registration);
   }
 
   /// Kayıt sil
   static Future<void> deleteRegistration(String id) async {
     await _registrationBox?.delete(id);
+    _forgetRegistration(id);
+  }
+
+  static bool _textIsUser(String? raw, String userId, String email) {
+    if (raw == null) return false;
+    final text = raw.trim();
+    if (text.isEmpty) return false;
+    if (userId.isNotEmpty && text == userId) return true;
+    return email.isNotEmpty && text.toLowerCase() == email.toLowerCase();
+  }
+
+  static bool _mapOwnedByUser(
+    Map<String, dynamic> map,
+    String userId,
+    String email,
+    String judgeName,
+    Set<String> ownedDavaIds,
+  ) {
+    const keys = <String>[
+      'userId',
+      'userEmail',
+      'ownerEmail',
+      'authorEmail',
+      'senderEmail',
+      'davaciEmail',
+      'email',
+      'openedBy',
+    ];
+    for (final key in keys) {
+      if (_textIsUser(map[key]?.toString(), userId, email)) return true;
+    }
+    if (judgeName.isNotEmpty && map['davaci']?.toString() == judgeName) {
+      return true;
+    }
+    final id = map['id']?.toString() ?? '';
+    final davaId = map['davaId']?.toString() ?? '';
+    if (id.isNotEmpty && ownedDavaIds.contains(id)) return true;
+    if (davaId.isNotEmpty && ownedDavaIds.contains(davaId)) return true;
+    return false;
+  }
+
+  static List<Map<String, dynamic>> _readMapList(Box? box, String key) {
+    final persisted = box?.get(key);
+    if (persisted is! List) return <Map<String, dynamic>>[];
+    return persisted
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  /// Hesap silme: bu kullanıcıya ait Hive kayıtlarını kaldırır.
+  static Future<void> deleteUserOwnedData({
+    required String userId,
+    required String email,
+  }) async {
+    final normalizedEmail = email.trim();
+    RegistrationModel? registration = getRegistrationByEmail(normalizedEmail);
+    if (registration == null && userId.isNotEmpty) {
+      for (final item in _registrationBox?.values ?? const <RegistrationModel>[]) {
+        if (item.id == userId) {
+          registration = item;
+          break;
+        }
+      }
+    }
+    final judgeName = registration?.judgeName ?? '';
+    final ownedDavaIds = <String>{};
+
+    for (final dava in List<DavaModel>.from(_davaBox?.values ?? const <DavaModel>[])) {
+      if (_textIsUser(dava.userId, userId, normalizedEmail)) {
+        ownedDavaIds.add(dava.id);
+      }
+    }
+    for (final map in _readMapList(_openedDavaBox, 'opened')) {
+      if (_mapOwnedByUser(map, userId, normalizedEmail, judgeName, ownedDavaIds)) {
+        final id = map['id']?.toString() ?? '';
+        if (id.isNotEmpty) ownedDavaIds.add(id);
+      }
+    }
+
+    bool owns(Map<String, dynamic> map) =>
+        _mapOwnedByUser(map, userId, normalizedEmail, judgeName, ownedDavaIds);
+
+    for (final id in ownedDavaIds) {
+      await _davaBox?.delete(id);
+    }
+
+    await _rewriteListKey(_openedDavaBox, 'opened', _openedDavalar, owns);
+    if (_openedDavaBox?.get('opened_davalar') != null) {
+      await _rewriteListKey(_openedDavaBox, 'opened_davalar', _openedDavalar, owns);
+    }
+    await _rewriteListKey(_savedDavaBox, 'saved', _savedDavalar, owns);
+
+    final albumIds = <String>[];
+    final albums = _albumBox?.get(normalizedEmail);
+    if (albums is List) {
+      for (final item in albums) {
+        if (item is Map && item['id'] != null) {
+          albumIds.add(item['id'].toString());
+        }
+      }
+    }
+    for (final albumId in albumIds) {
+      await _albumImageBox?.delete(albumId);
+    }
+
+    await _deleteKeysContainingEmail(normalizedEmail);
+    _incomingDavalarByUser.remove(normalizedEmail);
+    _incomingDavalarByUser.remove('${normalizedEmail}_invitations');
+    await _stripOwnedEntries(normalizedEmail, owns);
+
+    final evidenceIds = _evidenceBox?.values
+            .where((item) =>
+                _textIsUser(item.userId, userId, normalizedEmail) ||
+                ownedDavaIds.contains(item.davaId))
+            .map((item) => item.id)
+            .toList() ??
+        <String>[];
+    for (final id in evidenceIds) {
+      await _evidenceBox?.delete(id);
+    }
+
+    final commentIds = _commentBox?.values
+            .where((item) =>
+                _textIsUser(item.userId, userId, normalizedEmail) ||
+                ownedDavaIds.contains(item.davaId))
+            .map((item) => item.id)
+            .toList() ??
+        <String>[];
+    for (final id in commentIds) {
+      await _commentBox?.delete(id);
+    }
+
+    final friendshipIds = _friendshipBox?.values
+            .where((item) =>
+                item.requesterId == userId || item.recipientId == userId)
+            .map((item) => item.id)
+            .toList() ??
+        <String>[];
+    for (final id in friendshipIds) {
+      await _friendshipBox?.delete(id);
+    }
+
+    final userIds = _userBox?.values
+            .where((item) =>
+                item.id == userId || _textIsUser(item.email, userId, normalizedEmail))
+            .map((item) => item.id)
+            .toList() ??
+        <String>[];
+    for (final id in userIds) {
+      await _userBox?.delete(id);
+    }
+
+    if (_haykirBox != null) {
+      final haykirKeys = _haykirBox!.keys.where((key) {
+        final value = _haykirBox!.get(key);
+        return value is Map && owns(Map<String, dynamic>.from(value));
+      }).toList();
+      for (final key in haykirKeys) {
+        await _haykirBox!.delete(key);
+      }
+    }
+
+    await _settingsBox?.delete(normalizedEmail);
+    if (registration != null) {
+      await deleteRegistration(registration.id);
+    } else if (userId.isNotEmpty) {
+      await deleteRegistration(userId);
+    }
+  }
+
+  static Future<void> _rewriteListKey(
+    Box? box,
+    String key,
+    List<Map<String, dynamic>> memory,
+    bool Function(Map<String, dynamic> map) owns,
+  ) async {
+    final list = _readMapList(box, key);
+    if (list.isEmpty && box?.get(key) == null) {
+      memory.removeWhere(owns);
+      return;
+    }
+    list.removeWhere(owns);
+    if (key == 'opened' || key == 'saved') {
+      memory
+        ..clear()
+        ..addAll(list);
+    }
+    await box?.put(key, list);
+  }
+
+  static Future<void> _deleteKeysContainingEmail(String email) async {
+    if (email.isEmpty) return;
+    final emailLower = email.toLowerCase();
+    final boxes = <Box?>[
+      _incomingDavaBox,
+      _friendGroupBox,
+      _homeFeedBox,
+      _rejectedDavaBox,
+      _acceptedDavaBox,
+      _katildigimDavaBox,
+      _katildigimHaykirBox,
+      _tutulanReklamlarBox,
+      _albumBox,
+      _savedWidgetsBox,
+      _userLastCommentBox,
+      _dailyQuotaBox,
+      _cezaBox,
+      _masrafBox,
+      _davaActionsBox,
+      _hediyeUyariBox,
+      _cezaOyBox,
+      _hediyeOyBox,
+    ];
+    for (final box in boxes) {
+      if (box == null) continue;
+      final keys = box.keys
+          .where((key) => key.toString().toLowerCase().contains(emailLower))
+          .toList();
+      for (final key in keys) {
+        await box.delete(key);
+      }
+    }
+  }
+
+  static Future<void> _stripOwnedEntries(
+    String email,
+    bool Function(Map<String, dynamic> map) owns,
+  ) async {
+    final boxes = <Box?>[
+      _friendGroupBox,
+      _homeFeedBox,
+      _incomingDavaBox,
+      _rejectedDavaBox,
+      _acceptedDavaBox,
+      _katildigimDavaBox,
+      _katildigimHaykirBox,
+    ];
+    final emailLower = email.toLowerCase();
+    for (final box in boxes) {
+      if (box == null) continue;
+      for (final key in box.keys.toList()) {
+        final value = box.get(key);
+        if (value is Map) {
+          final map = Map<String, dynamic>.from(value);
+          final before = map.length;
+          map.removeWhere(
+            (entryKey, _) => entryKey.toString().toLowerCase() == emailLower,
+          );
+          if (map.length != before) await box.put(key, map);
+        } else if (value is List) {
+          final list = value.where((item) {
+            if (item is! Map) return true;
+            return !owns(Map<String, dynamic>.from(item));
+          }).toList();
+          if (list.length != value.length) await box.put(key, list);
+        }
+      }
+    }
   }
 
   /// Giriş doğrulama
@@ -1405,9 +1714,9 @@ class HiveDatabaseService {
         }
       }
       
-      print('✅ Engagement verileri güncellendi: davaId=$davaId');
+      appLog('✅ Engagement verileri güncellendi: davaId=$davaId');
     } catch (e) {
-      print('❌ Engagement güncelleme hatası: $e');
+      appLog('❌ Engagement güncelleme hatası: $e');
     }
   }
 
@@ -1593,7 +1902,7 @@ class HiveDatabaseService {
     String groupName, {
     required List<String> excludedEmails, // Dava gönderilen kişiler
   }) async {
-    print('DEBUG: pickInvitationRecipients - opener: $openerEmail, group: $groupName');
+    appLog('DEBUG: pickInvitationRecipients - opener: $openerEmail, group: $groupName');
     
     final normalized = groupName.toLowerCase().replaceAll('-', '').trim();
     final opener = getRegistrationByEmail(openerEmail);
@@ -1603,7 +1912,7 @@ class HiveDatabaseService {
     final openerJudgeName = opener?.judgeName ?? '';
     final isOpenerVerified = VerifiedUsersService.isVerified(openerJudgeName);
     
-    print('DEBUG: normalized group: $normalized, opener ID: ${opener?.id}, isVerified: $isOpenerVerified');
+    appLog('DEBUG: normalized group: $normalized, opener ID: ${opener?.id}, isVerified: $isOpenerVerified');
     
     // Hedef sayılar (istenen kurallara göre)
     int targetCount;
@@ -1639,7 +1948,7 @@ class HiveDatabaseService {
     } else if (normalized == 'arkadaşlar') {
       // Arkadaşlar - Kişisel listeden en fazla 9 kişi (daha az varsa o kadar)
       final friendCategories = getFriendCategories(openerEmail);
-      print('DEBUG: All friend categories for $openerEmail: $friendCategories');
+      appLog('DEBUG: Friend category count: ${friendCategories.length}');
       
       final friendEmails = friendCategories.entries
           .where((entry) {
@@ -1653,7 +1962,7 @@ class HiveDatabaseService {
           .map((entry) => entry.key)
           .toSet();
       
-      print('DEBUG: Found ${friendEmails.length} friends in personal list: $friendEmails');
+      appLog('DEBUG: Found ${friendEmails.length} friends in personal list: $friendEmails');
       
       pool = getAllRegistrations()
           .where((r) => friendEmails.contains(r.email) && 
@@ -1662,31 +1971,25 @@ class HiveDatabaseService {
       
       
       // Herkes kategorisi mantığını uygula - debug çıktıları ekle
-      print('DEBUG: Arkadaş pool after filtering: ${pool.length} users');
-      for (final user in pool) {
-        print('  - ${user.email} (${user.judgeName})');
-      }
+      appLog('DEBUG: Arkadaş pool after filtering: ${pool.length} users');
     } else if (normalized == 'takipçiler') {
       // Takipçiler - Kişisel listeden en fazla 7 kişi (daha az varsa o kadar)
       final friendCategories = getFriendCategories(openerEmail);
-      print('DEBUG: All friend categories for $openerEmail: $friendCategories');
+      appLog('DEBUG: Friend category count: ${friendCategories.length}');
       
       final followerEmails = friendCategories.entries
           .where((entry) => ProximityCategoryRules.countsAsTakipci(entry.value))
           .map((entry) => entry.key)
           .toSet();
       
-      print('DEBUG: Found ${followerEmails.length} followers in personal list: $followerEmails');
+      appLog('DEBUG: Found ${followerEmails.length} followers in personal list');
       
       pool = getAllRegistrations()
           .where((r) => followerEmails.contains(r.email) && 
                        !excludedEmails.contains(r.email)) // ✅ Davet gönderen kişi de dahil
           .toList();
       
-      print('DEBUG: Takipçi pool after filtering: ${pool.length} users');
-      for (final user in pool) {
-        print('  - ${user.email} (${user.judgeName})');
-      }
+      appLog('DEBUG: Takipçi pool after filtering: ${pool.length} users');
     } else if (normalized == 'herkes') {
       // Herkes - Global havuzdan rastgele 3 kişi (ülke şartı yok, davet gönderen kişi de dahil)
       pool = getAllRegistrations()
@@ -1706,7 +2009,7 @@ class HiveDatabaseService {
 
     // Eğer havuz boşsa: kişisel listeler için fallback yapma (0 döndür)
     if (pool.isEmpty) {
-      print('DEBUG: Pool is empty, using fallback mechanism for group: $normalized');
+      appLog('DEBUG: Pool is empty, using fallback mechanism for group: $normalized');
       // Sadece "tanımadıklarım" ve tanımsız gruplar için önceki fallback korunabilir
       if (normalized == 'tanımadıklarım' || normalized == 'tanimadiklarim') {
         pool = getAllRegistrations()
@@ -1714,7 +2017,7 @@ class HiveDatabaseService {
                          !excludedEmails.contains(r.email))
             .toList();
         
-        print('DEBUG: Fallback pool size (tanımadıklarım): ${pool.length}');
+        appLog('DEBUG: Fallback pool size (tanımadıklarım): ${pool.length}');
       }
     }
 
@@ -1734,7 +2037,7 @@ class HiveDatabaseService {
     // Eğer hala boşsa, son fallback: tüm kullanıcılardan rastgele seç
     List<RegistrationModel> finalPool = filteredPool;
     if (finalPool.isEmpty) {
-      print('DEBUG: Filtered pool is empty, using global fallback');
+      appLog('DEBUG: Filtered pool is empty, using global fallback');
       var globalPool = getAllRegistrations()
           .where((r) => r.email != openerEmail && !excludedEmails.contains(r.email))
           .toList();
@@ -1777,7 +2080,7 @@ class HiveDatabaseService {
         if (verifiedUsers.isEmpty) {
           nonVerifiedUsers.shuffle();
           final result = nonVerifiedUsers;
-          print('DEBUG: Final result (no verified, using non-verified): ${result.length} recipients selected');
+          appLog('DEBUG: Final result (no verified, using non-verified): ${result.length} recipients selected');
           return result;
         } else {
           // Mavi tik sahiplerini al, eğer 7'den azsa mavi tik sahibi olmayanlarla tamamla
@@ -1786,11 +2089,11 @@ class HiveDatabaseService {
             nonVerifiedUsers.shuffle();
             final selectedNonVerified = nonVerifiedUsers.take(remaining).toList();
             final result = [...verifiedUsers, ...selectedNonVerified];
-            print('DEBUG: Final result (verified + non-verified): ${result.length} recipients selected');
+            appLog('DEBUG: Final result (verified + non-verified): ${result.length} recipients selected');
             return result;
           } else {
             final result = verifiedUsers;
-            print('DEBUG: Final result (all verified): ${result.length} recipients selected');
+            appLog('DEBUG: Final result (all verified): ${result.length} recipients selected');
             return result;
           }
         }
@@ -1801,18 +2104,12 @@ class HiveDatabaseService {
           nonVerifiedUsers.shuffle();
           final selectedNonVerified = nonVerifiedUsers.take(remaining).toList();
           final result = [...verifiedUsers, ...selectedNonVerified];
-          print('DEBUG: Final result (verified + non-verified): ${result.length} recipients selected');
-          for (final user in result) {
-            print('  - Selected: ${user.email} (${user.judgeName})');
-          }
+          appLog('DEBUG: Final result (verified + non-verified): ${result.length} recipients selected');
           return result;
         } else {
           // targetCount veya daha fazla mavi tik sahibi varsa, sadece onları kullan
           final result = verifiedUsers.take(targetCount).toList();
-          print('DEBUG: Final result (all verified): ${result.length} recipients selected');
-          for (final user in result) {
-            print('  - Selected: ${user.email} (${user.judgeName})');
-          }
+          appLog('DEBUG: Final result (all verified): ${result.length} recipients selected');
           return result;
         }
       }
@@ -1825,22 +2122,18 @@ class HiveDatabaseService {
         ? finalPool
         : finalPool.take(targetCount).toList();
     
-    print('DEBUG: Final result: ${result.length} recipients selected');
-    for (final user in result) {
-      print('  - Selected: ${user.email} (${user.judgeName})');
-    }
+    appLog('DEBUG: Final result: ${result.length} recipients selected');
     
     return result;
   }
 
   /// Davet kaydet - Email ve DavaID tutarlılığı sağlanır
   static void addInvitation(String userEmail, Map<String, dynamic> invitation) {
-    print('DEBUG: addInvitation START - userEmail: $userEmail');
-    print('DEBUG: addInvitation - invitation data: $invitation');
+    appLog('DEBUG: addInvitation START');
     
     // Email ve DavaID kontrolü - her ikisi de mevcut olmalı
     if (userEmail.isEmpty || invitation['davaId'] == null || invitation['davaId'].toString().isEmpty) {
-      print('ERROR: addInvitation - userEmail veya davaId boş! userEmail: $userEmail, davaId: ${invitation['davaId']}');
+      appLog('ERROR: addInvitation - userEmail veya davaId boş');
       return;
     }
     
@@ -1849,7 +2142,6 @@ class HiveDatabaseService {
     invitation['davaId'] = invitation['davaId'].toString();
     
     final persisted = _incomingDavaBox?.get('${userEmail}_invitations');
-    print('DEBUG: addInvitation - existing data: $persisted');
     
     final List<Map<String, dynamic>> list = persisted != null
         ? (persisted as List)
@@ -1857,7 +2149,7 @@ class HiveDatabaseService {
             .toList()
         : <Map<String, dynamic>>[];
     
-    print('DEBUG: addInvitation - current list size: ${list.length}');
+    appLog('DEBUG: addInvitation - current list size: ${list.length}');
     
     // Aynı ID'li veya aynı davaId'li davet varsa güncelle, yoksa ekle
     final existingIndex = list.indexWhere((d) => 
@@ -1866,32 +2158,31 @@ class HiveDatabaseService {
     
     if (existingIndex != -1) {
       list[existingIndex] = invitation;
-      print('DEBUG: addInvitation - updated existing invitation at index $existingIndex');
+      appLog('DEBUG: addInvitation - updated existing invitation at index $existingIndex');
     } else {
       list.add(invitation);
-      print('DEBUG: addInvitation - added new invitation, new size: ${list.length}');
+      appLog('DEBUG: addInvitation - added new invitation, new size: ${list.length}');
     }
     
     final result = _incomingDavaBox?.put('${userEmail}_invitations', list);
-    print('DEBUG: addInvitation - Hive put result: $result');
-    print('DEBUG: addInvitation COMPLETE - saved invitation: ${invitation['davaAdi']} for $userEmail (davaId: ${invitation['davaId']})');
+    appLog('DEBUG: addInvitation - Hive put result: $result');
+    appLog('DEBUG: addInvitation COMPLETE');
   }
 
   /// Kullanıcının davetlerini getir
   static List<Map<String, dynamic>> getInvitations(String userEmail) {
     try {
-      print('DEBUG: getInvitations START - userEmail: $userEmail');
+      appLog('DEBUG: getInvitations START');
       
       final persisted = _incomingDavaBox?.get('${userEmail}_invitations');
-      print('DEBUG: getInvitations - raw persisted data: $persisted');
-      print('DEBUG: getInvitations - persisted type: ${persisted.runtimeType}');
+      appLog('DEBUG: getInvitations - persisted type: ${persisted.runtimeType}');
       
       if (persisted != null) {
         final result = (persisted as List)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
         
-        print('DEBUG: getInvitations - converted to list, size: ${result.length}');
+        appLog('DEBUG: getInvitations - converted to list, size: ${result.length}');
         
         // Eksik alanları varsayılan değerlerle doldur
         for (var invitation in result) {
@@ -1917,17 +2208,17 @@ class HiveDatabaseService {
           return bTime.compareTo(aTime);
         });
         
-        print('DEBUG: getInvitations COMPLETE - returning ${result.length} invitations for $userEmail');
+        appLog('DEBUG: getInvitations COMPLETE - returning ${result.length} invitations');
         for (int i = 0; i < result.length; i++) {
-          print('  ${i + 1}. ${result[i]['davaAdi']} (ID: ${result[i]['id']})');
+          appLog('  ${i + 1}. ${result[i]['davaAdi']} (ID: ${result[i]['id']})');
         }
         return result;
       } else {
-        print('DEBUG: getInvitations - no invitations found for $userEmail');
+        appLog('DEBUG: getInvitations - no invitations found');
         return <Map<String, dynamic>>[];
       }
     } catch (e) {
-      print('ERROR: getInvitations($userEmail) - $e');
+      appLog('ERROR: getInvitations - $e');
       return <Map<String, dynamic>>[];
     }
   }
@@ -1975,21 +2266,10 @@ class HiveDatabaseService {
   static void debugPrintIncomingFor(String userEmail, {bool withDetails = true}) {
     try {
       final list = getIncomingDavalar(userEmail);
-      // Özet satırı
-      // ignore: avoid_print
-      print('[incoming_dava_box] $userEmail -> ${list.length} kayıt');
+      appLog('[incoming_dava_box] ${list.length} kayıt');
       if (!withDetails) return;
-      for (final d in list) {
-        final id = d['id'];
-        final adi = d['adi'] ?? d['davaAdi'];
-        final davali = d['davali'];
-        final openedAt = d['openedAt'];
-        // ignore: avoid_print
-        print('  - id=$id | adi=$adi | davali=$davali | openedAt=$openedAt');
-      }
     } catch (e) {
-      // ignore: avoid_print
-      print('debugPrintIncomingFor hata: $e');
+      appLog('debugPrintIncomingFor hata: $e');
     }
   }
   
@@ -2002,14 +2282,14 @@ class HiveDatabaseService {
   
   /// Test amaçlı arkadaş kategorileri oluştur
   static Future<void> createTestFriendCategories(String ownerEmail) async {
-    print('DEBUG: Creating test friend categories for $ownerEmail');
+    appLog('DEBUG: Creating test friend categories for $ownerEmail');
     
     // Mevcut tüm kullanıcıları al
     final allUsers = getAllRegistrations();
     final otherUsers = allUsers.where((u) => u.email != ownerEmail).toList();
     
     if (otherUsers.isEmpty) {
-      print('DEBUG: No other users found for creating test categories');
+      appLog('DEBUG: No other users found for creating test categories');
       return;
     }
     
@@ -2020,18 +2300,17 @@ class HiveDatabaseService {
     for (int i = 0; i < otherUsers.length && i < 15; i++) {
       final category = categories[i % categories.length];
       friendCategories[otherUsers[i].email] = category;
-      print('DEBUG: Added ${otherUsers[i].email} to category: $category');
     }
     
     // Kategorileri kaydet
     await _friendGroupBox?.put(ownerEmail, friendCategories);
-    print('DEBUG: Saved ${friendCategories.length} friend categories for $ownerEmail');
+    appLog('DEBUG: Saved ${friendCategories.length} friend categories');
   }
   
   /// Kullanıcının arkadaş kategorilerini debug et
   static void debugFriendCategories(String ownerEmail) {
     final categories = getFriendCategories(ownerEmail);
-    print('DEBUG: Friend categories for $ownerEmail (${categories.length} total):');
+    appLog('DEBUG: Friend categories (${categories.length} total):');
     
     final grouped = <String, List<String>>{};
     categories.forEach((email, category) {
@@ -2039,14 +2318,14 @@ class HiveDatabaseService {
     });
     
     grouped.forEach((category, emails) {
-      print('  $category: ${emails.length} kişi - ${emails.take(3).join(', ')}${emails.length > 3 ? '...' : ''}');
+      appLog('  $category: ${emails.length} kişi');
     });
   }
   
   /// Davet sistemini test et
   static Future<void> testInvitationSystem(String userEmail) async {
-    print('\n=== DAVET SİSTEMİ TEST BAŞLADI ===');
-    print('Test kullanıcısı: $userEmail');
+    appLog('\n=== DAVET SİSTEMİ TEST BAŞLADI ===');
+    appLog('Davet sistemi testi başlıyor');
     
     // 1. Arkadaş kategorilerini kontrol et
     debugFriendCategories(userEmail);
@@ -2054,7 +2333,7 @@ class HiveDatabaseService {
     // 2. Eğer kategoriler boşsa test kategorileri oluştur
     final categories = getFriendCategories(userEmail);
     if (categories.isEmpty) {
-      print('Arkadaş kategorileri boş, test kategorileri oluşturuluyor...');
+      appLog('Arkadaş kategorileri boş, test kategorileri oluşturuluyor...');
       await createTestFriendCategories(userEmail);
       debugFriendCategories(userEmail);
     }
@@ -2063,73 +2342,67 @@ class HiveDatabaseService {
     final testGroups = ['Grup19', 'Arkadaşlar', 'Takipçiler', 'Herkes', 'Tanımadıklarım'];
     
     for (final group in testGroups) {
-      print('\n--- Test: $group grubu ---');
+      appLog('\n--- Test: $group grubu ---');
       try {
         final recipients = await pickInvitationRecipients(
           userEmail,
           group,
           excludedEmails: [userEmail], // Sadece kendisini hariç tut
         );
-        print('✅ $group: ${recipients.length} alıcı seçildi');
-        for (final recipient in recipients.take(3)) {
-          print('  - ${recipient.email} (${recipient.judgeName})');
-        }
-        if (recipients.length > 3) {
-          print('  ... ve ${recipients.length - 3} kişi daha');
-        }
+        appLog('✅ $group: ${recipients.length} alıcı seçildi');
       } catch (e) {
-        print('❌ $group: Hata - $e');
+        appLog('❌ $group: Hata - $e');
       }
     }
     
-    print('\n=== DAVET SİSTEMİ TEST TAMAMLANDI ===\n');
+    appLog('\n=== DAVET SİSTEMİ TEST TAMAMLANDI ===\n');
   }
   
   /// Belirli kullanıcılar için davet durumunu kontrol et
   static void debugInvitationStatus(String senderEmail, List<String> recipientEmails) {
-    print('\n=== DAVET DURUMU KONTROLÜ ===');
-    print('Gönderen: $senderEmail');
+    appLog('\n=== DAVET DURUMU KONTROLÜ ===');
+    appLog('Gönderen: $senderEmail');
     
     // Gönderenin arkadaş kategorilerini kontrol et
     debugFriendCategories(senderEmail);
     
     // Her alıcı için davet durumunu kontrol et
     for (final recipientEmail in recipientEmails) {
-      print('\n--- $recipientEmail için davet kontrolü ---');
+      appLog('\n--- $recipientEmail için davet kontrolü ---');
       
       // Bu kişinin davetlerini kontrol et
       final invitations = getInvitations(recipientEmail);
-      print('Toplam davet sayısı: ${invitations.length}');
+      appLog('Toplam davet sayısı: ${invitations.length}');
       
       // Gönderenden gelen davetleri filtrele
       final fromSender = invitations.where((inv) => 
           inv['davaci'] == senderEmail || 
           inv['userEmail'] == senderEmail).toList();
       
-      print('$senderEmail\'den gelen davetler: ${fromSender.length}');
+      appLog('$senderEmail\'den gelen davetler: ${fromSender.length}');
       
       for (final inv in fromSender) {
-        print('  - Dava: ${inv['davaAdi']} (ID: ${inv['davaId']})');
-        print('    Grup: ${inv['groupName']}');
-        print('    Tarih: ${inv['invitedAt']}');
+        appLog('  - Dava: ${inv['davaAdi']} (ID: ${inv['davaId']})');
+        appLog('    Grup: ${inv['groupName']}');
+        appLog('    Tarih: ${inv['invitedAt']}');
       }
       
       if (fromSender.isEmpty) {
-        print('❌ Bu kişiye $senderEmail\'den davet gelmemiş!');
+        appLog('❌ Bu kişiye $senderEmail\'den davet gelmemiş!');
         
         // Kişisel kategorilerde var mı kontrol et
         final senderCategories = getFriendCategories(senderEmail);
         final isInCategories = senderCategories.containsKey(recipientEmail);
         
         if (isInCategories) {
-          print('✅ Kişi gönderenin kategorilerinde mevcut: ${senderCategories[recipientEmail]}');
+          appLog('✅ Kişi gönderenin kategorilerinde mevcut: ${senderCategories[recipientEmail]}');
         } else {
-          print('❌ Kişi gönderenin kategorilerinde YOK!');
+          appLog('❌ Kişi gönderenin kategorilerinde YOK!');
         }
       }
     }
     
-    print('\n=== DAVET DURUMU KONTROLÜ TAMAMLANDI ===\n');
+    appLog('\n=== DAVET DURUMU KONTROLÜ TAMAMLANDI ===\n');
   }
 
   // ==================== RED EDİLEN DAVALAR ====================
@@ -2198,15 +2471,15 @@ class HiveDatabaseService {
         if (removed > 0) {
           totalRemoved += removed;
           _incomingDavaBox?.put(key, list);
-          print('✅ [HiveDatabaseService] removeIncomingDava: $key kullanıcısından $removed dava kaldırıldı (ID: $davaId)');
+          appLog('✅ [HiveDatabaseService] removeIncomingDava: $key kullanıcısından $removed dava kaldırıldı (ID: $davaId)');
         }
       }
     }
     
     if (totalRemoved > 0) {
-      print('✅ [HiveDatabaseService] removeIncomingDava: Toplam $totalRemoved dava kaldırıldı (ID: $davaId)');
+      appLog('✅ [HiveDatabaseService] removeIncomingDava: Toplam $totalRemoved dava kaldırıldı (ID: $davaId)');
     } else {
-      print('⚠️ [HiveDatabaseService] removeIncomingDava: Hiç dava kaldırılamadı (ID: $davaId)');
+      appLog('⚠️ [HiveDatabaseService] removeIncomingDava: Hiç dava kaldırılamadı (ID: $davaId)');
     }
   }
 
@@ -2364,7 +2637,7 @@ class HiveDatabaseService {
       return false;
     }
     if (davaId.trim().isEmpty) {
-      print('⚠️ [HiveDatabaseService] Boş dava kimliği ile hüküm yazılmadı.');
+      appLog('⚠️ [HiveDatabaseService] Boş dava kimliği ile hüküm yazılmadı.');
       return false;
     }
     
@@ -2380,7 +2653,7 @@ class HiveDatabaseService {
     if (persistedFinalized) {
       final String? existingText = existingData?['hukumText']?.toString();
       if (existingText != null && existingText != hukumText) {
-        print('⚠️ [HiveDatabaseService] Finalize edilmiş hüküm değiştirilemez: $key');
+        appLog('⚠️ [HiveDatabaseService] Finalize edilmiş hüküm değiştirilemez: $key');
         return false;
       }
     }
@@ -2398,13 +2671,13 @@ class HiveDatabaseService {
     };
     
     await _hukumBox!.put(key, hukumData);
-    print('✅ [HiveDatabaseService] Hüküm kaydedildi:');
-    print('   - Key: $key');
-    print('   - Dava ID: $davaId');
-    print('   - User Role: $userRole');
-    print('   - Hüküm Text: ${hukumText.length > 50 ? hukumText.substring(0, 50) : hukumText}...');
-    print('   - Sentiment: ${hukumSentiment ?? "null"}');
-    print('   - Is Finalized: $finalizationState');
+    appLog('✅ [HiveDatabaseService] Hüküm kaydedildi:');
+    appLog('   - Key: $key');
+    appLog('   - Dava ID: $davaId');
+    appLog('   - User Role: $userRole');
+    appLog('   - Hüküm Text: ${hukumText.length > 50 ? hukumText.substring(0, 50) : hukumText}...');
+    appLog('   - Sentiment: ${hukumSentiment ?? "null"}');
+    appLog('   - Is Finalized: $finalizationState');
     return true;
   }
 
@@ -2433,7 +2706,7 @@ class HiveDatabaseService {
   static Future<Map<String, dynamic>?> getHukumByDavaIdAndRole(String davaId, String userRole, {String? davaAdi}) async {
     await _ensureHukumBoxOpen();
     if (davaId.trim().isEmpty) {
-      print('⚠️ Boş dava kimliği; ad ile hash üretilmedi (${davaAdi ?? '-'})');
+      appLog('⚠️ Boş dava kimliği; ad ile hash üretilmedi (${davaAdi ?? '-'})');
       return null;
     }
     
@@ -2453,26 +2726,26 @@ class HiveDatabaseService {
   static Future<Map<String, Map<String, dynamic>>> getHukumlerByDavaIdGrouped(String davaId, {String? davaAdi}) async {
     await _ensureHukumBoxOpen();
     
-    print('🔍 [HiveDatabaseService] getHukumlerByDavaIdGrouped çağrıldı:');
-    print('   - Dava ID: "$davaId"');
+    appLog('🔍 [HiveDatabaseService] getHukumlerByDavaIdGrouped çağrıldı:');
+    appLog('   - Dava ID: "$davaId"');
     if (davaAdi != null) {
-      print('   - Dava Adı: "$davaAdi"');
+      appLog('   - Dava Adı: "$davaAdi"');
     }
     if (davaId.trim().isEmpty) {
-      print('⚠️ Boş dava kimliği; ad hash ile arama yapılmadı.');
+      appLog('⚠️ Boş dava kimliği; ad hash ile arama yapılmadı.');
       return {};
     }
     
     final Map<String, Map<String, dynamic>> hukumlerByRole = {};
     final keys = _hukumBox?.keys.toList() ?? [];
     
-    print('   - Toplam key sayısı: ${keys.length}');
+    appLog('   - Toplam key sayısı: ${keys.length}');
     
     // Debug: Tüm key'leri logla (ilk 10 tanesi)
     if (keys.isNotEmpty) {
-      print('   🔍 Veritabanındaki key\'ler (ilk 10):');
+      appLog('   🔍 Veritabanındaki key\'ler (ilk 10):');
       for (int i = 0; i < keys.length && i < 10; i++) {
-        print('      ${i + 1}. ${keys[i]}');
+        appLog('      ${i + 1}. ${keys[i]}');
       }
     }
     
@@ -2488,14 +2761,14 @@ class HiveDatabaseService {
           final userRole = hukumMap['userRole'] as String? ?? '';
           if (userRole.isNotEmpty) {
             hukumlerByRole[userRole] = hukumMap;
-            print('   ✅ Eşleşme bulundu: Key="$keyStr", Role="$userRole"');
+            appLog('   ✅ Eşleşme bulundu: Key="$keyStr", Role="$userRole"');
           }
         }
       }
     }
     
-    print('   - Eşleşen key sayısı: $matchCount');
-    print('   - Dönen hüküm sayısı: ${hukumlerByRole.length}');
+    appLog('   - Eşleşen key sayısı: $matchCount');
+    appLog('   - Dönen hüküm sayısı: ${hukumlerByRole.length}');
     
     return hukumlerByRole;
   }
@@ -2532,7 +2805,7 @@ class HiveDatabaseService {
     // Güncellenmiş listeyi kaydet
     _katildigimDavaBox!.put(userEmail, davaList);
     
-    print('✅ Katıldığım dava eklendi: ${dava['adi']}');
+    appLog('✅ Katıldığım dava eklendi: ${dava['adi']}');
   }
 
   static bool _isLegacyKatildigimTestRow(Map<String, dynamic> d) {
@@ -2553,7 +2826,7 @@ class HiveDatabaseService {
         list.where((d) => !_isLegacyKatildigimTestRow(d)).toList();
     if (filtered.length == list.length) return;
     _katildigimDavaBox!.put(key, filtered);
-    print(
+    appLog(
       '🧹 Eski test katıldığım dava kayıtları silindi: ${list.length - filtered.length}',
     );
   }
@@ -2762,7 +3035,7 @@ class HiveDatabaseService {
     // Güncellenmiş listeyi kaydet
     _katildigimDavaBox!.put(userEmail, davaList);
     
-    print('✅ Katıldığım dava silindi: $davaId');
+    appLog('✅ Katıldığım dava silindi: $davaId');
   }
 
   // ==================== KATILDIĞIM HAYKIRLAR ====================
@@ -2801,7 +3074,7 @@ class HiveDatabaseService {
         (h['haykirId']?.toString() ?? h['id']?.toString() ?? '') == haykirId
       );
       if (exists) {
-        print('⚠️ Bu haykır zaten katıldığım listesinde: $haykirId');
+        appLog('⚠️ Bu haykır zaten katıldığım listesinde: $haykirId');
         return;
       }
     }
@@ -2813,7 +3086,7 @@ class HiveDatabaseService {
     // Güncellenmiş listeyi kaydet
     _katildigimHaykirBox!.put(userEmail, haykirList);
     
-    print('✅ Katıldığım haykır eklendi: ${haykir['adi'] ?? haykirId}');
+    appLog('✅ Katıldığım haykır eklendi: ${haykir['adi'] ?? haykirId}');
   }
 
   /// ✅ Adım 3: Katıldığım haykırları getir
@@ -2860,7 +3133,7 @@ class HiveDatabaseService {
     // Güncellenmiş listeyi kaydet
     _katildigimHaykirBox!.put(userEmail, haykirList);
     
-    print('✅ Katıldığım haykır silindi: $haykirId');
+    appLog('✅ Katıldığım haykır silindi: $haykirId');
   }
 
   static Future<void> upsertDavaParticipant(String davaId, Map<String, dynamic> participant) async {
@@ -3075,7 +3348,7 @@ class HiveDatabaseService {
         });
       }
     } catch (e) {
-      print('❌ Ceza beğenisi güncellenirken hata: $e');
+      appLog('❌ Ceza beğenisi güncellenirken hata: $e');
       rethrow;
     }
   }
@@ -3087,7 +3360,7 @@ class HiveDatabaseService {
       final Map<String, dynamic>? data = _cezaBegeniBox!.get(cezaName) as Map<String, dynamic>?;
       return data != null ? (data['likeCount'] as int? ?? 0) : 0;
     } catch (e) {
-      print('❌ Ceza beğeni sayısı getirilirken hata: $e');
+      appLog('❌ Ceza beğeni sayısı getirilirken hata: $e');
       return 0;
     }
   }
@@ -3101,7 +3374,7 @@ class HiveDatabaseService {
       final List<String> likedBy = List<String>.from(data['likedBy'] ?? <String>[]);
       return likedBy.contains(userEmail);
     } catch (e) {
-      print('❌ Ceza beğeni kontrolü yapılırken hata: $e');
+      appLog('❌ Ceza beğeni kontrolü yapılırken hata: $e');
       return false;
     }
   }
@@ -3119,7 +3392,7 @@ class HiveDatabaseService {
       }
       return result;
     } catch (e) {
-      print('❌ Tüm ceza beğenileri getirilirken hata: $e');
+      appLog('❌ Tüm ceza beğenileri getirilirken hata: $e');
       return <String, int>{};
     }
   }
@@ -3152,9 +3425,9 @@ class HiveDatabaseService {
 
       await _cezaBox!.put(key, value);
 
-      print('✅ Ceza kaydedildi: $key');
+      appLog('✅ Ceza kaydedildi: $key');
     } catch (e) {
-      print('❌ Ceza kaydedilirken hata: $e');
+      appLog('❌ Ceza kaydedilirken hata: $e');
       rethrow;
     }
   }
@@ -3189,7 +3462,7 @@ class HiveDatabaseService {
         out[email.toLowerCase()] = kayit.text;
       }
     } catch (e) {
-      print('❌ Ceza haritası okunurken hata: $e');
+      appLog('❌ Ceza haritası okunurken hata: $e');
     }
     return out;
   }
@@ -3221,10 +3494,10 @@ class HiveDatabaseService {
         return null;
       }
 
-      print('✅ Ceza getirildi: $key');
+      appLog('✅ Ceza getirildi: $key');
       return kayit;
     } catch (e) {
-      print('❌ Ceza getirilirken hata: $e');
+      appLog('❌ Ceza getirilirken hata: $e');
       return null;
     }
   }
@@ -3259,7 +3532,7 @@ class HiveDatabaseService {
         }
       }
     } catch (e) {
-      print('❌ Ceza oy haritası okunurken hata: $e');
+      appLog('❌ Ceza oy haritası okunurken hata: $e');
     }
     return out;
   }
@@ -3290,7 +3563,7 @@ class HiveDatabaseService {
       });
       return votes[email];
     } catch (e) {
-      print('❌ Ceza oyu kaydedilirken hata: $e');
+      appLog('❌ Ceza oyu kaydedilirken hata: $e');
       rethrow;
     }
   }
@@ -3324,7 +3597,7 @@ class HiveDatabaseService {
         }
       }
     } catch (e) {
-      print('❌ Hediye oy haritası okunurken hata: $e');
+      appLog('❌ Hediye oy haritası okunurken hata: $e');
     }
     return out;
   }
@@ -3354,7 +3627,7 @@ class HiveDatabaseService {
       });
       return votes[email];
     } catch (e) {
-      print('❌ Hediye oyu kaydedilirken hata: $e');
+      appLog('❌ Hediye oyu kaydedilirken hata: $e');
       rethrow;
     }
   }
@@ -3388,9 +3661,9 @@ class HiveDatabaseService {
       final key = '${davaId}_$userEmail';
       await _cezaBox!.delete(key);
       
-      print('✅ Ceza silindi: $key');
+      appLog('✅ Ceza silindi: $key');
     } catch (e) {
-      print('❌ Ceza silinirken hata: $e');
+      appLog('❌ Ceza silinirken hata: $e');
       rethrow;
     }
   }
@@ -3419,9 +3692,9 @@ class HiveDatabaseService {
       
       await _masrafBox!.put(key, expensesList);
       
-      print('✅ Masraflar kaydedildi: $key (${expensesList.length} adet)');
+      appLog('✅ Masraflar kaydedildi: $key (${expensesList.length} adet)');
     } catch (e) {
-      print('❌ Masraflar kaydedilirken hata: $e');
+      appLog('❌ Masraflar kaydedilirken hata: $e');
       rethrow;
     }
   }
@@ -3480,7 +3753,7 @@ class HiveDatabaseService {
         out[email.toLowerCase()] = line;
       }
     } catch (e) {
-      print('❌ Hediye (masraf) haritası okunurken hata: $e');
+      appLog('❌ Hediye (masraf) haritası okunurken hata: $e');
     }
     return out;
   }
@@ -3503,10 +3776,10 @@ class HiveDatabaseService {
       
       final List<String> expensesList = List<String>.from(persisted as List);
       
-      print('✅ Masraflar getirildi: $key (${expensesList.length} adet)');
+      appLog('✅ Masraflar getirildi: $key (${expensesList.length} adet)');
       return expensesList;
     } catch (e) {
-      print('❌ Masraflar getirilirken hata: $e');
+      appLog('❌ Masraflar getirilirken hata: $e');
       return null;
     }
   }
@@ -3522,9 +3795,9 @@ class HiveDatabaseService {
       final key = '${davaId}_$userEmail';
       await _masrafBox!.delete(key);
       
-      print('✅ Masraflar silindi: $key');
+      appLog('✅ Masraflar silindi: $key');
     } catch (e) {
-      print('❌ Masraflar silinirken hata: $e');
+      appLog('❌ Masraflar silinirken hata: $e');
       rethrow;
     }
   }
@@ -3553,9 +3826,9 @@ class HiveDatabaseService {
       final String reklamId = reklamData['id'] as String;
       await _reklamBox!.put(reklamId, reklamData);
       
-      print('✅ Reklam kaydedildi: $reklamId');
+      appLog('✅ Reklam kaydedildi: $reklamId');
     } catch (e) {
-      print('❌ Reklam kaydedilirken hata: $e');
+      appLog('❌ Reklam kaydedilirken hata: $e');
       rethrow;
     }
   }
@@ -3570,7 +3843,7 @@ class HiveDatabaseService {
       
       return Map<String, dynamic>.from(persisted as Map);
     } catch (e) {
-      print('❌ Reklam getirilirken hata: $e');
+      appLog('❌ Reklam getirilirken hata: $e');
       return null;
     }
   }
@@ -3582,9 +3855,9 @@ class HiveDatabaseService {
       
       await _reklamBox!.delete(reklamId);
       
-      print('✅ Reklam silindi: $reklamId');
+      appLog('✅ Reklam silindi: $reklamId');
     } catch (e) {
-      print('❌ Reklam silinirken hata: $e');
+      appLog('❌ Reklam silinirken hata: $e');
       rethrow;
     }
   }
@@ -3629,7 +3902,7 @@ class HiveDatabaseService {
       
       return reklamlar;
     } catch (e) {
-      print('❌ Aktif reklamlar getirilirken hata: $e');
+      appLog('❌ Aktif reklamlar getirilirken hata: $e');
       return [];
     }
   }
@@ -3658,7 +3931,7 @@ class HiveDatabaseService {
       
       return reklamlar;
     } catch (e) {
-      print('❌ Tüm reklamlar getirilirken hata: $e');
+      appLog('❌ Tüm reklamlar getirilirken hata: $e');
       rethrow;
     }
   }
@@ -3672,7 +3945,7 @@ class HiveDatabaseService {
         return reklamKategori == kategori || reklamKategori == 'TUTULANLAR';
       }).toList();
     } catch (e) {
-      print('❌ Kategori reklamları getirilirken hata: $e');
+      appLog('❌ Kategori reklamları getirilirken hata: $e');
       return [];
     }
   }
@@ -3711,7 +3984,7 @@ class HiveDatabaseService {
       
       return validIds;
     } catch (e) {
-      print('❌ Tutulan reklamlar getirilirken hata: $e');
+      appLog('❌ Tutulan reklamlar getirilirken hata: $e');
       return [];
     }
   }
@@ -3725,10 +3998,10 @@ class HiveDatabaseService {
       if (!current.contains(reklamId)) {
         current.add(reklamId);
         await _tutulanReklamlarBox!.put(userEmail, current);
-        print('✅ Tutulan reklam eklendi: $reklamId');
+        appLog('✅ Tutulan reklam eklendi: $reklamId');
       }
     } catch (e) {
-      print('❌ Tutulan reklam eklenirken hata: $e');
+      appLog('❌ Tutulan reklam eklenirken hata: $e');
       rethrow;
     }
   }
@@ -3745,7 +4018,7 @@ class HiveDatabaseService {
       
       await saveReklam(reklam);
     } catch (e) {
-      print('❌ Reklam gösterim sayısı artırılırken hata: $e');
+      appLog('❌ Reklam gösterim sayısı artırılırken hata: $e');
     }
   }
 
@@ -3761,7 +4034,7 @@ class HiveDatabaseService {
       
       await saveReklam(reklam);
     } catch (e) {
-      print('❌ Reklam tıklama sayısı artırılırken hata: $e');
+      appLog('❌ Reklam tıklama sayısı artırılırken hata: $e');
     }
   }
 
@@ -3831,9 +4104,9 @@ class HiveDatabaseService {
         await saveReklam(reklamData);
       }
       
-      print('✅ Varsayılan reklamlar oluşturuldu (${kategoriler.length} adet)');
+      appLog('✅ Varsayılan reklamlar oluşturuldu (${kategoriler.length} adet)');
     } catch (e) {
-      print('❌ Varsayılan reklamlar oluşturulurken hata: $e');
+      appLog('❌ Varsayılan reklamlar oluşturulurken hata: $e');
     }
   }
 
@@ -3867,9 +4140,9 @@ class HiveDatabaseService {
       };
       
       await _hediyeUyariBox?.put(key, data);
-      print('✅ Hediye durumu kaydedildi: $key');
+      appLog('✅ Hediye durumu kaydedildi: $key');
     } catch (e) {
-      print('❌ Hediye durumu kaydedilirken hata: $e');
+      appLog('❌ Hediye durumu kaydedilirken hata: $e');
     }
   }
 
@@ -3883,7 +4156,7 @@ class HiveDatabaseService {
       }
       return null;
     } catch (e) {
-      print('❌ Hediye durumu alınırken hata: $e');
+      appLog('❌ Hediye durumu alınırken hata: $e');
       return null;
     }
   }
@@ -3907,7 +4180,7 @@ class HiveDatabaseService {
       if (existing != null) {
         final evetTiklandi = existing['evetTiklandi'] as bool? ?? false;
         if (evetTiklandi) {
-          print('⚠️ EVET tıklanmış, uyarı gönderilemez');
+          appLog('⚠️ EVET tıklanmış, uyarı gönderilemez');
           return false;
         }
         
@@ -3920,7 +4193,7 @@ class HiveDatabaseService {
             final fark = now.difference(sonUyariTarihi);
             if (fark.inDays < 19) {
               final kalanGun = 19 - fark.inDays;
-              print('⚠️ 19 günlük cooldown aktif, kalan gün: $kalanGun');
+              appLog('⚠️ 19 günlük cooldown aktif, kalan gün: $kalanGun');
               return false;
             }
           }
@@ -3988,7 +4261,7 @@ class HiveDatabaseService {
         
         bildirimler.add(uyariData);
         await _hediyeUyariBox?.put(bildirimKey, bildirimler);
-        print('✅ Bildirim gönderildi: $recipientEmail');
+        appLog('✅ Bildirim gönderildi: $recipientEmail');
       }
       
       // Hediye durumunu güncelle (son uyarı tarihini kaydet)
@@ -3999,10 +4272,10 @@ class HiveDatabaseService {
         sonUyariTarihi: DateTime.now(),
       );
       
-      print('✅ Uyarı gönderildi: $davaId');
+      appLog('✅ Uyarı gönderildi: $davaId');
       return true;
     } catch (e) {
-      print('❌ Uyarı gönderilirken hata: $e');
+      appLog('❌ Uyarı gönderilirken hata: $e');
       return false;
     }
   }
@@ -4039,7 +4312,7 @@ class HiveDatabaseService {
       });
       await _hediyeUyariBox?.put(bildirimKey, bildirimler);
     } catch (e) {
-      print('❌ Gelen dava bildirimi eklenemedi: $e');
+      appLog('❌ Gelen dava bildirimi eklenemedi: $e');
     }
   }
 
@@ -4076,7 +4349,7 @@ class HiveDatabaseService {
       });
       await _hediyeUyariBox?.put(bildirimKey, bildirimler);
     } catch (e) {
-      print('❌ Dürtme bildirimi eklenemedi: $e');
+      appLog('❌ Dürtme bildirimi eklenemedi: $e');
     }
   }
 
@@ -4106,7 +4379,7 @@ class HiveDatabaseService {
       if (elapsed >= cooldown) return null;
       return cooldown - elapsed;
     } catch (e) {
-      print('❌ Dürtme cooldown okunamadı: $e');
+      appLog('❌ Dürtme cooldown okunamadı: $e');
       return null;
     }
   }
@@ -4124,7 +4397,7 @@ class HiveDatabaseService {
         DateTime.now().toIso8601String(),
       );
     } catch (e) {
-      print('❌ Dürtme cooldown kaydedilemedi: $e');
+      appLog('❌ Dürtme cooldown kaydedilemedi: $e');
     }
   }
 
@@ -4145,7 +4418,7 @@ class HiveDatabaseService {
         },
       );
     } catch (e) {
-      print('❌ Dürtme gönderen kaydı yazılamadı: $e');
+      appLog('❌ Dürtme gönderen kaydı yazılamadı: $e');
     }
   }
 
@@ -4175,7 +4448,7 @@ class HiveDatabaseService {
       if (elapsed >= cooldown) return null;
       return cooldown - elapsed;
     } catch (e) {
-      print('❌ Dürtme gönderen cooldown okunamadı: $e');
+      appLog('❌ Dürtme gönderen cooldown okunamadı: $e');
       return null;
     }
   }
@@ -4201,7 +4474,7 @@ class HiveDatabaseService {
       if (elapsed >= shieldDuration) return null;
       return shieldDuration - elapsed;
     } catch (e) {
-      print('❌ Dürtme alıcı koruması okunamadı: $e');
+      appLog('❌ Dürtme alıcı koruması okunamadı: $e');
       return null;
     }
   }
@@ -4227,7 +4500,7 @@ class HiveDatabaseService {
         },
       );
     } catch (e) {
-      print('❌ Profil dürtme kelimesi kaydedilemedi: $e');
+      appLog('❌ Profil dürtme kelimesi kaydedilemedi: $e');
     }
   }
 
@@ -4255,7 +4528,7 @@ class HiveDatabaseService {
         raw.map((key, value) => MapEntry(key.toString(), value)),
       );
     } catch (e) {
-      print('❌ Profil dürtme kelimesi okunamadı: $e');
+      appLog('❌ Profil dürtme kelimesi okunamadı: $e');
       return null;
     }
   }
@@ -4276,7 +4549,7 @@ class HiveDatabaseService {
       }
       return [];
     } catch (e) {
-      print('❌ Bildirimler alınırken hata: $e');
+      appLog('❌ Bildirimler alınırken hata: $e');
       return [];
     }
   }
@@ -4292,7 +4565,7 @@ class HiveDatabaseService {
         await _hediyeUyariBox?.put(bildirimKey, list);
       }
     } catch (e) {
-      print('❌ Bildirim silinirken hata: $e');
+      appLog('❌ Bildirim silinirken hata: $e');
     }
   }
 
@@ -4314,7 +4587,7 @@ class HiveDatabaseService {
       }
       return Map<String, dynamic>.from(stats as Map);
     } catch (e) {
-      print('❌ Dava istatistikleri alınırken hata: $e');
+      appLog('❌ Dava istatistikleri alınırken hata: $e');
       return {
         'totalLikes': 0,
         'totalDislikes': 0,
@@ -4341,7 +4614,7 @@ class HiveDatabaseService {
       }
       return Map<String, dynamic>.from(action as Map);
     } catch (e) {
-      print('❌ Kullanıcı aksiyonu alınırken hata: $e');
+      appLog('❌ Kullanıcı aksiyonu alınırken hata: $e');
       return {
         'like': false,
         'dislike': false,
@@ -4357,7 +4630,7 @@ class HiveDatabaseService {
       // Hüküm süresi sonrası destek/kına kilidi:
       // Dava tarihi geçmişse sayaçların değişmesini servis katmanında da engelle.
       if (await _isLikeDislikeLockedAfter76Days(davaId)) {
-        print('⚠️ $_hukumFreezeDays gün doldu: destek/kına güncellenemez. davaId=$davaId');
+        appLog('⚠️ $_hukumFreezeDays gün doldu: destek/kına güncellenemez. davaId=$davaId');
         return;
       }
 
@@ -4434,9 +4707,9 @@ class HiveDatabaseService {
       };
       await _davaActionStatsBox?.put(davaId, updatedStats);
       
-      print('✅ Dava beğenme/beğenmeme güncellendi: $davaId, $userEmail, isLike: $isLike');
+      appLog('✅ Dava beğenme/beğenmeme güncellendi: $davaId, isLike: $isLike');
     } catch (e) {
-      print('❌ Dava beğenme/beğenmeme güncellenirken hata: $e');
+      appLog('❌ Dava beğenme/beğenmeme güncellenirken hata: $e');
     }
   }
 
@@ -4470,7 +4743,7 @@ class HiveDatabaseService {
       final stats = getDavaActionStats(davaId);
       return stats['gizliTanikCounter'] ?? 0;
     } catch (e) {
-      print('❌ Gizli tanık sayacı alınırken hata: $e');
+      appLog('❌ Gizli tanık sayacı alınırken hata: $e');
       return 0;
     }
   }
@@ -4487,10 +4760,10 @@ class HiveDatabaseService {
       updatedStats['gizliTanikCounter'] = newCounter;
       _davaActionStatsBox?.put(davaId, updatedStats);
       
-      print('✅ Gizli tanık sayacı artırıldı: $davaId, yeni sayı: $newCounter');
+      appLog('✅ Gizli tanık sayacı artırıldı: $davaId, yeni sayı: $newCounter');
       return newCounter;
     } catch (e) {
-      print('❌ Gizli tanık sayacı artırılırken hata: $e');
+      appLog('❌ Gizli tanık sayacı artırılırken hata: $e');
       return 1; // Hata durumunda 1 döndür
     }
   }
@@ -4523,11 +4796,11 @@ class HiveDatabaseService {
           final difference = now.difference(lastTime);
           
           if (difference.inSeconds < 19) {
-            print('⚠️ 19 saniye kuralı: Kullanıcı ${difference.inSeconds} saniye önce yorum yaptı. ${19 - difference.inSeconds} saniye beklemeli.');
+            appLog('⚠️ 19 saniye kuralı: Kullanıcı ${difference.inSeconds} saniye önce yorum yaptı. ${19 - difference.inSeconds} saniye beklemeli.');
             return false;
           }
         } catch (e) {
-          print('⚠️ Son yorum zamanı parse edilemedi: $e');
+          appLog('⚠️ Son yorum zamanı parse edilemedi: $e');
         }
       }
       
@@ -4539,7 +4812,7 @@ class HiveDatabaseService {
       
       // Maksimum 19 yorum kontrolü
       if (commentCount >= 19) {
-        print('⚠️ Maksimum yorum sayısına ulaşıldı: $davaId, $userEmail');
+        appLog('⚠️ Maksimum yorum sayısına ulaşıldı: $davaId');
         return false;
       }
       
@@ -4591,10 +4864,10 @@ class HiveDatabaseService {
       };
       await _davaActionStatsBox?.put(davaId, updatedStats);
       
-      print('✅ Dava yorum eklendi: $davaId, $userEmail, yorum sayısı: ${commentCount + 1}');
+      appLog('✅ Dava yorum eklendi: $davaId, yorum sayısı: ${commentCount + 1}');
       return true;
     } catch (e) {
-      print('❌ Dava yorum eklenirken hata: $e');
+      appLog('❌ Dava yorum eklenirken hata: $e');
       return false;
     }
   }
@@ -4608,7 +4881,7 @@ class HiveDatabaseService {
       
       // Eğer daha önce paylaşılmışsa tekrar paylaşma
       if (userAction['sharedAt'] != null) {
-        print('⚠️ Dava daha önce paylaşılmış: $davaId, $userEmail');
+        appLog('⚠️ Dava daha önce paylaşılmış: $davaId');
         return;
       }
       
@@ -4668,12 +4941,12 @@ class HiveDatabaseService {
           },
         };
         addHomeFeedPost(postData, userEmail: userEmail);
-        print('✅ Dava seyir defterine eklendi: $davaId, $userEmail, davaci: $davaciDisplayName');
+        appLog('✅ Dava seyir defterine eklendi: $davaId, davaci: $davaciDisplayName');
       }
       
-      print('✅ Dava paylaşıldı: $davaId, $userEmail');
+      appLog('✅ Dava paylaşıldı: $davaId');
     } catch (e) {
-      print('❌ Dava paylaşılırken hata: $e');
+      appLog('❌ Dava paylaşılırken hata: $e');
     }
   }
 
@@ -4707,7 +4980,7 @@ class HiveDatabaseService {
   }) async {
     try {
       if (hasUserRetweetedDava(davaId, userEmail)) {
-        print('⚠️ Dava zaten retweet edilmiş: $davaId, $userEmail');
+        appLog('⚠️ Dava zaten retweet edilmiş: $davaId');
         return false;
       }
 
@@ -4715,7 +4988,7 @@ class HiveDatabaseService {
           ? Map<String, dynamic>.from(payloadOverride)
           : _getDavaDataForShare(davaId, viewerEmail: userEmail);
       if (raw == null || raw.isEmpty) {
-        print('⚠️ Retweet için dava verisi bulunamadı: $davaId');
+        appLog('⚠️ Retweet için dava verisi bulunamadı: $davaId');
         return false;
       }
 
@@ -4766,10 +5039,10 @@ class HiveDatabaseService {
       userAction['retweetedAt'] = nowIso;
       await _davaActionsBox?.put(key, userAction);
 
-      print('✅ Dava retweet seyir defterine eklendi: $davaId, $userEmail');
+      appLog('✅ Dava retweet seyir defterine eklendi: $davaId');
       return true;
     } catch (e) {
-      print('❌ Dava retweet eklenirken hata: $e');
+      appLog('❌ Dava retweet eklenirken hata: $e');
       return false;
     }
   }
@@ -4800,10 +5073,10 @@ class HiveDatabaseService {
       userAction.remove('retweetedAt');
       await _davaActionsBox?.put(key, userAction);
 
-      print('✅ Dava retweet kaldırıldı: $davaId, $userEmail');
+      appLog('✅ Dava retweet kaldırıldı: $davaId');
       return true;
     } catch (e) {
-      print('❌ Dava retweet kaldırılırken hata: $e');
+      appLog('❌ Dava retweet kaldırılırken hata: $e');
       return false;
     }
   }
@@ -4833,7 +5106,7 @@ class HiveDatabaseService {
       });
       return collected;
     } catch (e) {
-      print('❌ Dava yorumları birleştirilirken hata: $e');
+      appLog('❌ Dava yorumları birleştirilirken hata: $e');
       return <Map<String, dynamic>>[];
     }
   }
@@ -4881,7 +5154,7 @@ class HiveDatabaseService {
       
       return null;
     } catch (e) {
-      print('❌ Dava verileri alınırken hata: $e');
+      appLog('❌ Dava verileri alınırken hata: $e');
       return null;
     }
   }
@@ -4913,7 +5186,7 @@ class HiveDatabaseService {
       raw = Map<String, dynamic>.from(fallbackSnapshot);
     }
     if (raw == null || raw.isEmpty) {
-      print(
+      appLog(
           '⚠️ composeHomeFeedDavaSharePostAfterHukumFinalized: dava bulunamadı: $id');
       return null;
     }
@@ -4976,9 +5249,9 @@ class HiveDatabaseService {
     try {
       await _ensureDavaHukumVerisiBoxOpen();
       _davaHukumVerisiBox?.put(davaId, hukumVerisi);
-      print('✅ Dava hüküm verisi kaydedildi: $davaId');
+      appLog('✅ Dava hüküm verisi kaydedildi: $davaId');
     } catch (e) {
-      print('❌ Dava hüküm verisi kaydedilirken hata: $e');
+      appLog('❌ Dava hüküm verisi kaydedilirken hata: $e');
     }
   }
 
@@ -4991,7 +5264,7 @@ class HiveDatabaseService {
       }
       return null;
     } catch (e) {
-      print('❌ Dava hüküm verisi alınırken hata: $e');
+      appLog('❌ Dava hüküm verisi alınırken hata: $e');
       return null;
     }
   }
@@ -5047,9 +5320,9 @@ class HiveDatabaseService {
       
       // ✅ Veritabanına kaydet
       await box.put(haykirId, haykirMap);
-      print('✅ Haykırış veritabanına kaydedildi: $haykirId');
+      appLog('✅ Haykırış veritabanına kaydedildi: $haykirId');
     } catch (e) {
-      print('❌ Haykırış eklenirken hata: $e');
+      appLog('❌ Haykırış eklenirken hata: $e');
       rethrow;
     }
   }
@@ -5074,9 +5347,9 @@ class HiveDatabaseService {
       
       // ✅ Veritabanına kaydet
       await box.put(haykirId, updatedData);
-      print('✅ Haykırış güncellendi: $haykirId');
+      appLog('✅ Haykırış güncellendi: $haykirId');
     } catch (e) {
-      print('❌ Haykırış güncellenirken hata: $e');
+      appLog('❌ Haykırış güncellenirken hata: $e');
       rethrow;
     }
   }
@@ -5110,7 +5383,7 @@ class HiveDatabaseService {
 
       if (list.length != originalLength) {
         _homeFeedBox!.put(key, list);
-        print('✅ Haykır postları seyir defterinden kaldırıldı: $haykirId, $key');
+        appLog('✅ Haykır postları seyir defterinden kaldırıldı: $haykirId, $key');
       }
     }
   }
@@ -5124,9 +5397,9 @@ class HiveDatabaseService {
       await box.delete(haykirId);
       await box.delete('haykir_stats_$haykirId');
       await box.delete('haykir_comments_$haykirId');
-      print('✅ Haykırış silindi: $haykirId');
+      appLog('✅ Haykırış silindi: $haykirId');
     } catch (e) {
-      print('❌ Haykırış silinirken hata: $e');
+      appLog('❌ Haykırış silinirken hata: $e');
       rethrow;
     }
   }
@@ -5138,7 +5411,7 @@ class HiveDatabaseService {
       final data = box.get(haykirId);
       return data != null ? Map<String, dynamic>.from(data as Map) : null;
     } catch (e) {
-      print('❌ Haykırış getirilirken hata: $e');
+      appLog('❌ Haykırış getirilirken hata: $e');
       return null;
     }
   }
@@ -5174,7 +5447,7 @@ class HiveDatabaseService {
       
       return allHaykirislar;
     } catch (e) {
-      print('❌ Kullanıcı haykırışları getirilirken hata: $e');
+      appLog('❌ Kullanıcı haykırışları getirilirken hata: $e');
       return [];
     }
   }
@@ -5219,7 +5492,7 @@ class HiveDatabaseService {
       
       return allHaykirislar;
     } catch (e) {
-      print('❌ Tüm haykırışlar getirilirken hata: $e');
+      appLog('❌ Tüm haykırışlar getirilirken hata: $e');
       return [];
     }
   }
@@ -5245,9 +5518,9 @@ class HiveDatabaseService {
       };
       
       await box.put(diremCategoriesKey, categoriesData);
-      print('✅ Direm kategorileri veritabanına kaydedildi');
+      appLog('✅ Direm kategorileri veritabanına kaydedildi');
     } catch (e) {
-      print('❌ Direm kategorileri kaydedilirken hata: $e');
+      appLog('❌ Direm kategorileri kaydedilirken hata: $e');
     }
   }
 
@@ -5259,7 +5532,7 @@ class HiveDatabaseService {
       final data = box.get(diremCategoriesKey);
       return data != null ? Map<String, dynamic>.from(data as Map) : null;
     } catch (e) {
-      print('❌ Direm kategorileri getirilirken hata: $e');
+      appLog('❌ Direm kategorileri getirilirken hata: $e');
       return null;
     }
   }
@@ -5298,10 +5571,10 @@ class HiveDatabaseService {
           'lastUpdated': DateTime.now().toIso8601String(),
         });
         
-        print('✅ Özel diren veritabanına kaydedildi: $diremText');
+        appLog('✅ Özel diren veritabanına kaydedildi: $diremText');
       }
     } catch (e) {
-      print('❌ Özel diren eklenirken hata: $e');
+      appLog('❌ Özel diren eklenirken hata: $e');
       rethrow;
     }
   }
@@ -5321,7 +5594,7 @@ class HiveDatabaseService {
       
       return [];
     } catch (e) {
-      print('❌ Özel direnler getirilirken hata: $e');
+      appLog('❌ Özel direnler getirilirken hata: $e');
       return [];
     }
   }
@@ -5346,10 +5619,10 @@ class HiveDatabaseService {
           'lastUpdated': DateTime.now().toIso8601String(),
         });
         
-        print('✅ Özel diren silindi: $diremText');
+        appLog('✅ Özel diren silindi: $diremText');
       }
     } catch (e) {
-      print('❌ Özel diren silinirken hata: $e');
+      appLog('❌ Özel diren silinirken hata: $e');
       rethrow;
     }
   }
@@ -5388,10 +5661,10 @@ class HiveDatabaseService {
           'lastUpdated': DateTime.now().toIso8601String(),
         });
         
-        print('✅ Üyelerden diren veritabanına kaydedildi: $diremText');
+        appLog('✅ Üyelerden diren veritabanına kaydedildi: $diremText');
       }
     } catch (e) {
-      print('❌ Üyelerden diren eklenirken hata: $e');
+      appLog('❌ Üyelerden diren eklenirken hata: $e');
       rethrow;
     }
   }
@@ -5411,7 +5684,7 @@ class HiveDatabaseService {
       
       return [];
     } catch (e) {
-      print('❌ Üyelerden direnler getirilirken hata: $e');
+      appLog('❌ Üyelerden direnler getirilirken hata: $e');
       return [];
     }
   }
@@ -5549,9 +5822,9 @@ class HiveDatabaseService {
       
       // ✅ Veritabanına kaydet
       await box.put(statsKey, stats);
-      print('✅ Haykır etkileşim istatistikleri güncellendi: $haykirId');
+      appLog('✅ Haykır etkileşim istatistikleri güncellendi: $haykirId');
     } catch (e) {
-      print('❌ Haykır etkileşim istatistikleri güncellenirken hata: $e');
+      appLog('❌ Haykır etkileşim istatistikleri güncellenirken hata: $e');
       rethrow;
     }
   }
@@ -5598,7 +5871,7 @@ class HiveDatabaseService {
         'isCommented': userEmail != null && userComments.contains(userEmail), // ✅ Yorum durumu
       };
     } catch (e) {
-      print('❌ Haykır etkileşim istatistikleri getirilirken hata: $e');
+      appLog('❌ Haykır etkileşim istatistikleri getirilirken hata: $e');
       return {
         'shareCount': 0,
         'commentCount': 0,
@@ -5668,7 +5941,7 @@ class HiveDatabaseService {
       
       return savedHaykirlar;
     } catch (e) {
-      print('❌ Kaydedilen haykırlar getirilirken hata: $e');
+      appLog('❌ Kaydedilen haykırlar getirilirken hata: $e');
       return [];
     }
   }
@@ -5703,7 +5976,7 @@ class HiveDatabaseService {
             };
           }
         } catch (e) {
-          print('⚠️ Son yorum zamanı parse edilemedi: $e');
+          appLog('⚠️ Son yorum zamanı parse edilemedi: $e');
         }
       }
       
@@ -5746,13 +6019,13 @@ class HiveDatabaseService {
         action: 'comment',
       );
       
-      print('✅ Haykır yorumu eklendi: $haykirId');
+      appLog('✅ Haykır yorumu eklendi: $haykirId');
       return {
         'success': true,
         'message': 'Yorum başarıyla eklendi',
       };
     } catch (e) {
-      print('❌ Haykır yorumu eklenirken hata: $e');
+      appLog('❌ Haykır yorumu eklenirken hata: $e');
       return {
         'success': false,
         'error': 'Yorum eklenirken hata oluştu: $e',
@@ -5781,7 +6054,7 @@ class HiveDatabaseService {
       
       return commentsList;
     } catch (e) {
-      print('❌ Haykır yorumları getirilirken hata: $e');
+      appLog('❌ Haykır yorumları getirilirken hata: $e');
       return [];
     }
   }
@@ -5806,7 +6079,7 @@ class HiveDatabaseService {
   }) {
     try {
       if (userEmail.isEmpty) {
-        print('⚠️ saveWidget: userEmail boş');
+        appLog('⚠️ saveWidget: userEmail boş');
         return;
       }
 
@@ -5846,9 +6119,9 @@ class HiveDatabaseService {
       });
 
       _savedWidgetsBox?.put(key, list);
-      print('✅ Widget kaydedildi: $label (userEmail: $userEmail)');
+      appLog('✅ Widget kaydedildi: $label');
     } catch (e) {
-      print('❌ Widget kaydedilirken hata: $e');
+      appLog('❌ Widget kaydedilirken hata: $e');
     }
   }
 
@@ -5877,7 +6150,7 @@ class HiveDatabaseService {
 
       return List<Map<String, dynamic>>.from(list);
     } catch (e) {
-      print('❌ Kaydedilen widget\'lar getirilirken hata: $e');
+      appLog('❌ Kaydedilen widget\'lar getirilirken hata: $e');
       return [];
     }
   }
@@ -5892,7 +6165,7 @@ class HiveDatabaseService {
   }) {
     try {
       if (userEmail.isEmpty) {
-        print('⚠️ deleteSavedWidget: userEmail boş');
+        appLog('⚠️ deleteSavedWidget: userEmail boş');
         return;
       }
 
@@ -5904,9 +6177,9 @@ class HiveDatabaseService {
 
       list.removeWhere((w) => w['widgetId']?.toString() == widgetId);
       _savedWidgetsBox?.put(key, list);
-      print('✅ Widget silindi: $widgetId (userEmail: $userEmail)');
+      appLog('✅ Widget silindi: $widgetId');
     } catch (e) {
-      print('❌ Widget silinirken hata: $e');
+      appLog('❌ Widget silinirken hata: $e');
     }
   }
 
@@ -5928,7 +6201,7 @@ class HiveDatabaseService {
 
       return list.any((w) => w['widgetId']?.toString() == widgetId);
     } catch (e) {
-      print('❌ Widget kayıt kontrolü yapılırken hata: $e');
+      appLog('❌ Widget kayıt kontrolü yapılırken hata: $e');
       return false;
     }
   }
@@ -5961,10 +6234,10 @@ class HiveDatabaseService {
       await _albumBox?.put(key, list);
 
       // ✅ Kalıcı olarak saklanıyor
-      print('✅ Albüm oluşturuldu: $albumId');
+      appLog('✅ Albüm oluşturuldu: $albumId');
       return albumId;
     } catch (e) {
-      print('❌ Albüm oluşturulurken hata: $e');
+      appLog('❌ Albüm oluşturulurken hata: $e');
       rethrow;
     }
   }
@@ -5985,7 +6258,7 @@ class HiveDatabaseService {
       return list.map((json) => AlbumModel.fromJson(json)).toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // En yeni önce
     } catch (e) {
-      print('❌ Albümler getirilirken hata: $e');
+      appLog('❌ Albümler getirilirken hata: $e');
       rethrow;
     }
   }
@@ -6024,10 +6297,10 @@ class HiveDatabaseService {
       await _albumBox?.put(key, list);
 
       // ✅ Kalıcı olarak saklanıyor
-      print('✅ Albüm güncellendi: $albumId');
+      appLog('✅ Albüm güncellendi: $albumId');
       return true;
     } catch (e) {
-      print('❌ Albüm güncellenirken hata: $e');
+      appLog('❌ Albüm güncellenirken hata: $e');
       return false;
     }
   }
@@ -6055,10 +6328,10 @@ class HiveDatabaseService {
       await deleteAllAlbumImages(albumId);
 
       // ✅ Kalıcı olarak saklanıyor
-      print('✅ Albüm silindi: $albumId');
+      appLog('✅ Albüm silindi: $albumId');
       return true;
     } catch (e) {
-      print('❌ Albüm silinirken hata: $e');
+      appLog('❌ Albüm silinirken hata: $e');
       return false;
     }
   }
@@ -6095,10 +6368,10 @@ class HiveDatabaseService {
       await _albumImageBox?.put(key, list);
 
       // ✅ Kalıcı olarak saklanıyor
-      print('✅ Resim albüme eklendi: $imageId');
+      appLog('✅ Resim albüme eklendi: $imageId');
       return imageId;
     } catch (e) {
-      print('❌ Resim albüme eklenirken hata: $e');
+      appLog('❌ Resim albüme eklenirken hata: $e');
       rethrow;
     }
   }
@@ -6119,7 +6392,7 @@ class HiveDatabaseService {
       return list.map((json) => AlbumImageModel.fromJson(json)).toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // En yeni önce
     } catch (e) {
-      print('❌ Albüm resimleri getirilirken hata: $e');
+      appLog('❌ Albüm resimleri getirilirken hata: $e');
       return [];
     }
   }
@@ -6144,10 +6417,10 @@ class HiveDatabaseService {
       await _albumImageBox?.put(key, list);
 
       // ✅ Kalıcı olarak saklanıyor
-      print('✅ Albüm resmi silindi: $imageId');
+      appLog('✅ Albüm resmi silindi: $imageId');
       return true;
     } catch (e) {
-      print('❌ Albüm resmi silinirken hata: $e');
+      appLog('❌ Albüm resmi silinirken hata: $e');
       return false;
     }
   }
@@ -6158,10 +6431,10 @@ class HiveDatabaseService {
       final key = albumId;
       await _albumImageBox?.delete(key);
       // ✅ Kalıcı olarak saklanıyor
-      print('✅ Albümdeki tüm resimler silindi: $albumId');
+      appLog('✅ Albümdeki tüm resimler silindi: $albumId');
       return true;
     } catch (e) {
-      print('❌ Albüm resimleri silinirken hata: $e');
+      appLog('❌ Albüm resimleri silinirken hata: $e');
       return false;
     }
   }
@@ -6204,10 +6477,10 @@ class HiveDatabaseService {
         );
       }
 
-      print('✅ Albüm kopyalandı: $albumId -> $newAlbumId');
+      appLog('✅ Albüm kopyalandı: $albumId -> $newAlbumId');
       return newAlbumId;
     } catch (e) {
-      print('❌ Albüm kopyalanırken hata: $e');
+      appLog('❌ Albüm kopyalanırken hata: $e');
       rethrow;
     }
   }

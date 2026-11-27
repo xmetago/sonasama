@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../services/hive_database_service.dart';
@@ -22,7 +23,8 @@ class TestNotificationsPage extends StatefulWidget {
 class _TestNotificationsPageState extends State<TestNotificationsPage> {
   List<Map<String, dynamic>> _bildirimler = [];
 
-  bool get _authorized => HiveDatabaseService.isAdmin(widget.userEmail);
+  bool get _authorized =>
+      kDebugMode && HiveDatabaseService.isAdmin(widget.userEmail);
 
   @override
   void initState() {

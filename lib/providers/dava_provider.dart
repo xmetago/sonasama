@@ -3,6 +3,7 @@ import '../services/dava_auto_assign_service.dart';
 import '../services/hive_database_service.dart';
 import '../services/offline_gift_queue.dart';
 import 'base_provider.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Dava yönetimi için provider
 class DavaProvider extends BaseProvider {
@@ -494,7 +495,7 @@ class DavaProvider extends BaseProvider {
       _rejectedDavalar = await HiveDatabaseService.getRejectedDavalar(_currentUserEmail ?? '');
       notifyListeners();
     } catch (e) {
-      print('Red edilen davalar yüklenirken hata: $e');
+      appLog('Red edilen davalar yüklenirken hata: $e');
       _rejectedDavalar = [];
     }
   }
@@ -513,14 +514,14 @@ class DavaProvider extends BaseProvider {
         final String? davaIdToRemove = dava['id']?.toString() ?? dava['davaId']?.toString();
         
         if (davaIdToRemove == null || davaIdToRemove.isEmpty) {
-          print('❌ [DavaProvider] acceptDava: Dava ID bulunamadı!');
+          appLog('❌ [DavaProvider] acceptDava: Dava ID bulunamadı!');
           return false;
         }
         
-        print('✅ [DavaProvider] acceptDava çağrıldı:');
-        print('   - Dava ID (kaldırılacak): $davaIdToRemove');
-        print('   - Dava Adı: ${dava['adi']}');
-        print('   - User Email: ${dava['userEmail']}');
+        appLog('✅ [DavaProvider] acceptDava çağrıldı:');
+        appLog('   - Dava ID (kaldırılacak): $davaIdToRemove');
+        appLog('   - Dava Adı: ${dava['adi']}');
+        appLog('   - User Email: ${dava['userEmail']}');
         
         // Gelen davalardan kaldır (hem id hem davaId ile kontrol et)
         final removedCount = _incomingDavalar.length;
@@ -530,7 +531,7 @@ class DavaProvider extends BaseProvider {
           return itemId == davaIdToRemove || itemDavaId == davaIdToRemove;
         });
         final newCount = _incomingDavalar.length;
-        print('   - Gelen davalardan kaldırıldı: ${removedCount - newCount} adet');
+        appLog('   - Gelen davalardan kaldırıldı: ${removedCount - newCount} adet');
         
         // Kabul edilen davalara ekle
         _acceptedDavalar.add(acceptedDava);
@@ -576,7 +577,7 @@ class DavaProvider extends BaseProvider {
       _acceptedDavalar = await HiveDatabaseService.getAcceptedDavalar(_currentUserEmail ?? '');
       notifyListeners();
     } catch (e) {
-      print('Kabul edilen davalar yüklenirken hata: $e');
+      appLog('Kabul edilen davalar yüklenirken hata: $e');
       _acceptedDavalar = [];
     }
   }
@@ -679,7 +680,7 @@ class DavaProvider extends BaseProvider {
           cezaText: cezaText,
           sealedAt: sealedAt,
         );
-        print('✅ [DavaProvider] Ceza kaydedildi ve dinleyicilere bildirildi');
+        appLog('✅ [DavaProvider] Ceza kaydedildi ve dinleyicilere bildirildi');
         // Ceza kaydedildikten sonra tüm dinleyicilere bildir
         notifyListeners();
         return true;
@@ -703,7 +704,7 @@ class DavaProvider extends BaseProvider {
           userEmail: userEmail,
           expenses: masraflar,
         );
-        print('✅ [DavaProvider] Masraf kaydedildi ve dinleyicilere bildirildi');
+        appLog('✅ [DavaProvider] Masraf kaydedildi ve dinleyicilere bildirildi');
         // Masraf kaydedildikten sonra tüm dinleyicilere bildir
         notifyListeners();
         return true;

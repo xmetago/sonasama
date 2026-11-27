@@ -6,6 +6,7 @@ import '../models/evidence_model.dart';
 import '../screens/delil_detay_page.dart';
 import '../theme/seyir_tokens.dart';
 import 'delil_surface.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Modern ve yeniden kullanılabilir Delil Görüntüleme Widget'ı
 /// Hem Seyir Defteri hem de Yargıla sayfasında kullanılabilir
@@ -98,10 +99,10 @@ class _EvidenceViewerWidgetState extends State<EvidenceViewerWidget> {
       
       // Sadece sorun varsa log
       if (counts.values.every((count) => count == 0)) {
-        print('⚠️ DavaId: ${widget.davaId} - Delil bulunamadı');
+        appLog('⚠️ DavaId: ${widget.davaId} - Delil bulunamadı');
       }
     } catch (e) {
-      print('❌ Delil yükleme hatası: $e');
+      appLog('❌ Delil yükleme hatası: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -423,10 +424,10 @@ class _EvidenceListPageState extends State<_EvidenceListPage> {
       
       // Sadece sorun varsa log
       if (filtered.isEmpty && all.isNotEmpty) {
-        print('⚠️ ${widget.typeInfo.label}: DavaId eşleşmedi (${widget.davaId})');
+        appLog('⚠️ ${widget.typeInfo.label}: DavaId eşleşmedi (${widget.davaId})');
       }
     } catch (e) {
-      print('❌ Hata: $e');
+      appLog('❌ Hata: $e');
       if (!mounted) return;
       setState(() {
         _items = [];

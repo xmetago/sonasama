@@ -11,6 +11,7 @@ import '../services/hive_database_service.dart';
 import '../models/album_model.dart';
 import 'album_goruntule_page.dart';
 import 'album_olustur_page.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// ✅ Step-1: Albüm listesi sayfası
 /// ✅ Veritabanına kaydediliyor
@@ -84,7 +85,7 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
       _allAlbums = HiveDatabaseService.getAlbums(email);
       _applyFilters();
     } catch (e) {
-      print('❌ Albümler yüklenirken hata: $e');
+      appLog('❌ Albümler yüklenirken hata: $e');
       if (!mounted) return;
       setState(() {
         _allAlbums = [];
@@ -189,7 +190,7 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
         if (bytes.isEmpty) return null;
         return MemoryImage(bytes) as ImageProvider<Object>;
       } catch (e) {
-        print('⚠️ Base64 decode hatası: $e');
+        appLog('⚠️ Base64 decode hatası: $e');
         return null;
       }
     }
@@ -308,7 +309,7 @@ class _AlbumlerListePageState extends State<AlbumlerListePage> {
         );
         successCount++;
       } catch (e) {
-        print('❌ Albüm silinirken hata: $e');
+        appLog('❌ Albüm silinirken hata: $e');
         failCount++;
       }
     }

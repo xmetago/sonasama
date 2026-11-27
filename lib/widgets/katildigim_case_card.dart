@@ -20,6 +20,7 @@ import 'countdown_timer_widget.dart';
 import 'expandable_comment_text.dart';
 import 'masraf_onay_panel.dart';
 import 'rol_hukum_kartlari_section.dart';
+import 'package:its19/utils/app_logger.dart';
 
 Map<String, Map<String, dynamic>> _mergeKatildigimHukumlerGroupedMaps(
   List<Map<String, Map<String, dynamic>>> parts,
@@ -120,6 +121,39 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
   final Map<String, String> _rolMasraflari = <String, String>{};
   HukumSentiment? _selectedSentiment;
 
+  bool _motionReady = false;
+
+  void _setLoop(AnimationController? controller, bool active, {bool reverse = false}) {
+    if (controller == null) return;
+    if (active) {
+      if (!controller.isAnimating) {
+        controller.repeat(reverse: reverse);
+      }
+    } else if (controller.isAnimating) {
+      controller.stop();
+    }
+  }
+
+  void _syncAttentionAnimations() {
+    if (!_motionReady) return;
+    final cezaActive = _yargicCezaText != null &&
+        _yargicCezaText!.isNotEmpty &&
+        !_cezaOnaylandi;
+    final masrafActive = _yargicMasraflar != null &&
+        _yargicMasraflar!.isNotEmpty &&
+        !_masrafOnaylandi;
+    _setLoop(_cezaPulseController, cezaActive, reverse: true);
+    _setLoop(_cezaGlowController, cezaActive);
+    _setLoop(_masrafPulseController, masrafActive, reverse: true);
+    _setLoop(_masrafGlowController, masrafActive);
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _syncAttentionAnimations();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -134,12 +168,13 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
       CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
     );
     _animationController.forward();
+    _motionReady = true;
     
-    // Ceza butonu için pulse animasyonu
+    // Ceza butonu için pulse animasyonu. Yalnızca onay beklerken döner.
     _cezaPulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
-    )..repeat(reverse: true);
+    );
     _cezaPulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _cezaPulseController!, curve: Curves.easeInOut),
     );
@@ -148,7 +183,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     _cezaGlowController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
-    )..repeat();
+    );
     _cezaGlowAnimation = Tween<double>(begin: 0.3, end: 0.8).animate(
       CurvedAnimation(parent: _cezaGlowController!, curve: Curves.easeInOut),
     );
@@ -157,7 +192,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     _masrafPulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
-    )..repeat(reverse: true);
+    );
     _masrafPulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _masrafPulseController!, curve: Curves.easeInOut),
     );
@@ -166,7 +201,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
     _masrafGlowController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
-    )..repeat();
+    );
     _masrafGlowAnimation = Tween<double>(begin: 0.3, end: 0.8).animate(
       CurvedAnimation(parent: _masrafGlowController!, curve: Curves.easeInOut),
     );
@@ -180,7 +215,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
           final davaProvider = Provider.of<DavaProvider>(context, listen: false);
           _lastHukumUpdateVersion = davaProvider.hukumUpdateVersion;
         } catch (e) {
-          print('⚠️ [FiveCardCaseInformation] Provider bulunamadı: $e');
+          appLog('⚠️ [FiveCardCaseInformation] Provider bulunamadı: $e');
         }
       }
     });
@@ -427,7 +462,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
         });
       }
     } catch (e) {
-      print('❌ [FiveCardCaseInformation] Konsensus yüklenirken hata: $e');
+      appLog('❌ [FiveCardCaseInformation] Konsensus yüklenirken hata: $e');
       if (mounted) {
         setState(() {
           _isLoadingConsensus = false;
@@ -1631,7 +1666,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
         widget.onRefresh!();
       }
     } catch (e) {
-      print('❌ Hızlı aksiyon hatası: $e');
+      appLog('❌ Hızlı aksiyon hatası: $e');
       _showActionSnack('❌ İşlem sırasında hata oluştu');
     }
   }
@@ -1785,7 +1820,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
           },
         );
       },
-    );
+    ).whenComplete(yorumController.dispose);
   }
 
   /// Mevcut hükümleri yükle ([ActigimDavaCard] / [ModernHukumCard] ile uyumlu birleştirme)
@@ -1943,7 +1978,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
         _selectedSentiment = _rolSentimentleri[normalizedUserRole];
       });
     } catch (e) {
-      print('❌ [FiveCardCaseInformation] Hükümler yüklenirken hata: $e');
+      appLog('❌ [FiveCardCaseInformation] Hükümler yüklenirken hata: $e');
     }
   }
 
@@ -2013,7 +2048,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation>
         _effectiveHediyeKaynak = hediyeKaynak.isNotEmpty ? hediyeKaynak : null;
       });
     } catch (e) {
-      print('❌ [FiveCardCaseInformation] Ceza/masraf/hediye yüklenirken hata: $e');
+      appLog('❌ [FiveCardCaseInformation] Ceza/masraf/hediye yüklenirken hata: $e');
       if (mounted) {
         setState(() {
           _yargicCezaText = null;

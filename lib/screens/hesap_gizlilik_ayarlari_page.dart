@@ -3,7 +3,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'dart:convert';
+import '../main.dart';
 import '../providers/auth_provider.dart';
+import '../services/account_deletion_service.dart';
 import '../services/hive_database_service.dart';
 import '../models/settings_model.dart';
 import '../theme/app_theme.dart';
@@ -55,6 +57,7 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
   String? _passwordFeedback;
   bool _passwordOk = false;
   bool _passwordBusy = false;
+  bool _deletingAccount = false;
 
   static const List<String> _languages = ['Türkçe', 'English'];
 
@@ -554,10 +557,182 @@ class _HesapGizlilikAyarlariPageState extends State<HesapGizlilikAyarlariPage> {
                 style: TextStyle(fontSize: SeyirTokens.typeTitle),
               ),
             ),
+            const SizedBox(height: SeyirTokens.space6),
+            _deleteAccountSection(palette),
           ],
         ),
       ),
     );
+  }
+
+  Widget _deleteAccountSection(SeyirPalette palette) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(SeyirTokens.space4),
+      decoration: BoxDecoration(
+        color: SeyirTokens.reject.withValues(alpha: palette.isDark ? 0.16 : 0.08),
+        borderRadius: SeyirTokens.radiusMdAll,
+        border: Border.all(color: SeyirTokens.reject.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'HESABI SİL',
+            style: palette.title(color: SeyirTokens.reject),
+          ),
+          const SizedBox(height: SeyirTokens.space2),
+          Text(
+            'Kaydınız, davalarınız, delilleriniz, mesajlarınız, arkadaşlıklarınız ve tercihleriniz silinir. Bu işlem geri alınamaz.',
+            style: palette.body(color: palette.textSecondary),
+          ),
+          const SizedBox(height: SeyirTokens.space3),
+          OutlinedButton(
+            key: const Key('delete-account'),
+            onPressed: _deletingAccount ? null : _confirmDeleteAccount,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: SeyirTokens.reject,
+              side: const BorderSide(color: SeyirTokens.reject),
+              minimumSize: const Size(double.infinity, SeyirTokens.tapTarget),
+            ),
+            child: _deletingAccount
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text(
+                    'Hesabımı sil',
+                    style: TextStyle(fontSize: SeyirTokens.typeTitle),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final email = widget.userEmail?.trim() ?? '';
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hesabı silmek için oturum açın.')),
+      );
+      return;
+    }
+
+    final emailController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        var errorText = '';
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final palette = SeyirPalette.of(context);
+            return AlertDialog(
+              title: Text(
+                'Hesabı sil',
+                style: palette.title(color: SeyirTokens.reject),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Onaylamak için e-posta adresinizi yazın. Bu işlem geri alınamaz.',
+                    style: palette.body(),
+                  ),
+                  const SizedBox(height: SeyirTokens.space3),
+                  TextField(
+                    key: const Key('delete-account-email'),
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autocorrect: false,
+                    decoration: InputDecoration(
+                      hintText: 'E-posta adresiniz',
+                      errorText: errorText.isEmpty ? null : errorText,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Vazgeç'),
+                ),
+                TextButton(
+                  key: const Key('delete-account-confirm'),
+                  onPressed: () {
+                    final typed = emailController.text.trim().toLowerCase();
+                    if (typed != email.toLowerCase()) {
+                      setDialogState(() {
+                        errorText = 'E-posta adresi eşleşmiyor.';
+                      });
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop(true);
+                  },
+                  child: const Text(
+                    'Hesabımı sil',
+                    style: TextStyle(color: SeyirTokens.reject),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    emailController.dispose();
+    if (confirmed != true || !mounted) return;
+
+    final user = HiveDatabaseService.getRegistrationByEmail(email);
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hesap kaydı bulunamadı.')),
+      );
+      return;
+    }
+
+    setState(() => _deletingAccount = true);
+    try {
+      final result = await AccountDeletionService.deleteAccount(
+        userId: user.id,
+        email: user.email,
+      );
+      if (!mounted) return;
+      context.read<AuthProvider>().logout();
+      if (result.remoteErrors.isNotEmpty) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Hesap silindi'),
+            content: const Text(
+              'Yerel hesabınız silindi. Bazı sohbet veya dosya kayıtları silinemedi.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Tamam'),
+              ),
+            ],
+          ),
+        );
+      }
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const WhoBoomLoginPage()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deletingAccount = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hesap silinemedi. Lütfen tekrar deneyin.'),
+          backgroundColor: SeyirTokens.reject,
+        ),
+      );
+    }
   }
 
   Widget _languageField(SeyirPalette palette) {

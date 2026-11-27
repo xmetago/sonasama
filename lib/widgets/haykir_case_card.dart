@@ -8,6 +8,7 @@ import '../services/hive_database_service.dart';
 import '../theme/seyir_tokens.dart';
 import 'expandable_comment_text.dart';
 import 'shared/app_snack.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Kart üzerindeki HAYKIR butonu: haykırışı seyir defterine yayınlar.
 Future<bool> publishHaykirToHomeFeed({
@@ -59,8 +60,8 @@ Future<bool> publishHaykirToHomeFeed({
 
     return published;
   } catch (e, stackTrace) {
-    print('❌ Haykırış seyir defterine eklenirken hata: $e');
-    print('Stack trace: $stackTrace');
+    appLog('❌ Haykırış seyir defterine eklenirken hata: $e');
+    appLog('Stack trace: $stackTrace');
 
     try {
       final postId = 'haykir_$haykirId';
@@ -93,7 +94,7 @@ Future<bool> publishHaykirToHomeFeed({
       );
       return true;
     } catch (e2) {
-      print('❌ Fallback yayınlama başarısız: $e2');
+      appLog('❌ Fallback yayınlama başarısız: $e2');
       return false;
     }
   }
@@ -1394,7 +1395,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
         };
         await davaProvider.addHomeFeedPost(haykirPostData);
       } catch (e) {
-        print('⚠️ Retweet seyir defterine eklenirken hata: $e');
+        appLog('⚠️ Retweet seyir defterine eklenirken hata: $e');
       }
       
       // ✅ Adım 3: Seçeneğe göre işlem yap
@@ -1438,7 +1439,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
           'yorumlar': <Map<String, dynamic>>[],
         };
         HiveDatabaseService.addInvitation(widget.userEmail!, currentUserInvitation);
-        print('✅ Kendine davet gönderildi: ${widget.userEmail}');
+        appLog('✅ Kendine davet gönderildi: ${widget.userEmail}');
 
         // ✅ Haykır başlatan kişiyi bul (authorEmail veya userEmail)
         final authorEmail = haykirData['userEmail']?.toString() ?? '';
@@ -1485,7 +1486,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
           
           // ✅ Haykır başlatan kişiye davet gönder
           HiveDatabaseService.addInvitation(authorEmail, authorInvitation);
-          print('✅ Haykır başlatan kişiye davet gönderildi: $authorEmail (Grup19 listesinde: $authorAlreadyInList)');
+          appLog('✅ Haykır başlatan kişiye davet gönderildi: $authorEmail (Grup19 listesinde: $authorAlreadyInList)');
         }
 
         // ✅ Haykır davetlerini kaydet (davet gönderen kişi dahil)
@@ -1527,7 +1528,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
         }
 
         final totalInvitations = invitationRecipients.length + (authorEmail.isNotEmpty && authorEmail != widget.userEmail && !authorAlreadyInList ? 1 : 0);
-        print('✅ Haykır retweet: Grup19 için ${invitationRecipients.length} kişiye + haykır başlatan kişiye davet gönderildi (Toplam: $totalInvitations)');
+        appLog('✅ Haykır retweet: Grup19 için ${invitationRecipients.length} kişiye + haykır başlatan kişiye davet gönderildi (Toplam: $totalInvitations)');
 
         // ✅ Grup-19 ile retweet yapıldığında kalıcı hale getir (geri alınamaz)
         try {
@@ -1536,10 +1537,10 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
             grup19Retweets.add(widget.userEmail!);
             haykirData['grup19Retweets'] = grup19Retweets;
             await HiveDatabaseService.updateHaykir(haykirId, haykirData);
-            print('✅ Grup-19 retweet kalıcı olarak işaretlendi: ${widget.userEmail}');
+            appLog('✅ Grup-19 retweet kalıcı olarak işaretlendi: ${widget.userEmail}');
           }
         } catch (e) {
-          print('⚠️ Grup-19 retweet kalıcı işaretleme hatası: $e');
+          appLog('⚠️ Grup-19 retweet kalıcı işaretleme hatası: $e');
         }
 
         if (mounted) {
@@ -1555,10 +1556,10 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
             retweetDisabledUsers.add(widget.userEmail!);
             haykirData['retweetDisabledUsers'] = retweetDisabledUsers;
             await HiveDatabaseService.updateHaykir(haykirId, haykirData);
-            print('✅ Retweet devre dışı bırakıldı: ${widget.userEmail}');
+            appLog('✅ Retweet devre dışı bırakıldı: ${widget.userEmail}');
           }
         } catch (e) {
-          print('⚠️ Retweet devre dışı bırakma hatası: $e');
+          appLog('⚠️ Retweet devre dışı bırakma hatası: $e');
         }
         
         if (mounted) {
@@ -1572,7 +1573,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
         isRetweeted = true;
       });
     } catch (e) {
-      print('❌ Haykır retweet hatası: $e');
+      appLog('❌ Haykır retweet hatası: $e');
       if (mounted) {
         showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }
@@ -1619,10 +1620,10 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
         
         if (retweetPost.isNotEmpty && retweetPost['id'] != null) {
           await davaProvider.removeHomeFeedPost(retweetPost['id']);
-          print('✅ Retweet post seyir defterinden kaldırıldı: ${retweetPost['id']}');
+          appLog('✅ Retweet post seyir defterinden kaldırıldı: ${retweetPost['id']}');
         }
       } catch (e) {
-        print('⚠️ Retweet post kaldırılırken hata: $e');
+        appLog('⚠️ Retweet post kaldırılırken hata: $e');
       }
       
       // ✅ Adım 3: State'i güncelle
@@ -1635,7 +1636,7 @@ class _FiveCardCaseInformationState extends State<FiveCardCaseInformation> with 
         showAppSnack(context, '✅ Retweet geri alındı', backgroundColor: Colors.orange, duration: Duration(seconds: 2));
       }
     } catch (e) {
-      print('❌ Retweet geri alma hatası: $e');
+      appLog('❌ Retweet geri alma hatası: $e');
       if (mounted) {
         showAppSnack(context, '❌ Hata: $e', backgroundColor: Colors.red);
       }

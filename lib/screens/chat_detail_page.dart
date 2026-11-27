@@ -18,6 +18,7 @@ import '../theme/seyir_tokens.dart';
 import '../widgets/delil_surface.dart';
 import '../widgets/simple_emoji_picker.dart';
 import '../widgets/audio_message_player.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class ChatDetailPage extends StatefulWidget {
   final String receiverId;
@@ -171,7 +172,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       await ChatService.markConversationAsRead(currentUser.id, widget.receiverId);
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Konuşma okundu işaretlenemedi: $e');
+        appLog('Konuşma okundu işaretlenemedi: $e');
       }
     }
   }
@@ -190,7 +191,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       await ChatService.markConversationAsRead(currentUser.id, widget.receiverId);
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Mesaj yenileme hatası: $e');
+        appLog('Mesaj yenileme hatası: $e');
       }
       try {
         final fallback = ChatService.getMessagesSync(currentUser.id, widget.receiverId);
@@ -233,7 +234,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       },
       onError: (Object e) {
         if (kDebugMode) {
-          debugPrint('Mesaj stream hatası: $e');
+          appLog('Mesaj stream hatası: $e');
         }
         if (mounted) {
           setState(() {
@@ -448,7 +449,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     types.PreviewData previewData,
   ) {
     if (kDebugMode) {
-      debugPrint('Link önizlemesi alındı: ${previewData.link}');
+      appLog('Link önizlemesi alındı: ${previewData.link}');
     }
   }
 
@@ -498,7 +499,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Ses kaydı başlatılamadı: $e');
+        appLog('Ses kaydı başlatılamadı: $e');
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -573,7 +574,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         );
       } catch (e) {
         if (kDebugMode) {
-          debugPrint('Ses yükleme hatası: $e');
+          appLog('Ses yükleme hatası: $e');
         }
       }
 
@@ -613,7 +614,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Ses kaydı gönderilemedi: $e');
+        appLog('Ses kaydı gönderilemedi: $e');
       }
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();

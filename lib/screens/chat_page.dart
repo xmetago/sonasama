@@ -14,6 +14,7 @@ import '../services/chat_service.dart';
 import '../models/registration_model.dart';
 import 'chat_detail_page.dart';
 import 'friendship_management_page.dart';
+import 'package:its19/utils/app_logger.dart';
 
 class Friend {
   final String name;
@@ -53,6 +54,12 @@ class _ChatPageState extends State<ChatPage> {
   List<Friend> friends = [];
 
   List<Friend> get activeFriends => friends.where((friend) => friend.isActive).toList();
+
+  @override
+  void dispose() {
+    _refreshController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -169,7 +176,7 @@ class _ChatPageState extends State<ChatPage> {
           }
         } catch (e) {
           // Kullanıcı bulunamadı, devam et
-          print('⚠️ Kullanıcı bulunamadı: $userId');
+          appLog('⚠️ Kullanıcı bulunamadı: $userId');
         }
       }
 
@@ -180,7 +187,7 @@ class _ChatPageState extends State<ChatPage> {
         return 0;
       });
 
-      print('✅ Grup-19 kategorisinden ${friends.length} kullanıcı yüklendi');
+      appLog('✅ Grup-19 kategorisinden ${friends.length} kullanıcı yüklendi');
       
       setState(() {
         _isLoading = false;
@@ -191,7 +198,7 @@ class _ChatPageState extends State<ChatPage> {
         _refreshController.refreshCompleted();
       }
     } catch (e) {
-      print('❌ Arkadaşlar yüklenirken hata: $e');
+      appLog('❌ Arkadaşlar yüklenirken hata: $e');
       setState(() {
         _isLoading = false;
         friends = [];

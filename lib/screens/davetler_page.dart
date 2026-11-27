@@ -11,6 +11,7 @@ import '../theme/seyir_tokens.dart';
 import './haykir_page.dart'; // ✅ HAYKIR sayfasına yönlendirme için
 import '../widgets/modern_dava_card.dart';
 import '../widgets/shared/app_snack.dart';
+import 'package:its19/utils/app_logger.dart';
 export '../widgets/davet_card.dart';
 export '../widgets/modern_dava_card.dart';
 
@@ -50,9 +51,9 @@ class _DavetlerPageState extends State<DavetlerPage> {
   // ignore: unused_element
   void _loadDavetler() {
     if (widget.userEmail != null) {
-      print('DEBUG: DavetlerPage - Loading invitations for ${widget.userEmail}');
+      appLog('DEBUG: DavetlerPage - Loading invitations for ${widget.userEmail}');
       final invitations = HiveDatabaseService.getInvitations(widget.userEmail!);
-      print('DEBUG: DavetlerPage - Loaded ${invitations.length} invitations');
+      appLog('DEBUG: DavetlerPage - Loaded ${invitations.length} invitations');
       
       // Davetleri kontrol et ve eksik alanları doldur
       final processedInvitations = invitations.map((invitation) {
@@ -80,7 +81,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
         davetler = processedInvitations;
       });
     } else {
-      print('DEBUG: DavetlerPage - userEmail is null');
+      appLog('DEBUG: DavetlerPage - userEmail is null');
     }
   }
 
@@ -147,9 +148,9 @@ class _DavetlerPageState extends State<DavetlerPage> {
       if (widget.forceLoadError) {
         throw Exception('Davetler yüklenemedi');
       }
-      print('DEBUG: DavetlerPage - Loading ACTIVE invitations for $email');
+      appLog('DEBUG: DavetlerPage - Loading ACTIVE invitations');
       final invitations = HiveDatabaseService.getActiveInvitations(email);
-      print('DEBUG: DavetlerPage - Loaded ${invitations.length} ACTIVE invitations');
+      appLog('DEBUG: DavetlerPage - Loaded ${invitations.length} ACTIVE invitations');
 
       final processedInvitations = invitations.map((invitation) {
         // Güvenli tip dönüşümü
@@ -176,7 +177,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
         _loadError = null;
       });
     } catch (e) {
-      print('DEBUG: DavetlerPage - load failed: $e');
+      appLog('DEBUG: DavetlerPage - load failed: $e');
       setState(() {
         davetler = [];
         _needsLogin = false;
@@ -428,11 +429,11 @@ class _DavetlerPageState extends State<DavetlerPage> {
               CommentUtils.countAllComments(
                   updatedPost['payload']['yorumlar']);
           await davaProvider.updateHomeFeedPost(postId, updatedPost);
-          print('✅ Yorum seyir defterinde de güncellendi: $postId');
+          appLog('✅ Yorum seyir defterinde de güncellendi: $postId');
         }
       }
     } catch (e) {
-      print('⚠️ Seyir defteri güncelleme hatası: $e');
+      appLog('⚠️ Seyir defteri güncelleme hatası: $e');
     }
 
     if (!mounted) return;
@@ -486,7 +487,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
               
               showAppSnack(context, '🔄 HAYKIR paylaşımı geri alındı: ${davet['davaAdi'] ?? davet['haykirAdi'] ?? 'HAYKIR'}', backgroundColor: Colors.grey, duration: const Duration(seconds: 2));
             } catch (e) {
-              print('⚠️ HAYKIR retweet geri alma hatası: $e');
+              appLog('⚠️ HAYKIR retweet geri alma hatası: $e');
             }
           } else {
             // ✅ Retweet yapılıyor - Seyir Defteri'ne ekle
@@ -518,7 +519,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
           }
         }
       } catch (e) {
-        print('❌ HAYKIR retweet hatası: $e');
+        appLog('❌ HAYKIR retweet hatası: $e');
         showAppSnack(context, '❌ HAYKIR paylaşım hatası: $e', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
       }
       return;
@@ -536,7 +537,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
           // ✅ Retweet geri alınıyor - Seyir Defteri'nden kaldır
           if (existing != null) {
             await davaProvider.removeHomeFeedPost(postId);
-            print('✅ Seyir Defteri\'nden kaldırıldı: $postId');
+            appLog('✅ Seyir Defteri\'nden kaldırıldı: $postId');
           }
           
           // ✅ Katıldığım Davalar sayfasından da kaldır
@@ -558,11 +559,11 @@ class _DavetlerPageState extends State<DavetlerPage> {
           if (existing != null) {
             // Mevcut paylaşımı güncelle
             await davaProvider.updateHomeFeedPost(postId, postData);
-            print('✅ Seyir Defteri güncellendi: $postId');
+            appLog('✅ Seyir Defteri güncellendi: $postId');
           } else {
             // Yeni paylaşım ekle
             await davaProvider.addHomeFeedPost(postData);
-            print('✅ Seyir Defteri\'ne eklendi: $postId');
+            appLog('✅ Seyir Defteri\'ne eklendi: $postId');
           }
           
           // ✅ YENİ: Katıldığım Davalar sayfasına da ekle
@@ -571,11 +572,11 @@ class _DavetlerPageState extends State<DavetlerPage> {
           showAppSnack(context, '🔄 Davet Seyir Defteri\'nde paylaşıldı ve Katıldığım Davalar\'a eklendi: ${davet['davaAdi']}', backgroundColor: const Color(0xFF10B981), duration: const Duration(seconds: 3));
         }
       } else {
-        print('⚠️ Dava ID bulunamadı, Seyir Defteri\'ne eklenemedi');
+        appLog('⚠️ Dava ID bulunamadı, Seyir Defteri\'ne eklenemedi');
         showAppSnack(context, '⚠️ Dava ID bulunamadı, paylaşılamadı', backgroundColor: Colors.orange, duration: Duration(seconds: 2));
       }
     } catch (e) {
-      print('❌ Seyir Defteri paylaşım hatası: $e');
+      appLog('❌ Seyir Defteri paylaşım hatası: $e');
       showAppSnack(context, '❌ Paylaşım hatası: $e', backgroundColor: Colors.red, duration: const Duration(seconds: 3));
     }
   }
@@ -604,13 +605,13 @@ class _DavetlerPageState extends State<DavetlerPage> {
         // HiveDatabaseService'e ekle
         await HiveDatabaseService.addKatildigimHaykir(widget.userEmail!, katildigimHaykirData);
         
-        print('✅ Katıldığım HAYKIR\'lar\'a eklendi: $haykirId');
+        appLog('✅ Katıldığım HAYKIR\'lar\'a eklendi: $haykirId');
         
       } else {
-        print('⚠️ HAYKIR ID veya userEmail bulunamadı, Katıldığım HAYKIR\'lar\'a eklenemedi');
+        appLog('⚠️ HAYKIR ID veya userEmail bulunamadı, Katıldığım HAYKIR\'lar\'a eklenemedi');
       }
     } catch (e) {
-      print('❌ Katıldığım HAYKIR\'lar\'a eklenirken hata: $e');
+      appLog('❌ Katıldığım HAYKIR\'lar\'a eklenirken hata: $e');
     }
   }
 
@@ -644,13 +645,13 @@ class _DavetlerPageState extends State<DavetlerPage> {
         // HiveDatabaseService'e ekle
         await HiveDatabaseService.addKatildigimDava(widget.userEmail!, katildigimDavaData);
         
-        print('✅ Katıldığım Davalar\'a eklendi: $davaId');
+        appLog('✅ Katıldığım Davalar\'a eklendi: $davaId');
         
       } else {
-        print('⚠️ Dava ID veya userEmail bulunamadı, Katıldığım Davalar\'a eklenemedi');
+        appLog('⚠️ Dava ID veya userEmail bulunamadı, Katıldığım Davalar\'a eklenemedi');
       }
     } catch (e) {
-      print('❌ Katıldığım Davalar\'a eklenirken hata: $e');
+      appLog('❌ Katıldığım Davalar\'a eklenirken hata: $e');
     }
   }
 
@@ -694,7 +695,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
         }
       }
     } catch (e) {
-      print('⚠️ Seyir defteri güncelleme hatası: $e');
+      appLog('⚠️ Seyir defteri güncelleme hatası: $e');
     }
     
     showAppSnack(context, '👍 Davet beğenildi: ${davet['davaAdi']}', backgroundColor: Colors.orange, duration: const Duration(seconds: 2));
@@ -739,7 +740,7 @@ class _DavetlerPageState extends State<DavetlerPage> {
         }
       }
     } catch (e) {
-      print('⚠️ Seyir defteri güncelleme hatası: $e');
+      appLog('⚠️ Seyir defteri güncelleme hatası: $e');
     }
     
     showAppSnack(context, '👎 Davet beğenilmedi: ${davet['davaAdi']}', backgroundColor: Colors.red, duration: const Duration(seconds: 2));

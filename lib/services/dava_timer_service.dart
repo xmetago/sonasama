@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../theme/seyir_tokens.dart';
 import 'evidence_service.dart';
 import 'hive_database_service.dart';
+import 'package:its19/utils/app_logger.dart';
 
 /// Dava yaşam döngüsü durumları (depolama / API stringleri).
 abstract class DavaLifecycleStatuses {
@@ -224,7 +225,7 @@ class DavaTimerService {
       await _evidenceService.initialize();
       await _evidenceService.applyDefaultLikesForUsers(davaId, userEmails);
     } catch (e) {
-      print('❌ Süresi dolanlar için varsayılan delil beğenisi uygulanamadı: $e');
+      appLog('❌ Süresi dolanlar için varsayılan delil beğenisi uygulanamadı: $e');
     }
   }
 

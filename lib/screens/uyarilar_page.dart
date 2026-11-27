@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import '../services/hive_database_service.dart';
@@ -213,7 +214,8 @@ class _UyarilarPageState extends State<UyarilarPage> {
     final palette = SeyirPalette.of(context);
     final orange = _orange(palette);
     final device = _deviceAccent(palette);
-    final showTestPage = HiveDatabaseService.isAdmin(widget.userEmail);
+    final showTestPage =
+        kDebugMode && HiveDatabaseService.isAdmin(widget.userEmail);
     final uygulama = _aktifTab == 'uygulama';
 
     return Scaffold(
